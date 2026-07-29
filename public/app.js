@@ -6,6 +6,7 @@ const state = {
   proposals: [],
   settings: { signatureName: "", favorites: { templates: [], commands: [] } },
   activeView: "templates",
+  recentItems: [],
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -61,6 +62,263 @@ function roleLabel(role) {
   return { employee: "Mitarbeiter", editor: "Redakteur", admin: "Administrator" }[role] || role;
 }
 
+
+const DIAGNOSTICS = {
+  "Netzwerk / Internet": [
+    "IP-Konfiguration dokumentiert",
+    "Gateway erreichbar",
+    "DNS-Auflösung geprüft",
+    "Ping zum Ziel geprüft",
+    "VPN/Proxy geprüft",
+    "Netzwerktreiber geprüft",
+  ],
+  "VPN": [
+    "Internetverbindung geprüft",
+    "VPN-Profil geprüft",
+    "Anmeldedaten geprüft",
+    "MFA geprüft",
+    "Client-Version geprüft",
+    "VPN-Logs gesichert",
+  ],
+  "Drucker": [
+    "Drucker erreichbar",
+    "Warteschlange geprüft",
+    "Spooler neu gestartet",
+    "Treiber geprüft",
+    "Testseite gedruckt",
+    "Berechtigungen geprüft",
+  ],
+  "Windows / Software": [
+    "Fehler reproduziert",
+    "Ereignisanzeige geprüft",
+    "Dienststatus geprüft",
+    "Updates geprüft",
+    "Reparatur/Neuinstallation getestet",
+    "Benutzerprofil gegengeprüft",
+  ],
+  "Anmeldung / Berechtigung": [
+    "Kontostatus geprüft",
+    "Gruppenmitgliedschaften geprüft",
+    "Kennwort/Sperre geprüft",
+    "Gruppenrichtlinien aktualisiert",
+    "Anmeldung an anderem Gerät getestet",
+    "Replikation berücksichtigt",
+  ],
+  "Hardware": [
+    "Kabel/Strom geprüft",
+    "Geräte-Manager geprüft",
+    "Treiber/Firmware geprüft",
+    "Diagnosetest durchgeführt",
+    "Komponente gegengeprüft",
+    "Inventarnummer dokumentiert",
+  ],
+};
+
+function recentStorageKey() {
+  return `helpdesk_recent_${state.user?.id ?? "anonymous"}`;
+}
+
+function loadRecentItems() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(recentStorageKey()) || "[]");
+    state.recentItems = Array.isArray(parsed) ? parsed.slice(0, 8) : [];
+  } catch {
+    state.recentItems = [];
+  }
+  renderQuickbar();
+}
+
+function saveRecentItems() {
+  localStorage.setItem(recentStorageKey(), JSON.stringify(state.recentItems));
+}
+
+function addRecentItem(type, id, label) {
+  state.recentItems = [
+    { type, id, label },
+    ...state.recentItems.filter((item) => !(item.type === type && item.id === id)),
+  ].slice(0, 8);
+  saveRecentItems();
+  renderQuickbar();
+}
+
+function renderQuickbar() {
+  const container = $("#quickbar-items");
+  if (!container) return;
+
+  container.innerHTML = state.recentItems.length
+    ? state.recentItems.map((item) => `
+      <button
+        class="quick-item"
+        type="button"
+        data-recent-type="${escapeHtml(item.type)}"
+        data-recent-id="${Number(item.id)}"
+      >${escapeHtml(item.label)}</button>
+    `).join("")
+    : '<span class="quick-empty">Noch keine zuletzt verwendeten Inhalte.</span>';
+}
+
+function renderDiagnosticChecklist() {
+  const selectedType = $("#diag-type").value;
+  const items = DIAGNOSTICS[selectedType] || [];
+  $("#diag-checklist").innerHTML = items.map((item, index) => `
+    <label class="checklist-item">
+      <input type="checkbox" value="${escapeHtml(item)}" id="diag-step-${index}">
+      <span>${escapeHtml(item)}</span>
+    </label>
+  `).join("");
+}
+
+function initializeDiagnostics() {
+  $("#diag-type").innerHTML = Object.keys(DIAGNOSTICS)
+    .map((name) => `<option>${escapeHtml(name)}</option>`)
+    .join("");
+  renderDiagnosticChecklist();
+}
+
+function generateDiagnosticText() {
+  const selectedSteps = [...$("#diag-checklist").querySelectorAll("input:checked")]
+    .map((input) => `✓ ${input.value}`);
+
+  const lines = [
+    `Diagnose: ${$("#diag-type").value}`,
+    $("#diag-ticket").value.trim() ? `Ticket: ${$("#diag-ticket").value.trim()}` : "",
+    $("#diag-user").value.trim() ? `Benutzer: ${$("#diag-user").value.trim()}` : "",
+    $("#diag-device").value.trim() ? `Gerät: ${$("#diag-device").value.trim()}` : "",
+    "",
+    "Durchgeführte Prüfungen:",
+    selectedSteps.length ? selectedSteps.join("\n") : "- Keine Prüfschritte ausgewählt",
+    "",
+    "Notizen / Ergebnisse:",
+    $("#diag-notes").value.trim() || "- Keine zusätzlichen Notizen",
+    "",
+    `Bearbeitet von: ${state.settings.signatureName || state.user.displayName}`,
+  ].filter((line, index, values) => line !== "" || values[index - 1] !== "");
+
+  $("#diag-output").textContent = lines.join("\n");
+}
+
+function resetDiagnostics() {
+  $("#diag-checklist").querySelectorAll("input").forEach((input) => {
+    input.checked = false;
+  });
+  ["#diag-user", "#diag-device", "#diag-ticket", "#diag-notes"].forEach((selector) => {
+    $(selector).value = "";
+  });
+  $("#diag-output").textContent = "Noch kein Text erzeugt.";
+}
+
+function fieldValue(selector, fallback = "-") {
+  return $(selector).value.trim() || fallback;
+}
+
+function generateTicketText() {
+  const mode = $("#gen-mode").value;
+  const common = [
+    `Ticket: ${fieldValue("#gen-ticket")}`,
+    `Priorität: ${fieldValue("#gen-priority")}`,
+    `Benutzer: ${fieldValue("#gen-user")}`,
+    `Gerät: ${fieldValue("#gen-device")}`,
+    `Betroffene Benutzer/Systeme: ${fieldValue("#gen-affected")}`,
+    "",
+    `Fehlerbild / Auswirkungen:\n${fieldValue("#gen-issue")}`,
+    "",
+    `Durchgeführte Schritte:\n${fieldValue("#gen-steps")}`,
+  ];
+
+  let specific;
+  if (mode === "escalation") {
+    specific = [
+      "",
+      `Aktuelles Ergebnis / offene Frage:\n${fieldValue("#gen-result")}`,
+      "",
+      `Zielteam: ${fieldValue("#gen-team")}`,
+      `Reproduzierbar: ${fieldValue("#gen-repro")}`,
+      "",
+      `Reproduktionsschritte:\n${fieldValue("#gen-reprosteps")}`,
+      "",
+      `Logs / Fehlercodes / Zeitstempel:\n${fieldValue("#gen-logs")}`,
+      "",
+      `Konkrete Frage an den 3rd Level:\n${fieldValue("#gen-request")}`,
+    ];
+  } else if (mode === "progress") {
+    specific = [
+      "",
+      `Aktueller Zwischenstand:\n${fieldValue("#gen-result")}`,
+      "",
+      "Das Ticket bleibt bis zur weiteren Klärung geöffnet.",
+    ];
+  } else {
+    specific = [
+      "",
+      `Ergebnis / Lösung:\n${fieldValue("#gen-result")}`,
+      "",
+      "Das Anliegen wurde gelöst und kann abgeschlossen werden.",
+    ];
+  }
+
+  $("#gen-output").textContent = [
+    ...common,
+    ...specific,
+    "",
+    `Bearbeitet von: ${state.settings.signatureName || state.user.displayName}`,
+  ].join("\n");
+}
+
+function clearGenerator() {
+  [
+    "#gen-user", "#gen-device", "#gen-ticket", "#gen-affected", "#gen-issue",
+    "#gen-steps", "#gen-result", "#gen-team", "#gen-logs", "#gen-reprosteps",
+    "#gen-request",
+  ].forEach((selector) => {
+    $(selector).value = "";
+  });
+  $("#gen-mode").value = "solution";
+  $("#gen-priority").value = "Normal";
+  $("#gen-repro").value = "Unbekannt";
+  $("#gen-output").textContent = "Noch kein Text erzeugt.";
+}
+
+function historyRow(item, type) {
+  const canRestore = canReview();
+  const subtitle = type === "version"
+    ? `Version ${item.version} · ${formatDate(item.created_at)} · ${escapeHtml(item.changed_by_name || "")}`
+    : `Archiviert am ${formatDate(item.updated_at)} · Version ${item.version}`;
+
+  return `
+    <article class="history-row">
+      <div>
+        <h4>${escapeHtml(item.title)}</h4>
+        <p>${subtitle}</p>
+      </div>
+      ${canRestore
+        ? `<button type="button" data-restore-${type}="${item.id}">Wiederherstellen</button>`
+        : ""}
+    </article>
+  `;
+}
+
+async function loadHistory() {
+  const data = await api("/api/history");
+  $("#template-version-list").innerHTML = data.versions.length
+    ? data.versions.map((item) => historyRow(item, "version")).join("")
+    : '<div class="history-empty">Noch keine älteren Vorlagen-Versionen vorhanden.</div>';
+
+  $("#template-trash-list").innerHTML = data.trash.length
+    ? data.trash.map((item) => historyRow(item, "template")).join("")
+    : '<div class="history-empty">Der Papierkorb ist leer.</div>';
+}
+
+async function restoreHistoryItem(type, id) {
+  if (!confirm("Diesen Stand wirklich wiederherstellen?")) return;
+  await api(`/api/history/${type}/${id}/restore`, {
+    method: "POST",
+    body: "{}",
+  });
+  showToast("Vorlage wurde wiederhergestellt.");
+  await loadBootstrap();
+  await loadHistory();
+}
+
 function canReview() {
   return ["editor", "admin"].includes(state.user?.role);
 }
@@ -91,6 +349,7 @@ async function loadBootstrap() {
   applyRoleVisibility();
   renderTemplates();
   renderCommands();
+  loadRecentItems();
 }
 
 function populateCategories() {
@@ -327,6 +586,9 @@ async function switchView(view) {
     proposals: ["Persönlich", "Meine Vorschläge"],
     approvals: ["Prüfung", "Freigaben"],
     commands: ["Werkzeuge", "Befehle"],
+    diagnose: ["Werkzeuge", "Diagnose"],
+    generator: ["Dokumentation", "Ticket-Generator"],
+    history: ["Nachvollziehbarkeit", "Versionen & Papierkorb"],
     game: ["Pause", "Helpdesk Runner"],
     admin: ["Verwaltung", "Administration"],
     settings: ["Persönlich", "Einstellungen"],
@@ -338,6 +600,7 @@ async function switchView(view) {
 
   if (view === "proposals" || view === "approvals") await loadProposals(view);
   if (view === "admin") await loadUsers();
+  if (view === "history") await loadHistory();
   if (view === "game") await loadLeaderboard();
 }
 
@@ -495,7 +758,10 @@ $("#templates-list").addEventListener("click", (event) => {
   const copyButton = event.target.closest("[data-copy-template]");
   if (copyButton) {
     const template = state.templates.find((item) => item.id === Number(copyButton.dataset.copyTemplate));
-    if (template) copyText(replacePersonalPlaceholders(template.body));
+    if (template) {
+      copyText(replacePersonalPlaceholders(template.body));
+      addRecentItem("template", template.id, template.title);
+    }
   }
 
   const editButton = event.target.closest("[data-edit-template]");
@@ -513,6 +779,7 @@ $("#commands-list").addEventListener("click", (event) => {
 
   if (command.risk_level === "high" && !confirm("Dieser Befehl ist als hohes Risiko markiert. Wirklich kopieren?")) return;
   copyText(command.command);
+  addRecentItem("command", command.id, command.name);
 });
 
 $("#approvals-list").addEventListener("click", (event) => {
@@ -578,6 +845,63 @@ $("#category-form").addEventListener("submit", async (event) => {
   }
 });
 
+
+$("#clear-recent-button").addEventListener("click", () => {
+  state.recentItems = [];
+  saveRecentItems();
+  renderQuickbar();
+});
+
+$("#quickbar-items").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-recent-type]");
+  if (!button) return;
+
+  const id = Number(button.dataset.recentId);
+  if (button.dataset.recentType === "template") {
+    const template = state.templates.find((item) => item.id === id);
+    if (template) {
+      copyText(replacePersonalPlaceholders(template.body));
+      addRecentItem("template", template.id, template.title);
+    }
+    return;
+  }
+
+  const command = state.commands.find((item) => item.id === id);
+  if (command) {
+    copyText(command.command);
+    addRecentItem("command", command.id, command.name);
+  }
+});
+
+$("#diag-type").addEventListener("change", renderDiagnosticChecklist);
+$("#diag-generate-button").addEventListener("click", generateDiagnosticText);
+$("#diag-reset-button").addEventListener("click", resetDiagnostics);
+$("#diag-copy-button").addEventListener("click", () => {
+  const output = $("#diag-output").textContent;
+  if (output && output !== "Noch kein Text erzeugt.") copyText(output);
+});
+
+$("#gen-create-button").addEventListener("click", generateTicketText);
+$("#gen-clear-button").addEventListener("click", clearGenerator);
+$("#gen-copy-button").addEventListener("click", () => {
+  const output = $("#gen-output").textContent;
+  if (output && output !== "Noch kein Text erzeugt.") copyText(output);
+});
+
+$("#history-refresh-button").addEventListener("click", () => {
+  loadHistory().catch((error) => alert(error.message));
+});
+$("#template-version-list").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-restore-version]");
+  if (button) restoreHistoryItem("version", Number(button.dataset.restoreVersion))
+    .catch((error) => alert(error.message));
+});
+$("#template-trash-list").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-restore-template]");
+  if (button) restoreHistoryItem("template", Number(button.dataset.restoreTemplate))
+    .catch((error) => alert(error.message));
+});
+
 $("#new-command-button").addEventListener("click", () => $("#command-dialog").showModal());
 $("#command-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -605,6 +929,7 @@ $("#command-form").addEventListener("submit", async (event) => {
   }
 });
 
+initializeDiagnostics();
 initializeGame();
 initialize().catch((error) => {
   console.error(error);

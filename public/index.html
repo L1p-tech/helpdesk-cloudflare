@@ -43,6 +43,9 @@
           Freigaben <span id="approval-count"></span>
         </button>
         <button class="main-tab" data-view="commands" type="button">Befehle</button>
+        <button class="main-tab" data-view="diagnose" type="button">Diagnose</button>
+        <button class="main-tab" data-view="generator" type="button">Ticket-Generator</button>
+        <button class="main-tab" data-view="history" type="button">Versionen &amp; Papierkorb</button>
         <button class="main-tab" data-view="game" type="button">Pause</button>
         <button class="main-tab" data-view="admin" data-role="admin" type="button">Administration</button>
         <button class="main-tab" data-view="settings" type="button">Einstellungen</button>
@@ -58,6 +61,17 @@
         </div>
 
         <div id="toast" class="toast hidden"></div>
+
+        <section class="quickbar" id="quickbar">
+          <div class="quickbar-head">
+            <div>
+              <h3>Persönliche Schnellleiste</h3>
+              <p>Zuletzt kopierte Vorlagen und Befehle</p>
+            </div>
+            <button class="btn-link" id="clear-recent-button" type="button">Verlauf leeren</button>
+          </div>
+          <div class="quickbar-items" id="quickbar-items"></div>
+        </section>
 
         <section class="view" id="view-templates">
           <div class="controls">
@@ -93,6 +107,102 @@
             Platzhalter in eckigen Klammern vorher ersetzen.
           </p>
           <div id="commands-list" class="templates-list"></div>
+        </section>
+
+
+        <section class="view hidden" id="view-diagnose">
+          <div class="panel-box">
+            <h3>Diagnose-Checkliste</h3>
+            <div class="form-grid">
+              <label>Störungstyp<select id="diag-type"></select></label>
+              <label>Benutzer<input id="diag-user" placeholder="Name / Benutzerkennung"></label>
+              <label>Gerät<input id="diag-device" placeholder="PC-Name / Gerät"></label>
+              <label>Ticketnummer<input id="diag-ticket" placeholder="Ticketnummer"></label>
+            </div>
+            <div id="diag-checklist" class="checklist"></div>
+            <label class="field-block">Notizen / Ergebnisse<textarea id="diag-notes" rows="5"></textarea></label>
+            <div class="card-actions">
+              <button class="btn-primary" id="diag-generate-button" type="button">Tickettext erzeugen</button>
+              <button id="diag-reset-button" type="button">Checkliste leeren</button>
+            </div>
+          </div>
+          <div class="panel-box">
+            <h3>Ergebnis</h3>
+            <div class="output-box" id="diag-output">Noch kein Text erzeugt.</div>
+            <div class="card-actions">
+              <button class="btn-primary" id="diag-copy-button" type="button">Kopieren</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="view hidden" id="view-generator">
+          <div class="panel-box">
+            <h3>Tickettext und Eskalation erstellen</h3>
+            <div class="form-grid">
+              <label>Textart
+                <select id="gen-mode">
+                  <option value="solution">Lösung / Abschluss</option>
+                  <option value="progress">Zwischenstand</option>
+                  <option value="escalation">Eskalation an 3rd Level</option>
+                </select>
+              </label>
+              <label>Priorität
+                <select id="gen-priority">
+                  <option>Niedrig</option>
+                  <option selected>Normal</option>
+                  <option>Hoch</option>
+                  <option>Kritisch</option>
+                </select>
+              </label>
+              <label>Benutzer<input id="gen-user" placeholder="Name / Kennung"></label>
+              <label>Gerät<input id="gen-device" placeholder="PC / Server / Drucker"></label>
+              <label>Ticketnummer<input id="gen-ticket"></label>
+              <label>Betroffene Benutzer/Systeme<input id="gen-affected"></label>
+              <label class="wide">Fehlerbild und Auswirkungen<textarea id="gen-issue" rows="4"></textarea></label>
+              <label class="wide">Durchgeführte Schritte<textarea id="gen-steps" rows="5"></textarea></label>
+              <label class="wide">Ergebnis / Lösung / offene Frage<textarea id="gen-result" rows="4"></textarea></label>
+              <label>Zielteam<input id="gen-team" placeholder="3rd-Level-Team"></label>
+              <label>Reproduzierbar
+                <select id="gen-repro">
+                  <option>Unbekannt</option>
+                  <option>Ja</option>
+                  <option>Nein</option>
+                </select>
+              </label>
+              <label class="wide">Logs, Fehlercodes, Zeitstempel<textarea id="gen-logs" rows="4"></textarea></label>
+              <label class="wide">Reproduktionsschritte<textarea id="gen-reprosteps" rows="4"></textarea></label>
+              <label class="wide">Konkrete Frage an den 3rd Level<textarea id="gen-request" rows="4"></textarea></label>
+            </div>
+            <div class="card-actions">
+              <button class="btn-primary" id="gen-create-button" type="button">Text erzeugen</button>
+              <button id="gen-clear-button" type="button">Leeren</button>
+            </div>
+          </div>
+          <div class="panel-box">
+            <h3>Fertiger Tickettext</h3>
+            <div class="output-box" id="gen-output">Noch kein Text erzeugt.</div>
+            <div class="card-actions">
+              <button class="btn-primary" id="gen-copy-button" type="button">Kopieren</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="view hidden" id="view-history">
+          <div class="panel-box">
+            <div class="panel-title-row">
+              <div>
+                <h3>Vorlagen-Versionen</h3>
+                <p>Vor jeder genehmigten Änderung wird die vorherige Version gespeichert.</p>
+              </div>
+              <button id="history-refresh-button" type="button">Aktualisieren</button>
+            </div>
+            <div class="history-table" id="template-version-list"></div>
+          </div>
+          <div class="panel-box">
+            <h3>Papierkorb</h3>
+            <p>Archivierte Vorlagen können von Redakteuren und Administratoren wiederhergestellt werden.</p>
+            <div class="history-table" id="template-trash-list"></div>
+          </div>
         </section>
 
         <section class="view hidden" id="view-game">
