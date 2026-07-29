@@ -33,6 +33,23 @@ function escapeHtml(value) {
   return element.innerHTML;
 }
 
+function formatDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+function highlightPlaceholders(value) {
+  return escapeHtml(value).replace(
+    /\[([^\]]+)\]/g,
+    '<span class="placeholder">[$1]</span>',
+  );
+}
+
 function showToast(message) {
   const toast = $("#toast");
   toast.textContent = message;
@@ -94,6 +111,7 @@ async function copyText(text) {
 }
 
 function templateCard(template) {
+  const updatedAt = formatDate(template.updated_at);
   return `
     <details class="card">
       <summary>
@@ -106,10 +124,12 @@ function templateCard(template) {
           </span>
           <span class="summary-title">${escapeHtml(template.title)}</span>
         </div>
-        <span class="summary-meta">Version ${template.version} · ${escapeHtml(template.updated_by_name)}</span>
+        <span class="summary-meta">
+          ${updatedAt ? `Aktualisiert am ${updatedAt} · ` : ""}Version ${template.version}
+        </span>
       </summary>
       <div class="card-content">
-        <div class="template-body">${escapeHtml(template.body)}</div>
+        <div class="template-body">${highlightPlaceholders(template.body)}</div>
         <div class="card-actions">
           <button class="primary" data-copy-template="${template.id}">Kopieren</button>
           <button data-edit-template="${template.id}">Änderung vorschlagen</button>
