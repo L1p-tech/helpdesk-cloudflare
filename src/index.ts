@@ -36,11 +36,20 @@ interface ProposalRow {
   template_id: number | null;
   base_version: number | null;
   proposal_type: "create" | "update";
-  category_id: number;
+  category_id: number | null;
+  proposed_category_name: string | null;
+  proposed_category_color: string | null;
   title: string;
   body: string;
   status: string;
   submitted_by: number;
+}
+
+interface CategoryRow {
+  id: number;
+  slug: string;
+  name: string;
+  color: string;
 }
 
 function routePath(request: Request): string {
@@ -106,6 +115,56 @@ async function findDuplicate(
   }
 
   return best;
+}
+
+function slugifyCategory(name: string): string {
+  return name
+    .toLocaleLowerCase("de")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
+}
+
+async function resolveProposalCategory(
+  env: Env,
+  userId: number,
+  categoryId: number | null,
+  proposedCategoryName: string | null,
+  proposedCategoryColor: string | null,
+): Promise<number> {
+  if (proposedCategoryName) {
+    const existing = await env.DB.prepare(
+      `SELECT id, slug, name, color
+       FROM categories
+       WHERE lower(name) = lower(?1)
+       LIMIT 1`,
+    ).bind(proposedCategoryName).first<CategoryRow>();
+
+    if (existing) return existing.id;
+
+    const slug = slugifyCategory(proposedCategoryName);
+    if (!slug) throw new HttpError(400, "Kategoriename ist ungültig.");
+
+    const result = await env.DB.prepare(
+      `INSERT INTO categories (slug, name, color, created_by)
+       VALUES (?1, ?2, ?3, ?4)`,
+    ).bind(
+      slug,
+      proposedCategoryName,
+      proposedCategoryColor ?? "#4a7cff",
+      userId,
+    ).run();
+
+    return Number(result.meta.last_row_id);
+  }
+
+  if (categoryId === null) {
+    throw new HttpError(400, "Kategorie fehlt.");
+  }
+
+  return categoryId;
 }
 
 async function createInitialAdmin(request: Request, env: Env): Promise<Response> {
@@ -282,7 +341,7 @@ async function handleProposals(
               u.display_name AS submitted_by_name,
               d.title AS duplicate_title
        FROM template_proposals p
-       JOIN categories c ON c.id = p.category_id
+       LEFT JOIN categories c ON c.id = p.category_id
        JOIN users u ON u.id = p.submitted_by
        LEFT JOIN templates d ON d.id = p.duplicate_template_id
        WHERE ${adminView ? "p.status = 'pending'" : "p.submitted_by = ?1"}
@@ -309,7 +368,16 @@ async function handleProposals(
     const body = await readJson<Record<string, unknown>>(request);
     const title = requiredString(body.title, "Titel", 160);
     const templateBody = requiredString(body.body, "Vorlagentext", 20_000);
-    const categoryId = positiveInteger(body.categoryId, "Kategorie");
+    const categoryMode = body.categoryMode === "new" ? "new" : "existing";
+    const categoryId = categoryMode === "existing"
+      ? positiveInteger(body.categoryId, "Kategorie")
+      : null;
+    const proposedCategoryName = categoryMode === "new"
+      ? requiredString(body.proposedCategoryName, "Neue Kategorie", 60)
+      : null;
+    const proposedCategoryColor = categoryMode === "new"
+      ? validColor(body.proposedCategoryColor)
+      : null;
     const reason = optionalString(body.reason, 1000);
     const templateId = body.templateId ? positiveInteger(body.templateId, "Vorlagen-ID") : null;
 
@@ -334,16 +402,18 @@ async function handleProposals(
 
     const result = await env.DB.prepare(
       `INSERT INTO template_proposals
-        (template_id, base_version, proposal_type, category_id, title, body,
-         reason, status, duplicate_score, duplicate_template_id, submitted_by,
-         submitted_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?9, ?10, CURRENT_TIMESTAMP)`,
+        (template_id, base_version, proposal_type, category_id, proposed_category_name,
+         proposed_category_color, title, body, reason, status, duplicate_score,
+         duplicate_template_id, submitted_by, submitted_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10, ?11, ?12, CURRENT_TIMESTAMP)`,
     )
       .bind(
         templateId,
         baseVersion,
         proposalType,
         categoryId,
+        proposedCategoryName,
+        proposedCategoryColor,
         title,
         templateBody,
         reason,
@@ -381,8 +451,9 @@ async function handleProposals(
     const note = optionalString(body.note, 2000);
 
     const proposal = await env.DB.prepare(
-      `SELECT id, template_id, base_version, proposal_type, category_id, title,
-              body, status, submitted_by
+      `SELECT id, template_id, base_version, proposal_type, category_id,
+              proposed_category_name, proposed_category_color, title, body,
+              status, submitted_by
        FROM template_proposals WHERE id = ?1`,
     ).bind(proposalId).first<ProposalRow>();
 
@@ -392,6 +463,13 @@ async function handleProposals(
     }
 
     if (action === "approve") {
+      const resolvedCategoryId = await resolveProposalCategory(
+        env,
+        user.id,
+        proposal.category_id,
+        proposal.proposed_category_name,
+        proposal.proposed_category_color,
+      );
       let templateId: number;
       if (proposal.proposal_type === "create") {
         const result = await env.DB.prepare(
@@ -400,7 +478,7 @@ async function handleProposals(
            VALUES (?1, ?2, ?3, 1, ?4, ?5)`,
         )
           .bind(
-            proposal.category_id,
+            resolvedCategoryId,
             proposal.title,
             proposal.body,
             proposal.submitted_by,
@@ -437,7 +515,7 @@ async function handleProposals(
            WHERE id = ?5`,
         )
           .bind(
-            proposal.category_id,
+            resolvedCategoryId,
             proposal.title,
             proposal.body,
             user.id,
@@ -507,13 +585,7 @@ async function handleCategories(
   const body = await readJson<Record<string, unknown>>(request);
   const name = requiredString(body.name, "Kategoriename", 60);
   const color = validColor(body.color);
-  const slug = name
-    .toLocaleLowerCase("de")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
+  const slug = slugifyCategory(name);
 
   if (!slug) throw new HttpError(400, "Kategoriename ist ungültig.");
 
@@ -533,10 +605,62 @@ async function handleTemplates(
   path: string,
 ): Promise<Response | null> {
   const templateMatch = path.match(/^\/api\/templates\/(\d+)$/);
-  if (!templateMatch || request.method !== "DELETE") return null;
+  if (!templateMatch) return null;
+
+  const templateId = positiveInteger(templateMatch[1], "Vorlagen-ID");
+
+  if (request.method === "PUT") {
+    requireRole(user, ["admin"]);
+
+    const current = await env.DB.prepare(
+      `SELECT id, version, category_id, title, body
+       FROM templates
+       WHERE id = ?1 AND active = 1`,
+    ).bind(templateId).first<{
+      id: number;
+      version: number;
+      category_id: number;
+      title: string;
+      body: string;
+    }>();
+
+    if (!current) throw new HttpError(404, "Vorlage wurde nicht gefunden.");
+
+    const body = await readJson<Record<string, unknown>>(request);
+    const title = requiredString(body.title, "Titel", 160);
+    const templateBody = requiredString(body.body, "Vorlagentext", 20_000);
+    const categoryId = positiveInteger(body.categoryId, "Kategorie");
+    const note = optionalString(body.note, 1000) ?? "Direktbearbeitung durch Administrator";
+
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO template_versions
+          (template_id, version, category_id, title, body, changed_by, change_note)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+      ).bind(
+        current.id,
+        current.version,
+        current.category_id,
+        current.title,
+        current.body,
+        user.id,
+        note,
+      ),
+      env.DB.prepare(
+        `UPDATE templates
+         SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
+             updated_by = ?4, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?5`,
+      ).bind(categoryId, title, templateBody, user.id, templateId),
+    ]);
+
+    await audit(env, user.id, "update", "template", templateId, { direct: true });
+    return json({ ok: true });
+  }
+
+  if (request.method !== "DELETE") return null;
 
   requireRole(user, ["admin"]);
-  const templateId = positiveInteger(templateMatch[1], "Vorlagen-ID");
 
   const current = await env.DB.prepare(
     `SELECT id, version, category_id, title, body

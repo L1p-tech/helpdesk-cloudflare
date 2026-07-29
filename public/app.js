@@ -4,9 +4,19 @@ const state = {
   templates: [],
   commands: [],
   proposals: [],
-  settings: { signatureName: "", favorites: { templates: [], commands: [] } },
+  settings: {
+    signatureName: "",
+    favorites: { templates: [], commands: [] },
+    preferences: { theme: "forest" },
+  },
   activeView: "templates",
   recentItems: [],
+};
+
+const THEMES = {
+  forest: { label: "Forest", next: "midnight" },
+  midnight: { label: "Midnight", next: "dune" },
+  dune: { label: "Dune", next: "forest" },
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -95,9 +105,33 @@ async function persistSettings() {
     body: JSON.stringify({
       signatureName: state.settings.signatureName,
       favorites: state.settings.favorites,
-      preferences: {},
+      preferences: state.settings.preferences,
     }),
   });
+}
+
+function normalizePreferences(value) {
+  const preferences = value && typeof value === "object" ? value : {};
+  const theme = typeof preferences.theme === "string" && THEMES[preferences.theme]
+    ? preferences.theme
+    : "forest";
+  return { theme };
+}
+
+function applyTheme(theme) {
+  const resolvedTheme = THEMES[theme] ? theme : "forest";
+  document.documentElement.dataset.theme = resolvedTheme;
+  $("#theme-select").value = resolvedTheme;
+  $("#theme-button").textContent = `Theme: ${THEMES[resolvedTheme].label}`;
+}
+
+async function cycleTheme() {
+  const currentTheme = state.settings.preferences.theme || "forest";
+  const nextTheme = THEMES[currentTheme]?.next || "forest";
+  state.settings.preferences.theme = nextTheme;
+  applyTheme(nextTheme);
+  await persistSettings();
+  showToast(`Theme gewechselt: ${THEMES[nextTheme].label}`);
 }
 
 async function toggleFavorite(type, id) {
@@ -419,6 +453,7 @@ async function loadBootstrap() {
   state.templates = data.templates;
   state.commands = data.commands;
   let parsedFavorites = {};
+  let parsedPreferences = {};
   try {
     parsedFavorites = JSON.parse(
       data.settings.favorites_json || '{"templates":[],"commands":[]}',
@@ -426,14 +461,22 @@ async function loadBootstrap() {
   } catch {
     parsedFavorites = {};
   }
+  try {
+    parsedPreferences = JSON.parse(data.settings.preferences_json || "{}");
+  } catch {
+    parsedPreferences = {};
+  }
 
   state.settings = {
     signatureName: data.settings.signature_name || "",
     favorites: normalizeFavorites(parsedFavorites),
+    preferences: normalizePreferences(parsedPreferences),
   };
 
+  applyTheme(state.settings.preferences.theme);
   $("#current-user").innerHTML = `<strong>${escapeHtml(state.user.displayName)}</strong><br>${roleLabel(state.user.role)}`;
   $("#signature-name").value = state.settings.signatureName;
+  $("#theme-select").value = state.settings.preferences.theme;
   populateCategories();
   applyRoleVisibility();
   renderTemplates();
@@ -447,6 +490,29 @@ function populateCategories() {
     .join("");
   $("#proposal-category").innerHTML = options;
   $("#template-category-filter").innerHTML = `<option value="">Alle Kategorien</option>${options}`;
+}
+
+function selectedProposalCategoryMode() {
+  return document.querySelector("input[name='proposal-category-mode']:checked")?.value || "existing";
+}
+
+function syncProposalCategoryMode() {
+  const directEdit = $("#proposal-dialog").dataset.mode === "direct-edit";
+  const mode = selectedProposalCategoryMode();
+  const existingWrap = $("#proposal-category-existing-wrap");
+  const newWrap = $("#proposal-category-new-wrap");
+  const categorySelect = $("#proposal-category");
+  const categoryName = $("#proposal-category-name");
+  const modeInputs = [...document.querySelectorAll("input[name='proposal-category-mode']")];
+
+  modeInputs.forEach((input) => {
+    input.disabled = directEdit;
+  });
+
+  existingWrap.classList.toggle("hidden", !directEdit && mode !== "existing" ? true : false);
+  newWrap.classList.toggle("hidden", directEdit || mode !== "new");
+  categorySelect.required = directEdit || mode === "existing";
+  categoryName.required = !directEdit && mode === "new";
 }
 
 function replacePersonalPlaceholders(text) {
@@ -493,7 +559,7 @@ function templateCard(template) {
         <div class="template-body">${highlightPlaceholders(template.body)}</div>
         <div class="card-actions">
           <button class="primary" data-copy-template="${template.id}">Kopieren</button>
-          <button data-edit-template="${template.id}">Änderung vorschlagen</button>
+          <button data-edit-template="${template.id}">${isAdmin() ? "Direkt bearbeiten" : "Änderung vorschlagen"}</button>
           ${isAdmin() ? `<button class="danger-button" data-delete-template="${template.id}">Löschen</button>` : ""}
         </div>
       </div>
@@ -635,7 +701,7 @@ async function loadProposals(view) {
           <div>
             <h3>${escapeHtml(proposal.title)}</h3>
             <div class="badges">
-              <span class="badge">${escapeHtml(proposal.category_name)}</span>
+              <span class="badge">${escapeHtml(proposal.category_name || proposal.proposed_category_name || "Neue Kategorie")}</span>
               <span class="badge">${escapeHtml(proposal.status)}</span>
               ${proposal.duplicate_score >= .65
                 ? `<span class="badge">Ähnlichkeit ${Math.round(proposal.duplicate_score * 100)} %</span>`
@@ -659,10 +725,22 @@ function openProposal(template = null) {
   $("#proposal-template-id").value = template?.id || "";
   $("#proposal-title").value = template?.title || "";
   $("#proposal-category").value = template?.category_id || state.categories[0]?.id || "";
+  const directEdit = Boolean(isAdmin() && template);
+  $("#proposal-dialog").dataset.mode = directEdit ? "direct-edit" : "proposal";
+  document.querySelector("input[name='proposal-category-mode'][value='existing']").checked = true;
+  $("#proposal-category-name").value = "";
+  $("#proposal-category-color").value = "#4a7cff";
   $("#proposal-body").value = template?.body || "";
   $("#proposal-reason").value = "";
   $("#duplicate-result").classList.add("hidden");
-  $("#proposal-dialog-title").textContent = template ? "Änderung vorschlagen" : "Neue Vorlage vorschlagen";
+  syncProposalCategoryMode();
+  $("#proposal-dialog-title").textContent = directEdit
+    ? "Vorlage direkt bearbeiten"
+    : template
+      ? "Änderung vorschlagen"
+      : "Neue Vorlage vorschlagen";
+  $("#proposal-form .btn-save").textContent = directEdit ? "Direkt speichern" : "Zur Freigabe einreichen";
+  $("#check-duplicate-button").classList.toggle("hidden", directEdit);
   $("#proposal-dialog").showModal();
 }
 
@@ -686,15 +764,38 @@ async function checkDuplicate() {
 async function submitProposal(event) {
   event.preventDefault();
   try {
+    const categoryMode = selectedProposalCategoryMode();
+    const payload = {
+      templateId: $("#proposal-template-id").value || null,
+      title: $("#proposal-title").value,
+      categoryMode,
+      categoryId: categoryMode === "existing" ? Number($("#proposal-category").value) : null,
+      proposedCategoryName: categoryMode === "new" ? $("#proposal-category-name").value : null,
+      proposedCategoryColor: categoryMode === "new" ? $("#proposal-category-color").value : null,
+      body: $("#proposal-body").value,
+      reason: $("#proposal-reason").value,
+      note: $("#proposal-reason").value,
+    };
+
+    if ($("#proposal-dialog").dataset.mode === "direct-edit") {
+      await api(`/api/templates/${$("#proposal-template-id").value}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: payload.title,
+          categoryId: Number($("#proposal-category").value),
+          body: payload.body,
+          note: payload.reason,
+        }),
+      });
+      $("#proposal-dialog").close();
+      showToast("Vorlage wurde direkt aktualisiert.");
+      await loadBootstrap();
+      return;
+    }
+
     const data = await api("/api/proposals", {
       method: "POST",
-      body: JSON.stringify({
-        templateId: $("#proposal-template-id").value || null,
-        title: $("#proposal-title").value,
-        categoryId: Number($("#proposal-category").value),
-        body: $("#proposal-body").value,
-        reason: $("#proposal-reason").value,
-      }),
+      body: JSON.stringify(payload),
     });
     $("#proposal-dialog").close();
     showToast(data.duplicate.score >= .65
@@ -715,6 +816,7 @@ function openReview(proposalId) {
   $("#review-content").innerHTML = `
     <h3>${escapeHtml(proposal.title)}</h3>
     <p class="muted">Eingereicht von ${escapeHtml(proposal.submitted_by_name)}</p>
+    <p class="muted">Kategorie: ${escapeHtml(proposal.category_name || proposal.proposed_category_name || "Nicht angegeben")}</p>
     ${proposal.duplicate_title
       ? `<div class="notice">Mögliche Ähnlichkeit mit „${escapeHtml(proposal.duplicate_title)}“: ${Math.round(proposal.duplicate_score * 100)} %</div>`
       : ""}
@@ -1173,6 +1275,17 @@ $("#template-search").addEventListener("input", renderTemplates);
 $("#template-category-filter").addEventListener("change", renderTemplates);
 $("#template-sort").addEventListener("change", renderTemplates);
 $("#command-search").addEventListener("input", renderCommands);
+$("#theme-button").addEventListener("click", () => {
+  cycleTheme().catch((error) => alert(error.message));
+});
+$("#theme-select").addEventListener("change", (event) => {
+  const theme = event.target.value;
+  state.settings.preferences.theme = THEMES[theme] ? theme : "forest";
+  applyTheme(state.settings.preferences.theme);
+});
+document.querySelectorAll("input[name='proposal-category-mode']").forEach((input) => {
+  input.addEventListener("change", syncProposalCategoryMode);
+});
 $("#new-proposal-button").addEventListener("click", () => openProposal());
 $("#proposal-form").addEventListener("submit", submitProposal);
 $("#check-duplicate-button").addEventListener("click", () => checkDuplicate().catch((error) => alert(error.message)));
@@ -1249,8 +1362,10 @@ $("#review-form").addEventListener("click", (event) => {
 $("#settings-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   state.settings.signatureName = $("#signature-name").value.trim();
+  state.settings.preferences.theme = $("#theme-select").value;
   try {
     await persistSettings();
+    applyTheme(state.settings.preferences.theme);
     showToast("Einstellungen gespeichert.");
   } catch (error) {
     alert(error.message);

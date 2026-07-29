@@ -31,6 +31,7 @@
           <p>Vorlage suchen → aufklappen → kopieren → in das Ticket einfügen</p>
         </div>
         <div class="user-area">
+          <button class="btn-tool" id="theme-button" type="button">Theme</button>
           <div id="current-user"></div>
           <button class="btn-tool" id="logout-button" type="button">Abmelden</button>
         </div>
@@ -261,6 +262,13 @@
           <form class="panel form-panel narrow" id="settings-form">
             <h3>Persönliche Einstellungen</h3>
             <label>Wert für <code>[ICH]</code><input id="signature-name" placeholder="Max Mustermann"></label>
+            <label>Theme
+              <select id="theme-select">
+                <option value="forest">Forest</option>
+                <option value="midnight">Midnight</option>
+                <option value="dune">Dune</option>
+              </select>
+            </label>
             <p class="panel-hint">Dieser Wert wird nur für dein Konto gespeichert.</p>
             <button class="btn-primary" type="submit">Speichern</button>
           </form>
@@ -278,7 +286,15 @@
       <div class="modal-body">
         <input type="hidden" id="proposal-template-id">
         <label>Titel<input id="proposal-title" maxlength="160" required></label>
-        <label>Kategorie<select id="proposal-category" required></select></label>
+        <div class="category-mode-switch">
+          <label class="check"><input type="radio" name="proposal-category-mode" value="existing" checked> Vorhandene Kategorie</label>
+          <label class="check"><input type="radio" name="proposal-category-mode" value="new"> Neue Kategorie vorschlagen</label>
+        </div>
+        <label id="proposal-category-existing-wrap">Kategorie<select id="proposal-category" required></select></label>
+        <div class="grid-two compact-grid hidden" id="proposal-category-new-wrap">
+          <label>Neue Kategorie<input id="proposal-category-name" maxlength="60" placeholder="z. B. Microsoft 365"></label>
+          <label>Farbe<input id="proposal-category-color" type="color" value="#4a7cff"></label>
+        </div>
         <label>Vorlagentext<textarea id="proposal-body" rows="12" required></textarea></label>
         <label>Begründung<textarea id="proposal-reason" rows="3"></textarea></label>
         <div id="duplicate-result" class="notice hidden"></div>
