@@ -66,6 +66,10 @@ function replaceLiteral(value, search, replacement) {
   return String(value).split(search).join(replacement);
 }
 
+function isAdmin() {
+  return state.user?.role === "admin";
+}
+
 function normalizeFavorites(value) {
   const favorites = value && typeof value === "object" ? value : {};
   return {
@@ -490,6 +494,7 @@ function templateCard(template) {
         <div class="card-actions">
           <button class="primary" data-copy-template="${template.id}">Kopieren</button>
           <button data-edit-template="${template.id}">Änderung vorschlagen</button>
+          ${isAdmin() ? `<button class="danger-button" data-delete-template="${template.id}">Löschen</button>` : ""}
         </div>
       </div>
     </details>`;
@@ -598,6 +603,7 @@ function commandCard(command) {
         <code class="command-code">${escapeHtml(command.command)}</code>
         <div class="card-actions">
           <button class="primary" data-copy-command="${command.id}">Kopieren</button>
+          ${isAdmin() ? `<button class="danger-button" data-delete-command="${command.id}">Löschen</button>` : ""}
         </div>
       </div>
     </details>`;
@@ -730,6 +736,27 @@ async function reviewProposal(action) {
   } catch (error) {
     alert(error.message);
   }
+}
+
+async function deleteTemplate(templateId) {
+  if (!confirm("Diese Vorlage wirklich löschen? Sie landet im Papierkorb und kann später wiederhergestellt werden.")) return;
+  await api(`/api/templates/${templateId}`, {
+    method: "DELETE",
+    body: "{}",
+  });
+  showToast("Vorlage wurde gelöscht.");
+  await loadBootstrap();
+  if (state.activeView === "history") await loadHistory();
+}
+
+async function deleteCommand(commandId) {
+  if (!confirm("Diesen Befehl wirklich löschen?")) return;
+  await api(`/api/commands/${commandId}`, {
+    method: "DELETE",
+    body: "{}",
+  });
+  showToast("Befehl wurde gelöscht.");
+  await loadBootstrap();
 }
 
 async function switchView(view) {
@@ -1174,6 +1201,12 @@ $("#templates-list").addEventListener("click", (event) => {
     const template = state.templates.find((item) => item.id === Number(editButton.dataset.editTemplate));
     if (template) openProposal(template);
   }
+
+  const deleteButton = event.target.closest("[data-delete-template]");
+  if (deleteButton) {
+    deleteTemplate(Number(deleteButton.dataset.deleteTemplate))
+      .catch((error) => alert(error.message));
+  }
 });
 
 $("#commands-list").addEventListener("click", (event) => {
@@ -1182,6 +1215,13 @@ $("#commands-list").addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
     toggleFavorite("command", Number(favoriteButton.dataset.favoriteCommand))
+      .catch((error) => alert(error.message));
+    return;
+  }
+
+  const deleteButton = event.target.closest("[data-delete-command]");
+  if (deleteButton) {
+    deleteCommand(Number(deleteButton.dataset.deleteCommand))
       .catch((error) => alert(error.message));
     return;
   }

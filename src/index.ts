@@ -526,60 +526,133 @@ async function handleCategories(
   return json({ id: Number(result.meta.last_row_id) }, { status: 201 });
 }
 
+async function handleTemplates(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  path: string,
+): Promise<Response | null> {
+  const templateMatch = path.match(/^\/api\/templates\/(\d+)$/);
+  if (!templateMatch || request.method !== "DELETE") return null;
+
+  requireRole(user, ["admin"]);
+  const templateId = positiveInteger(templateMatch[1], "Vorlagen-ID");
+
+  const current = await env.DB.prepare(
+    `SELECT id, version, category_id, title, body
+     FROM templates
+     WHERE id = ?1 AND active = 1`,
+  ).bind(templateId).first<{
+    id: number;
+    version: number;
+    category_id: number;
+    title: string;
+    body: string;
+  }>();
+
+  if (!current) throw new HttpError(404, "Vorlage wurde nicht gefunden.");
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO template_versions
+        (template_id, version, category_id, title, body, changed_by, change_note)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+    ).bind(
+      current.id,
+      current.version,
+      current.category_id,
+      current.title,
+      current.body,
+      user.id,
+      "Vorlage archiviert",
+    ),
+    env.DB.prepare(
+      `UPDATE templates
+       SET active = 0, updated_by = ?1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?2`,
+    ).bind(user.id, templateId),
+  ]);
+
+  await audit(env, user.id, "delete", "template", templateId);
+  return json({ ok: true });
+}
+
 async function handleCommands(
   request: Request,
   env: Env,
   user: AuthUser,
   path: string,
 ): Promise<Response | null> {
-  if (path !== "/api/commands" || request.method !== "POST") return null;
-  requireRole(user, ["editor", "admin"]);
+  if (path === "/api/commands" && request.method === "POST") {
+    requireRole(user, ["editor", "admin"]);
 
-  const body = await readJson<Record<string, unknown>>(request);
-  const category = requiredString(body.category, "Kategorie", 60);
-  const name = requiredString(body.name, "Name", 120);
-  const command = requiredString(body.command, "Befehl", 5000);
-  const description = requiredString(body.description, "Beschreibung", 2000);
-  const shell = requiredString(body.shell, "Shell", 20);
-  const riskLevel = requiredString(body.riskLevel ?? "low", "Risiko", 20);
+    const body = await readJson<Record<string, unknown>>(request);
+    const category = requiredString(body.category, "Kategorie", 60);
+    const name = requiredString(body.name, "Name", 120);
+    const command = requiredString(body.command, "Befehl", 5000);
+    const description = requiredString(body.description, "Beschreibung", 2000);
+    const shell = requiredString(body.shell, "Shell", 20);
+    const riskLevel = requiredString(body.riskLevel ?? "low", "Risiko", 20);
 
-  if (!["cmd", "powershell", "windows"].includes(shell)) {
-    throw new HttpError(400, "Ungültige Shell.");
-  }
-  if (!["low", "medium", "high"].includes(riskLevel)) {
-    throw new HttpError(400, "Ungültige Risikostufe.");
-  }
+    if (!["cmd", "powershell", "windows"].includes(shell)) {
+      throw new HttpError(400, "Ungültige Shell.");
+    }
+    if (!["low", "medium", "high"].includes(riskLevel)) {
+      throw new HttpError(400, "Ungültige Risikostufe.");
+    }
 
-  const duplicate = await env.DB.prepare(
-    `SELECT id FROM commands
-     WHERE active = 1 AND (lower(name) = lower(?1) OR command = ?2)
-     LIMIT 1`,
-  ).bind(name, command).first();
+    const duplicate = await env.DB.prepare(
+      `SELECT id FROM commands
+       WHERE active = 1 AND (lower(name) = lower(?1) OR command = ?2)
+       LIMIT 1`,
+    ).bind(name, command).first();
 
-  if (duplicate) throw new HttpError(409, "Befehl oder Bezeichnung existiert bereits.");
+    if (duplicate) throw new HttpError(409, "Befehl oder Bezeichnung existiert bereits.");
 
-  const result = await env.DB.prepare(
-    `INSERT INTO commands
-      (category, name, command, description, shell, requires_admin, risk_level,
-       remote_capable, restart_required, created_by, updated_by)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)`,
-  )
-    .bind(
-      category,
-      name,
-      command,
-      description,
-      shell,
-      body.requiresAdmin ? 1 : 0,
-      riskLevel,
-      body.remoteCapable ? 1 : 0,
-      body.restartRequired ? 1 : 0,
-      user.id,
+    const result = await env.DB.prepare(
+      `INSERT INTO commands
+        (category, name, command, description, shell, requires_admin, risk_level,
+         remote_capable, restart_required, created_by, updated_by)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)`,
     )
-    .run();
+      .bind(
+        category,
+        name,
+        command,
+        description,
+        shell,
+        body.requiresAdmin ? 1 : 0,
+        riskLevel,
+        body.remoteCapable ? 1 : 0,
+        body.restartRequired ? 1 : 0,
+        user.id,
+      )
+      .run();
 
-  await audit(env, user.id, "create", "command", Number(result.meta.last_row_id));
-  return json({ id: Number(result.meta.last_row_id) }, { status: 201 });
+    await audit(env, user.id, "create", "command", Number(result.meta.last_row_id));
+    return json({ id: Number(result.meta.last_row_id) }, { status: 201 });
+  }
+
+  const commandMatch = path.match(/^\/api\/commands\/(\d+)$/);
+  if (commandMatch && request.method === "DELETE") {
+    requireRole(user, ["admin"]);
+    const commandId = positiveInteger(commandMatch[1], "Befehls-ID");
+
+    const result = await env.DB.prepare(
+      `UPDATE commands
+       SET active = 0, updated_by = ?1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?2 AND active = 1`,
+    ).bind(user.id, commandId).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Befehl wurde nicht gefunden.");
+    }
+
+    await audit(env, user.id, "delete", "command", commandId);
+    return json({ ok: true });
+  }
+
+  return null;
 }
 
 async function handleUsers(
@@ -868,6 +941,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     handleSettings,
     handleProposals,
     handleCategories,
+    handleTemplates,
     handleCommands,
     handleUsers,
     handleHistory,
