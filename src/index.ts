@@ -1133,6 +1133,8 @@ async function handleUsers(
     const hasTemplateNames = await hasColumn(env, "templates", "created_by_name");
     const hasCommandNames = await hasColumn(env, "commands", "created_by_name");
     const hasVersionNames = await hasColumn(env, "template_versions", "changed_by_name");
+    const hasProposalNames = await hasColumn(env, "template_proposals", "submitted_by_name");
+    const hasFeedbackNames = await hasColumn(env, "feedback_items", "submitted_by_name");
 
     await env.DB.batch([
       env.DB.prepare(
@@ -1164,6 +1166,22 @@ async function handleUsers(
           ? `UPDATE template_versions SET changed_by = NULL WHERE changed_by = ?1`
           : `UPDATE template_versions SET changed_by = ?2 WHERE changed_by = ?1`,
       ).bind(targetId, user.id),
+      env.DB.prepare(
+        hasProposalNames
+          ? `UPDATE template_proposals SET submitted_by = NULL WHERE submitted_by = ?1`
+          : `UPDATE template_proposals SET submitted_by = ?2 WHERE submitted_by = ?1`,
+      ).bind(targetId, user.id),
+      env.DB.prepare(
+        "UPDATE template_proposals SET reviewed_by = NULL WHERE reviewed_by = ?1",
+      ).bind(targetId),
+      env.DB.prepare(
+        hasFeedbackNames
+          ? `UPDATE feedback_items SET submitted_by = NULL WHERE submitted_by = ?1`
+          : `UPDATE feedback_items SET submitted_by = ?2 WHERE submitted_by = ?1`,
+      ).bind(targetId, user.id),
+      env.DB.prepare(
+        "UPDATE feedback_items SET reviewed_by = NULL WHERE reviewed_by = ?1",
+      ).bind(targetId),
     ]);
 
     const deleteResult = await env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(targetId).run();
