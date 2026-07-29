@@ -6,7 +6,7 @@ CREATE TABLE users (
   display_name TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
-  password_iterations INTEGER NOT NULL DEFAULT 100000,
+  password_iterations INTEGER NOT NULL DEFAULT 210000,
   role TEXT NOT NULL CHECK (role IN ('employee', 'editor', 'admin')),
   active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
   failed_login_count INTEGER NOT NULL DEFAULT 0,

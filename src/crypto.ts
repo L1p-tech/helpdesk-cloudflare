@@ -27,7 +27,7 @@ export async function sha256(value: string): Promise<string> {
 export async function hashPassword(
   password: string,
   saltBase64?: string,
-  iterations = 100_000,
+  iterations = 210_000,
 ): Promise<{ hash: string; salt: string; iterations: number }> {
   const salt = saltBase64
     ? fromBase64(saltBase64)
@@ -45,7 +45,7 @@ export async function hashPassword(
     {
       name: "PBKDF2",
       hash: "SHA-256",
-      salt: new Uint8Array(salt).buffer,
+      salt,
       iterations,
     },
     key,

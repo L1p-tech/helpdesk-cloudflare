@@ -364,17 +364,7 @@ async function handleProposals(
     requireRole(user, ["editor", "admin"]);
 
     const proposalId = positiveInteger(reviewMatch[1], "Vorschlags-ID");
-    const actionValue = reviewMatch[2];
-
-    if (
-      actionValue !== "approve" &&
-      actionValue !== "reject" &&
-      actionValue !== "changes"
-    ) {
-      throw new HttpError(400, "Ungültige Freigabeaktion.");
-    }
-
-    const action = actionValue;
+    const action = reviewMatch[2];
     const body = await readJson<Record<string, unknown>>(request);
     const note = optionalString(body.note, 2000);
 
@@ -684,6 +674,128 @@ async function handleUsers(
   return null;
 }
 
+
+async function handleHistory(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  path: string,
+): Promise<Response | null> {
+  if (path === "/api/history" && request.method === "GET") {
+    const [versions, trash] = await Promise.all([
+      env.DB.prepare(
+        `SELECT v.id, v.template_id, v.version, v.title, v.created_at,
+                u.display_name AS changed_by_name
+         FROM template_versions v
+         JOIN users u ON u.id = v.changed_by
+         ORDER BY v.created_at DESC
+         LIMIT 100`,
+      ).all(),
+      env.DB.prepare(
+        `SELECT id, title, version, updated_at
+         FROM templates
+         WHERE active = 0
+         ORDER BY updated_at DESC
+         LIMIT 100`,
+      ).all(),
+    ]);
+
+    return json({
+      versions: versions.results,
+      trash: trash.results,
+    });
+  }
+
+  const versionMatch = path.match(/^\/api\/history\/version\/(\d+)\/restore$/);
+  if (versionMatch && request.method === "POST") {
+    requireRole(user, ["editor", "admin"]);
+    const versionId = positiveInteger(versionMatch[1], "Versions-ID");
+
+    const version = await env.DB.prepare(
+      `SELECT id, template_id, version, category_id, title, body
+       FROM template_versions
+       WHERE id = ?1`,
+    ).bind(versionId).first<{
+      id: number;
+      template_id: number;
+      version: number;
+      category_id: number;
+      title: string;
+      body: string;
+    }>();
+
+    if (!version) throw new HttpError(404, "Version wurde nicht gefunden.");
+
+    const current = await env.DB.prepare(
+      `SELECT id, version, category_id, title, body
+       FROM templates WHERE id = ?1`,
+    ).bind(version.template_id).first<{
+      id: number;
+      version: number;
+      category_id: number;
+      title: string;
+      body: string;
+    }>();
+
+    if (!current) throw new HttpError(404, "Zielvorlage wurde nicht gefunden.");
+
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO template_versions
+          (template_id, version, category_id, title, body, changed_by, change_note)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+      ).bind(
+        current.id,
+        current.version,
+        current.category_id,
+        current.title,
+        current.body,
+        user.id,
+        `Automatische Sicherung vor Wiederherstellung von Version ${version.version}`,
+      ),
+      env.DB.prepare(
+        `UPDATE templates
+         SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
+             active = 1, updated_by = ?4, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?5`,
+      ).bind(
+        version.category_id,
+        version.title,
+        version.body,
+        user.id,
+        version.template_id,
+      ),
+    ]);
+
+    await audit(env, user.id, "restore", "template_version", versionId, {
+      templateId: version.template_id,
+      restoredVersion: version.version,
+    });
+    return json({ ok: true });
+  }
+
+  const templateMatch = path.match(/^\/api\/history\/template\/(\d+)\/restore$/);
+  if (templateMatch && request.method === "POST") {
+    requireRole(user, ["editor", "admin"]);
+    const templateId = positiveInteger(templateMatch[1], "Vorlagen-ID");
+
+    const result = await env.DB.prepare(
+      `UPDATE templates
+       SET active = 1, updated_by = ?1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?2 AND active = 0`,
+    ).bind(user.id, templateId).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Archivierte Vorlage wurde nicht gefunden.");
+    }
+
+    await audit(env, user.id, "restore", "template", templateId);
+    return json({ ok: true });
+  }
+
+  return null;
+}
+
 async function handleGame(
   request: Request,
   env: Env,
@@ -746,6 +858,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     handleCategories,
     handleCommands,
     handleUsers,
+    handleHistory,
     handleGame,
   ];
 
