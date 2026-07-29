@@ -142,3 +142,6 @@ Danach im Cloudflare-Dashboard:
 - interne Datenschutzprüfung
 - Test mit zwei parallel angemeldeten Benutzern
 
+## Design
+
+Die Oberfläche verwendet wieder das kompakte dunkle Karten- und Tab-Design der lokalen Helpdesk-Datei. Die Cloudflare-Funktionen und API-Endpunkte bleiben unverändert.

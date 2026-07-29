@@ -95,25 +95,27 @@ async function copyText(text) {
 
 function templateCard(template) {
   return `
-    <article class="card">
-      <div class="card-header">
-        <div>
-          <h3>${escapeHtml(template.title)}</h3>
-          <div class="badges">
-            <span class="badge" style="border-color:${template.category_color};color:${template.category_color}">
-              ${escapeHtml(template.category_name)}
-            </span>
-            <span class="badge">Version ${template.version}</span>
-            <span class="badge">Geändert von ${escapeHtml(template.updated_by_name)}</span>
-          </div>
+    <details class="card">
+      <summary>
+        <div class="summary-main">
+          <span
+            class="badge category-badge"
+            style="--category-color:${template.category_color}"
+          >
+            ${escapeHtml(template.category_name)}
+          </span>
+          <span class="summary-title">${escapeHtml(template.title)}</span>
+        </div>
+        <span class="summary-meta">Version ${template.version} · ${escapeHtml(template.updated_by_name)}</span>
+      </summary>
+      <div class="card-content">
+        <div class="template-body">${escapeHtml(template.body)}</div>
+        <div class="card-actions">
+          <button class="primary" data-copy-template="${template.id}">Kopieren</button>
+          <button data-edit-template="${template.id}">Änderung vorschlagen</button>
         </div>
       </div>
-      <div class="template-body">${escapeHtml(template.body)}</div>
-      <div class="card-actions">
-        <button class="primary" data-copy-template="${template.id}">Kopieren</button>
-        <button data-edit-template="${template.id}">Änderung vorschlagen</button>
-      </div>
-    </article>`;
+    </details>`;
 }
 
 function renderTemplates() {
@@ -140,20 +142,29 @@ function commandCard(command) {
       : "Niedriges Risiko";
 
   return `
-    <article class="card">
-      <h3>${escapeHtml(command.name)}</h3>
-      <p class="muted">${escapeHtml(command.description)}</p>
-      <div class="badges">
-        <span class="badge">${escapeHtml(command.category)}</span>
-        <span class="badge">${escapeHtml(command.shell)}</span>
-        <span class="badge">${warning}</span>
-        ${command.requires_admin ? '<span class="badge">Admin</span>' : ""}
-        ${command.remote_capable ? '<span class="badge">Remote</span>' : ""}
-        ${command.restart_required ? '<span class="badge">Neustart</span>' : ""}
+    <details class="card">
+      <summary>
+        <div class="summary-main">
+          <span class="badge">${escapeHtml(command.category)}</span>
+          <span class="summary-title">${escapeHtml(command.name)}</span>
+        </div>
+        <span class="summary-meta">${escapeHtml(command.shell)} · ${warning}</span>
+      </summary>
+      <div class="card-content">
+        <p class="muted">${escapeHtml(command.description)}</p>
+        <div class="badges">
+          <span class="badge">${escapeHtml(command.shell)}</span>
+          <span class="badge">${warning}</span>
+          ${command.requires_admin ? '<span class="badge">Admin</span>' : ""}
+          ${command.remote_capable ? '<span class="badge">Remote</span>' : ""}
+          ${command.restart_required ? '<span class="badge">Neustart</span>' : ""}
+        </div>
+        <code class="command-code">${escapeHtml(command.command)}</code>
+        <div class="card-actions">
+          <button class="primary" data-copy-command="${command.id}">Kopieren</button>
+        </div>
       </div>
-      <code class="command-code">${escapeHtml(command.command)}</code>
-      <div class="card-actions"><button class="primary" data-copy-command="${command.id}">Kopieren</button></div>
-    </article>`;
+    </details>`;
 }
 
 function renderCommands() {
