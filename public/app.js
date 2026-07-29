@@ -62,6 +62,9 @@ function roleLabel(role) {
   return { employee: "Mitarbeiter", editor: "Redakteur", admin: "Administrator" }[role] || role;
 }
 
+function replaceLiteral(value, search, replacement) {
+  return String(value).split(search).join(replacement);
+}
 
 function normalizeFavorites(value) {
   const favorites = value && typeof value === "object" ? value : {};
@@ -443,7 +446,7 @@ function populateCategories() {
 }
 
 function replacePersonalPlaceholders(text) {
-  return text.replaceAll("[ICH]", state.settings.signatureName || "[ICH]");
+  return replaceLiteral(text, "[ICH]", state.settings.signatureName || "[ICH]");
 }
 
 async function copyText(text) {

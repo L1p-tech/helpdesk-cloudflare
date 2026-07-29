@@ -25,6 +25,29 @@ export function errorResponse(error: unknown): Response {
     );
   }
 
+  if (error instanceof Error) {
+    if (error.message.includes("UNIQUE constraint failed")) {
+      return json(
+        { error: "Ein Eintrag mit diesen Daten existiert bereits." },
+        { status: 409 },
+      );
+    }
+
+    if (error.message.includes("FOREIGN KEY constraint failed")) {
+      return json(
+        { error: "Verknüpfte Daten wurden nicht gefunden oder sind nicht mehr gültig." },
+        { status: 400 },
+      );
+    }
+
+    if (error.message.includes("CHECK constraint failed")) {
+      return json(
+        { error: "Mindestens ein Wert ist ungültig." },
+        { status: 400 },
+      );
+    }
+  }
+
   console.error(error);
   return json({ error: "Interner Serverfehler." }, { status: 500 });
 }
