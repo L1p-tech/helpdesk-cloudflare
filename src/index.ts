@@ -90,6 +90,13 @@ async function audit(
     .run();
 }
 
+async function hasColumn(env: Env, table: string, column: string): Promise<boolean> {
+  const pragma = await env.DB.prepare(`PRAGMA table_info(${table})`).all<{
+    name: string;
+  }>();
+  return pragma.results.some((entry) => entry.name === column);
+}
+
 async function notify(
   env: Env,
   userId: number,
@@ -350,12 +357,16 @@ async function handleProposals(
 ): Promise<Response | null> {
   if (path === "/api/proposals" && request.method === "GET") {
     const adminView = user.role === "admin" || user.role === "editor";
+    const hasSubmittedByName = await hasColumn(env, "template_proposals", "submitted_by_name");
     const result = await env.DB.prepare(
       `SELECT p.*, c.name AS category_name, c.color AS category_color,
-              p.submitted_by_name,
+              ${hasSubmittedByName
+    ? "p.submitted_by_name"
+    : "COALESCE(u.display_name, 'Ehemaliger Mitarbeiter') AS submitted_by_name"},
               d.title AS duplicate_title
        FROM template_proposals p
        LEFT JOIN categories c ON c.id = p.category_id
+       ${hasSubmittedByName ? "LEFT JOIN users u ON u.id = p.submitted_by" : "JOIN users u ON u.id = p.submitted_by"}
        LEFT JOIN templates d ON d.id = p.duplicate_template_id
        WHERE ${adminView ? "p.status = 'pending'" : "p.submitted_by = ?1"}
        ORDER BY p.updated_at DESC`,
@@ -412,15 +423,15 @@ async function handleProposals(
         duplicate,
       });
     }
-
-    const result = await env.DB.prepare(
-      `INSERT INTO template_proposals
-        (template_id, base_version, proposal_type, category_id, proposed_category_name,
-         proposed_category_color, title, body, reason, status, duplicate_score,
-         duplicate_template_id, submitted_by, submitted_by_name, submitted_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10, ?11, ?12, ?13, CURRENT_TIMESTAMP)`,
-    )
-      .bind(
+    const hasSubmittedByName = await hasColumn(env, "template_proposals", "submitted_by_name");
+    const insert = hasSubmittedByName
+      ? env.DB.prepare(
+        `INSERT INTO template_proposals
+          (template_id, base_version, proposal_type, category_id, proposed_category_name,
+           proposed_category_color, title, body, reason, status, duplicate_score,
+           duplicate_template_id, submitted_by, submitted_by_name, submitted_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10, ?11, ?12, ?13, CURRENT_TIMESTAMP)`,
+      ).bind(
         templateId,
         baseVersion,
         proposalType,
@@ -435,7 +446,28 @@ async function handleProposals(
         user.id,
         user.displayName,
       )
-      .run();
+      : env.DB.prepare(
+        `INSERT INTO template_proposals
+          (template_id, base_version, proposal_type, category_id, proposed_category_name,
+           proposed_category_color, title, body, reason, status, duplicate_score,
+           duplicate_template_id, submitted_by, submitted_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10, ?11, ?12, CURRENT_TIMESTAMP)`,
+      ).bind(
+        templateId,
+        baseVersion,
+        proposalType,
+        categoryId,
+        proposedCategoryName,
+        proposedCategoryColor,
+        title,
+        templateBody,
+        reason,
+        duplicate.score,
+        duplicate.templateId,
+        user.id,
+      );
+
+    const result = await insert.run();
 
     const proposalId = Number(result.meta.last_row_id);
     await audit(env, user.id, "submit", "template_proposal", proposalId, {
@@ -805,11 +837,15 @@ async function handleFeedback(
 ): Promise<Response | null> {
   if (path === "/api/feedback" && request.method === "GET") {
     const adminView = user.role === "admin";
+    const hasSubmittedByName = await hasColumn(env, "feedback_items", "submitted_by_name");
     const query = env.DB.prepare(
       `SELECT f.id, f.type, f.title, f.message, f.status, f.submitted_by,
-              f.submitted_by_name, f.admin_note,
+              ${hasSubmittedByName
+    ? "f.submitted_by_name"
+    : "COALESCE(u.display_name, 'Ehemaliger Mitarbeiter') AS submitted_by_name"}, f.admin_note,
               f.created_at, f.updated_at
        FROM feedback_items f
+       ${hasSubmittedByName ? "LEFT JOIN users u ON u.id = f.submitted_by" : "JOIN users u ON u.id = f.submitted_by"}
        WHERE ${adminView ? "1 = 1" : "f.submitted_by = ?1"}
        ORDER BY f.created_at DESC`,
     );
@@ -831,10 +867,16 @@ async function handleFeedback(
       throw new HttpError(400, "Ungültiger Feedback-Typ.");
     }
 
-    const result = await env.DB.prepare(
-      `INSERT INTO feedback_items (type, title, message, submitted_by, submitted_by_name)
-       VALUES (?1, ?2, ?3, ?4, ?5)`,
-    ).bind(type, title, message, user.id, user.displayName).run();
+    const hasSubmittedByName = await hasColumn(env, "feedback_items", "submitted_by_name");
+    const result = hasSubmittedByName
+      ? await env.DB.prepare(
+        `INSERT INTO feedback_items (type, title, message, submitted_by, submitted_by_name)
+         VALUES (?1, ?2, ?3, ?4, ?5)`,
+      ).bind(type, title, message, user.id, user.displayName).run()
+      : await env.DB.prepare(
+        `INSERT INTO feedback_items (type, title, message, submitted_by)
+         VALUES (?1, ?2, ?3, ?4)`,
+      ).bind(type, title, message, user.id).run();
 
     const feedbackId = Number(result.meta.last_row_id);
     await audit(env, user.id, "submit", "feedback_item", feedbackId, { type });
@@ -1147,10 +1189,16 @@ async function handleGame(
   path: string,
 ): Promise<Response | null> {
   if (path === "/api/game/leaderboard" && request.method === "GET") {
+    const hasScoreDisplayName = await hasColumn(env, "game_scores", "display_name");
     const result = await env.DB.prepare(
-      `SELECT g.display_name, MAX(g.score) AS score, MAX(g.created_at) AS achieved_at
+      `SELECT ${hasScoreDisplayName
+    ? "COALESCE(g.display_name, u.display_name, 'Ehemaliger Mitarbeiter')"
+    : "u.display_name"} AS display_name,
+              MAX(g.score) AS score,
+              MAX(g.created_at) AS achieved_at
        FROM game_scores g
-       GROUP BY g.display_name
+       ${hasScoreDisplayName ? "LEFT JOIN users u ON u.id = g.user_id" : "JOIN users u ON u.id = g.user_id"}
+       GROUP BY g.user_id, display_name
        ORDER BY score DESC, achieved_at ASC
        LIMIT 20`,
     ).all();
@@ -1174,21 +1222,32 @@ async function handleGame(
       throw new HttpError(400, "Punktestand konnte nicht plausibilisiert werden.");
     }
 
-    await env.DB.prepare(
-      "INSERT INTO game_scores (user_id, display_name, score, duration_ms) VALUES (?1, ?2, ?3, ?4)",
-    ).bind(user.id, user.displayName, score, durationMs).run();
+    const hasScoreDisplayName = await hasColumn(env, "game_scores", "display_name");
+    if (hasScoreDisplayName) {
+      await env.DB.prepare(
+        "INSERT INTO game_scores (user_id, display_name, score, duration_ms) VALUES (?1, ?2, ?3, ?4)",
+      ).bind(user.id, user.displayName, score, durationMs).run();
+    } else {
+      await env.DB.prepare(
+        "INSERT INTO game_scores (user_id, score, duration_ms) VALUES (?1, ?2, ?3)",
+      ).bind(user.id, score, durationMs).run();
+    }
 
     return json({ ok: true }, { status: 201 });
   }
 
   if (path === "/api/game/typing/leaderboard" && request.method === "GET") {
+    const hasTypingDisplayName = await hasColumn(env, "typing_game_scores", "display_name");
     const result = await env.DB.prepare(
-      `SELECT t.display_name,
+      `SELECT ${hasTypingDisplayName
+    ? "COALESCE(t.display_name, u.display_name, 'Ehemaliger Mitarbeiter')"
+    : "u.display_name"} AS display_name,
               MAX(t.wpm) AS wpm,
               MAX(t.accuracy) AS accuracy,
               MAX(t.created_at) AS achieved_at
        FROM typing_game_scores t
-       GROUP BY t.display_name
+       ${hasTypingDisplayName ? "LEFT JOIN users u ON u.id = t.user_id" : "JOIN users u ON u.id = t.user_id"}
+       GROUP BY t.user_id, display_name
        ORDER BY wpm DESC, accuracy DESC, achieved_at ASC
        LIMIT 20`,
     ).all();
@@ -1227,11 +1286,20 @@ async function handleGame(
       throw new HttpError(400, "Ergebnis konnte nicht plausibilisiert werden.");
     }
 
-    await env.DB.prepare(
-      `INSERT INTO typing_game_scores
-        (user_id, display_name, wpm, accuracy, correct_chars, total_chars, duration_ms)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
-    ).bind(user.id, user.displayName, wpm, accuracy, correctChars, totalChars, durationMs).run();
+    const hasTypingDisplayName = await hasColumn(env, "typing_game_scores", "display_name");
+    if (hasTypingDisplayName) {
+      await env.DB.prepare(
+        `INSERT INTO typing_game_scores
+          (user_id, display_name, wpm, accuracy, correct_chars, total_chars, duration_ms)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+      ).bind(user.id, user.displayName, wpm, accuracy, correctChars, totalChars, durationMs).run();
+    } else {
+      await env.DB.prepare(
+        `INSERT INTO typing_game_scores
+          (user_id, wpm, accuracy, correct_chars, total_chars, duration_ms)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(user.id, wpm, accuracy, correctChars, totalChars, durationMs).run();
+    }
 
     return json({ ok: true }, { status: 201 });
   }
