@@ -44,6 +44,7 @@
           Freigaben <span id="approval-count"></span>
         </button>
         <button class="main-tab" data-view="commands" type="button">Befehle</button>
+        <button class="main-tab" data-view="feedback" type="button">Verbesserungen</button>
         <button class="main-tab" data-view="diagnose" type="button">Diagnose</button>
         <button class="main-tab" data-view="generator" type="button">Ticket-Generator</button>
         <button class="main-tab" data-view="history" type="button">Versionen &amp; Papierkorb</button>
@@ -116,6 +117,33 @@
             Platzhalter in eckigen Klammern vorher ersetzen.
           </p>
           <div id="commands-list" class="templates-list"></div>
+        </section>
+
+        <section class="view hidden" id="view-feedback">
+          <div class="grid-two">
+            <form class="panel form-panel" id="feedback-form">
+              <h3>Bug oder Verbesserung melden</h3>
+              <label>Typ
+                <select id="feedback-type">
+                  <option value="bug">Bug</option>
+                  <option value="improvement">Verbesserung</option>
+                </select>
+              </label>
+              <label>Titel<input id="feedback-title" maxlength="160" required></label>
+              <label class="wide">Beschreibung<textarea id="feedback-message" rows="6" required></textarea></label>
+              <button class="btn-primary" type="submit">Absenden</button>
+            </form>
+            <div class="panel">
+              <div class="panel-title-row">
+                <div>
+                  <h3>Eingereichte Vorschläge</h3>
+                  <p>Admins sehen alle Einträge. Mitarbeiter sehen nur ihre eigenen.</p>
+                </div>
+                <button id="feedback-refresh-button" type="button">Aktualisieren</button>
+              </div>
+              <div id="feedback-list" class="templates-list"></div>
+            </div>
+          </div>
         </section>
 
 

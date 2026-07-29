@@ -52,6 +52,19 @@ interface CategoryRow {
   color: string;
 }
 
+interface FeedbackRow {
+  id: number;
+  type: "bug" | "improvement";
+  title: string;
+  message: string;
+  status: "open" | "planned" | "closed";
+  submitted_by: number;
+  submitted_by_name: string;
+  admin_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 function routePath(request: Request): string {
   return new URL(request.url).pathname.replace(/\/+$/, "") || "/";
 }
@@ -779,6 +792,91 @@ async function handleCommands(
   return null;
 }
 
+async function handleFeedback(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  path: string,
+): Promise<Response | null> {
+  if (path === "/api/feedback" && request.method === "GET") {
+    const adminView = user.role === "admin";
+    const query = env.DB.prepare(
+      `SELECT f.id, f.type, f.title, f.message, f.status, f.submitted_by,
+              u.display_name AS submitted_by_name, f.admin_note,
+              f.created_at, f.updated_at
+       FROM feedback_items f
+       JOIN users u ON u.id = f.submitted_by
+       WHERE ${adminView ? "1 = 1" : "f.submitted_by = ?1"}
+       ORDER BY f.created_at DESC`,
+    );
+
+    const result = adminView
+      ? await query.all<FeedbackRow>()
+      : await query.bind(user.id).all<FeedbackRow>();
+
+    return json({ items: result.results });
+  }
+
+  if (path === "/api/feedback" && request.method === "POST") {
+    const body = await readJson<Record<string, unknown>>(request);
+    const type = requiredString(body.type, "Typ", 20);
+    const title = requiredString(body.title, "Titel", 160);
+    const message = requiredString(body.message, "Beschreibung", 4000);
+
+    if (!["bug", "improvement"].includes(type)) {
+      throw new HttpError(400, "Ungültiger Feedback-Typ.");
+    }
+
+    const result = await env.DB.prepare(
+      `INSERT INTO feedback_items (type, title, message, submitted_by)
+       VALUES (?1, ?2, ?3, ?4)`,
+    ).bind(type, title, message, user.id).run();
+
+    const feedbackId = Number(result.meta.last_row_id);
+    await audit(env, user.id, "submit", "feedback_item", feedbackId, { type });
+    return json({ id: feedbackId }, { status: 201 });
+  }
+
+  const feedbackMatch = path.match(/^\/api\/feedback\/(\d+)$/);
+  if (feedbackMatch && request.method === "PATCH") {
+    requireRole(user, ["admin"]);
+    const feedbackId = positiveInteger(feedbackMatch[1], "Feedback-ID");
+    const body = await readJson<Record<string, unknown>>(request);
+    const status = body.status ? requiredString(body.status, "Status", 20) : null;
+    const adminNote = body.adminNote === undefined
+      ? null
+      : optionalString(body.adminNote, 2000);
+
+    if (status && !["open", "planned", "closed"].includes(status)) {
+      throw new HttpError(400, "Ungültiger Feedback-Status.");
+    }
+
+    const result = await env.DB.prepare(
+      `UPDATE feedback_items
+       SET status = COALESCE(?1, status),
+           admin_note = CASE WHEN ?2 = 1 THEN ?3 ELSE admin_note END,
+           reviewed_by = ?4,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?5`,
+    ).bind(
+      status,
+      body.adminNote === undefined ? 0 : 1,
+      adminNote,
+      user.id,
+      feedbackId,
+    ).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Feedback wurde nicht gefunden.");
+    }
+
+    await audit(env, user.id, "update", "feedback_item", feedbackId, { status });
+    return json({ ok: true });
+  }
+
+  return null;
+}
+
 async function handleUsers(
   request: Request,
   env: Env,
@@ -1067,6 +1165,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     handleCategories,
     handleTemplates,
     handleCommands,
+    handleFeedback,
     handleUsers,
     handleHistory,
     handleGame,
