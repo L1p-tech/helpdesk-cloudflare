@@ -91,10 +91,81 @@ async function audit(
 }
 
 async function hasColumn(env: Env, table: string, column: string): Promise<boolean> {
-  const pragma = await env.DB.prepare(`PRAGMA table_info(${table})`).all<{
-    name: string;
-  }>();
-  return pragma.results.some((entry) => entry.name === column);
+  try {
+    const pragma = await env.DB.prepare(`PRAGMA table_info(${table})`).all<{
+      name: string;
+    }>();
+    return pragma.results.some((entry) => entry.name === column);
+  } catch {
+    return false;
+  }
+}
+
+function isSchemaMismatch(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /no such column|has no column named|NOT NULL constraint failed/i.test(error.message);
+}
+
+function isMissingTable(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /no such table/i.test(error.message);
+}
+
+async function withSchemaFallback<T>(
+  primary: () => Promise<T>,
+  fallback: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await primary();
+  } catch (error) {
+    if (!isSchemaMismatch(error)) throw error;
+    return fallback();
+  }
+}
+
+async function ignoreMissingTable(operation: () => Promise<unknown>): Promise<void> {
+  try {
+    await operation();
+  } catch (error) {
+    if (!isMissingTable(error)) throw error;
+  }
+}
+
+async function ensureFeedbackTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS feedback_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL CHECK (type IN ('bug', 'improvement')),
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'planned', 'closed')),
+      submitted_by INTEGER,
+      submitted_by_name TEXT NOT NULL,
+      reviewed_by INTEGER,
+      admin_note TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+    )`,
+  ).run();
+}
+
+async function ensureTypingScoresTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS typing_game_scores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      display_name TEXT NOT NULL,
+      wpm INTEGER NOT NULL CHECK (wpm >= 0 AND wpm <= 400),
+      accuracy INTEGER NOT NULL CHECK (accuracy >= 0 AND accuracy <= 100),
+      correct_chars INTEGER NOT NULL CHECK (correct_chars >= 0),
+      total_chars INTEGER NOT NULL CHECK (total_chars >= 1),
+      duration_ms INTEGER NOT NULL CHECK (duration_ms >= 10000 AND duration_ms <= 300000),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    )`,
+  ).run();
 }
 
 async function notify(
@@ -503,12 +574,22 @@ async function handleProposals(
     const body = await readJson<Record<string, unknown>>(request);
     const note = optionalString(body.note, 2000);
 
-    const proposal = await env.DB.prepare(
-      `SELECT id, template_id, base_version, proposal_type, category_id,
-              proposed_category_name, proposed_category_color, title, body,
-              status, submitted_by
-       FROM template_proposals WHERE id = ?1`,
-    ).bind(proposalId).first<ProposalRow>();
+    const proposal = await withSchemaFallback(
+      () => env.DB.prepare(
+        `SELECT id, template_id, base_version, proposal_type, category_id,
+                proposed_category_name, proposed_category_color, title, body,
+                status, submitted_by, submitted_by_name
+         FROM template_proposals WHERE id = ?1`,
+      ).bind(proposalId).first<ProposalRow>(),
+      () => env.DB.prepare(
+        `SELECT p.id, p.template_id, p.base_version, p.proposal_type, p.category_id,
+                p.proposed_category_name, p.proposed_category_color, p.title, p.body,
+                p.status, p.submitted_by, u.display_name AS submitted_by_name
+         FROM template_proposals p
+         JOIN users u ON u.id = p.submitted_by
+         WHERE p.id = ?1`,
+      ).bind(proposalId).first<ProposalRow>(),
+    );
 
     if (!proposal) throw new HttpError(404, "Vorschlag wurde nicht gefunden.");
     if (proposal.status !== "pending") {
@@ -934,28 +1015,44 @@ async function handleFeedback(
   path: string,
 ): Promise<Response | null> {
   if (path === "/api/feedback" && request.method === "GET") {
+    await ensureFeedbackTable(env);
     const adminView = user.role === "admin";
-    const hasSubmittedByName = await hasColumn(env, "feedback_items", "submitted_by_name");
-    const query = env.DB.prepare(
-      `SELECT f.id, f.type, f.title, f.message, f.status, f.submitted_by,
-              ${hasSubmittedByName
-    ? "f.submitted_by_name"
-    : "COALESCE(u.display_name, 'Ehemaliger Mitarbeiter') AS submitted_by_name"}, f.admin_note,
-              f.created_at, f.updated_at
-       FROM feedback_items f
-       ${hasSubmittedByName ? "LEFT JOIN users u ON u.id = f.submitted_by" : "JOIN users u ON u.id = f.submitted_by"}
-       WHERE ${adminView ? "1 = 1" : "f.submitted_by = ?1"}
-       ORDER BY f.created_at DESC`,
+    const result = await withSchemaFallback(
+      async () => {
+        const query = env.DB.prepare(
+          `SELECT f.id, f.type, f.title, f.message, f.status, f.submitted_by,
+                  COALESCE(f.submitted_by_name, u.display_name, 'Ehemaliger Mitarbeiter') AS submitted_by_name,
+                  f.admin_note, f.created_at, f.updated_at
+           FROM feedback_items f
+           LEFT JOIN users u ON u.id = f.submitted_by
+           WHERE ${adminView ? "1 = 1" : "f.submitted_by = ?1"}
+           ORDER BY f.created_at DESC`,
+        );
+        return adminView
+          ? query.all<FeedbackRow>()
+          : query.bind(user.id).all<FeedbackRow>();
+      },
+      async () => {
+        const query = env.DB.prepare(
+          `SELECT f.id, f.type, f.title, f.message, f.status, f.submitted_by,
+                  u.display_name AS submitted_by_name, f.admin_note,
+                  f.created_at, f.updated_at
+           FROM feedback_items f
+           JOIN users u ON u.id = f.submitted_by
+           WHERE ${adminView ? "1 = 1" : "f.submitted_by = ?1"}
+           ORDER BY f.created_at DESC`,
+        );
+        return adminView
+          ? query.all<FeedbackRow>()
+          : query.bind(user.id).all<FeedbackRow>();
+      },
     );
-
-    const result = adminView
-      ? await query.all<FeedbackRow>()
-      : await query.bind(user.id).all<FeedbackRow>();
 
     return json({ items: result.results });
   }
 
   if (path === "/api/feedback" && request.method === "POST") {
+    await ensureFeedbackTable(env);
     const body = await readJson<Record<string, unknown>>(request);
     const type = requiredString(body.type, "Typ", 20);
     const title = requiredString(body.title, "Titel", 160);
@@ -965,16 +1062,16 @@ async function handleFeedback(
       throw new HttpError(400, "Ungültiger Feedback-Typ.");
     }
 
-    const hasSubmittedByName = await hasColumn(env, "feedback_items", "submitted_by_name");
-    const result = hasSubmittedByName
-      ? await env.DB.prepare(
+    const result = await withSchemaFallback(
+      () => env.DB.prepare(
         `INSERT INTO feedback_items (type, title, message, submitted_by, submitted_by_name)
          VALUES (?1, ?2, ?3, ?4, ?5)`,
-      ).bind(type, title, message, user.id, user.displayName).run()
-      : await env.DB.prepare(
+      ).bind(type, title, message, user.id, user.displayName).run(),
+      () => env.DB.prepare(
         `INSERT INTO feedback_items (type, title, message, submitted_by)
          VALUES (?1, ?2, ?3, ?4)`,
-      ).bind(type, title, message, user.id).run();
+      ).bind(type, title, message, user.id).run(),
+    );
 
     const feedbackId = Number(result.meta.last_row_id);
     await audit(env, user.id, "submit", "feedback_item", feedbackId, { type });
@@ -1130,59 +1227,56 @@ async function handleUsers(
       throw new HttpError(400, "Das eigene Konto kann nicht gelöscht werden.");
     }
 
-    const hasTemplateNames = await hasColumn(env, "templates", "created_by_name");
-    const hasCommandNames = await hasColumn(env, "commands", "created_by_name");
-    const hasVersionNames = await hasColumn(env, "template_versions", "changed_by_name");
-    const hasProposalNames = await hasColumn(env, "template_proposals", "submitted_by_name");
-    const hasFeedbackNames = await hasColumn(env, "feedback_items", "submitted_by_name");
-
-    await env.DB.batch([
-      env.DB.prepare(
-        hasTemplateNames
-          ? `UPDATE templates SET created_by = NULL WHERE created_by = ?1`
-          : `UPDATE templates
-             SET created_by = ?2, updated_at = updated_at
-             WHERE created_by = ?1`,
-      ).bind(targetId, user.id),
-      env.DB.prepare(
-        hasTemplateNames
-          ? `UPDATE templates SET updated_by = NULL WHERE updated_by = ?1`
-          : `UPDATE templates
-             SET updated_by = ?2, updated_at = updated_at
-             WHERE updated_by = ?1`,
-      ).bind(targetId, user.id),
-      env.DB.prepare(
-        hasCommandNames
-          ? `UPDATE commands SET created_by = NULL WHERE created_by = ?1`
-          : `UPDATE commands SET created_by = ?2 WHERE created_by = ?1`,
-      ).bind(targetId, user.id),
-      env.DB.prepare(
-        hasCommandNames
-          ? `UPDATE commands SET updated_by = NULL WHERE updated_by = ?1`
-          : `UPDATE commands SET updated_by = ?2 WHERE updated_by = ?1`,
-      ).bind(targetId, user.id),
-      env.DB.prepare(
-        hasVersionNames
-          ? `UPDATE template_versions SET changed_by = NULL WHERE changed_by = ?1`
-          : `UPDATE template_versions SET changed_by = ?2 WHERE changed_by = ?1`,
-      ).bind(targetId, user.id),
-      env.DB.prepare(
-        hasProposalNames
-          ? `UPDATE template_proposals SET submitted_by = NULL WHERE submitted_by = ?1`
-          : `UPDATE template_proposals SET submitted_by = ?2 WHERE submitted_by = ?1`,
-      ).bind(targetId, user.id),
-      env.DB.prepare(
-        "UPDATE template_proposals SET reviewed_by = NULL WHERE reviewed_by = ?1",
-      ).bind(targetId),
-      env.DB.prepare(
-        hasFeedbackNames
-          ? `UPDATE feedback_items SET submitted_by = NULL WHERE submitted_by = ?1`
-          : `UPDATE feedback_items SET submitted_by = ?2 WHERE submitted_by = ?1`,
-      ).bind(targetId, user.id),
-      env.DB.prepare(
-        "UPDATE feedback_items SET reviewed_by = NULL WHERE reviewed_by = ?1",
-      ).bind(targetId),
-    ]);
+    await withSchemaFallback(
+      () => env.DB.prepare("UPDATE templates SET created_by = NULL WHERE created_by = ?1")
+        .bind(targetId).run(),
+      () => env.DB.prepare(
+        "UPDATE templates SET created_by = ?2, updated_at = updated_at WHERE created_by = ?1",
+      ).bind(targetId, user.id).run(),
+    );
+    await withSchemaFallback(
+      () => env.DB.prepare("UPDATE templates SET updated_by = NULL WHERE updated_by = ?1")
+        .bind(targetId).run(),
+      () => env.DB.prepare(
+        "UPDATE templates SET updated_by = ?2, updated_at = updated_at WHERE updated_by = ?1",
+      ).bind(targetId, user.id).run(),
+    );
+    await withSchemaFallback(
+      () => env.DB.prepare("UPDATE commands SET created_by = NULL WHERE created_by = ?1")
+        .bind(targetId).run(),
+      () => env.DB.prepare("UPDATE commands SET created_by = ?2 WHERE created_by = ?1")
+        .bind(targetId, user.id).run(),
+    );
+    await withSchemaFallback(
+      () => env.DB.prepare("UPDATE commands SET updated_by = NULL WHERE updated_by = ?1")
+        .bind(targetId).run(),
+      () => env.DB.prepare("UPDATE commands SET updated_by = ?2 WHERE updated_by = ?1")
+        .bind(targetId, user.id).run(),
+    );
+    await withSchemaFallback(
+      () => env.DB.prepare("UPDATE template_versions SET changed_by = NULL WHERE changed_by = ?1")
+        .bind(targetId).run(),
+      () => env.DB.prepare("UPDATE template_versions SET changed_by = ?2 WHERE changed_by = ?1")
+        .bind(targetId, user.id).run(),
+    );
+    await ignoreMissingTable(() => withSchemaFallback(
+      () => env.DB.prepare("UPDATE template_proposals SET submitted_by = NULL WHERE submitted_by = ?1")
+        .bind(targetId).run(),
+      () => env.DB.prepare("UPDATE template_proposals SET submitted_by = ?2 WHERE submitted_by = ?1")
+        .bind(targetId, user.id).run(),
+    ));
+    await ignoreMissingTable(() => env.DB.prepare(
+      "UPDATE template_proposals SET reviewed_by = NULL WHERE reviewed_by = ?1",
+    ).bind(targetId).run());
+    await ignoreMissingTable(() => withSchemaFallback(
+      () => env.DB.prepare("UPDATE feedback_items SET submitted_by = NULL WHERE submitted_by = ?1")
+        .bind(targetId).run(),
+      () => env.DB.prepare("UPDATE feedback_items SET submitted_by = ?2 WHERE submitted_by = ?1")
+        .bind(targetId, user.id).run(),
+    ));
+    await ignoreMissingTable(() => env.DB.prepare(
+      "UPDATE feedback_items SET reviewed_by = NULL WHERE reviewed_by = ?1",
+    ).bind(targetId).run());
 
     const deleteResult = await env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(targetId).run();
     if (!deleteResult.meta.changes) {
@@ -1344,19 +1438,30 @@ async function handleGame(
   path: string,
 ): Promise<Response | null> {
   if (path === "/api/game/leaderboard" && request.method === "GET") {
-    const hasScoreDisplayName = await hasColumn(env, "game_scores", "display_name");
-    const result = await env.DB.prepare(
-      `SELECT ${hasScoreDisplayName
-    ? "COALESCE(g.display_name, u.display_name, 'Ehemaliger Mitarbeiter')"
-    : "u.display_name"} AS display_name,
-              MAX(g.score) AS score,
-              MAX(g.created_at) AS achieved_at
-       FROM game_scores g
-       ${hasScoreDisplayName ? "LEFT JOIN users u ON u.id = g.user_id" : "JOIN users u ON u.id = g.user_id"}
-       GROUP BY g.user_id, display_name
-       ORDER BY score DESC, achieved_at ASC
-       LIMIT 20`,
-    ).all();
+    const result = await withSchemaFallback(
+      () => env.DB.prepare(
+        `SELECT COALESCE(g.display_name, u.display_name, 'Ehemaliger Mitarbeiter') AS display_name,
+                MAX(g.score) AS score,
+                MAX(g.created_at) AS achieved_at
+         FROM game_scores g
+         LEFT JOIN users u ON u.id = g.user_id
+         GROUP BY
+           COALESCE(g.user_id, g.display_name),
+           COALESCE(g.display_name, u.display_name, 'Ehemaliger Mitarbeiter')
+         ORDER BY score DESC, achieved_at ASC
+         LIMIT 20`,
+      ).all(),
+      () => env.DB.prepare(
+        `SELECT u.display_name AS display_name,
+                MAX(g.score) AS score,
+                MAX(g.created_at) AS achieved_at
+         FROM game_scores g
+         JOIN users u ON u.id = g.user_id
+         GROUP BY g.user_id, u.display_name
+         ORDER BY score DESC, achieved_at ASC
+         LIMIT 20`,
+      ).all(),
+    );
     return json({ leaderboard: result.results });
   }
 
@@ -1377,39 +1482,51 @@ async function handleGame(
       throw new HttpError(400, "Punktestand konnte nicht plausibilisiert werden.");
     }
 
-    const hasScoreDisplayName = await hasColumn(env, "game_scores", "display_name");
-    if (hasScoreDisplayName) {
-      await env.DB.prepare(
+    await withSchemaFallback(
+      () => env.DB.prepare(
         "INSERT INTO game_scores (user_id, display_name, score, duration_ms) VALUES (?1, ?2, ?3, ?4)",
-      ).bind(user.id, user.displayName, score, durationMs).run();
-    } else {
-      await env.DB.prepare(
+      ).bind(user.id, user.displayName, score, durationMs).run(),
+      () => env.DB.prepare(
         "INSERT INTO game_scores (user_id, score, duration_ms) VALUES (?1, ?2, ?3)",
-      ).bind(user.id, score, durationMs).run();
-    }
+      ).bind(user.id, score, durationMs).run(),
+    );
 
     return json({ ok: true }, { status: 201 });
   }
 
   if (path === "/api/game/typing/leaderboard" && request.method === "GET") {
-    const hasTypingDisplayName = await hasColumn(env, "typing_game_scores", "display_name");
-    const result = await env.DB.prepare(
-      `SELECT ${hasTypingDisplayName
-    ? "COALESCE(t.display_name, u.display_name, 'Ehemaliger Mitarbeiter')"
-    : "u.display_name"} AS display_name,
-              MAX(t.wpm) AS wpm,
-              MAX(t.accuracy) AS accuracy,
-              MAX(t.created_at) AS achieved_at
-       FROM typing_game_scores t
-       ${hasTypingDisplayName ? "LEFT JOIN users u ON u.id = t.user_id" : "JOIN users u ON u.id = t.user_id"}
-       GROUP BY t.user_id, display_name
-       ORDER BY wpm DESC, accuracy DESC, achieved_at ASC
-       LIMIT 20`,
-    ).all();
+    await ensureTypingScoresTable(env);
+    const result = await withSchemaFallback(
+      () => env.DB.prepare(
+        `SELECT COALESCE(t.display_name, u.display_name, 'Ehemaliger Mitarbeiter') AS display_name,
+                MAX(t.wpm) AS wpm,
+                MAX(t.accuracy) AS accuracy,
+                MAX(t.created_at) AS achieved_at
+         FROM typing_game_scores t
+         LEFT JOIN users u ON u.id = t.user_id
+         GROUP BY
+           COALESCE(t.user_id, t.display_name),
+           COALESCE(t.display_name, u.display_name, 'Ehemaliger Mitarbeiter')
+         ORDER BY wpm DESC, accuracy DESC, achieved_at ASC
+         LIMIT 20`,
+      ).all(),
+      () => env.DB.prepare(
+        `SELECT u.display_name AS display_name,
+                MAX(t.wpm) AS wpm,
+                MAX(t.accuracy) AS accuracy,
+                MAX(t.created_at) AS achieved_at
+         FROM typing_game_scores t
+         JOIN users u ON u.id = t.user_id
+         GROUP BY t.user_id, u.display_name
+         ORDER BY wpm DESC, accuracy DESC, achieved_at ASC
+         LIMIT 20`,
+      ).all(),
+    );
     return json({ leaderboard: result.results });
   }
 
   if (path === "/api/game/typing/scores" && request.method === "POST") {
+    await ensureTypingScoresTable(env);
     const body = await readJson<Record<string, unknown>>(request);
     const wpm = Number(body.wpm);
     const accuracy = Number(body.accuracy);
@@ -1441,20 +1558,18 @@ async function handleGame(
       throw new HttpError(400, "Ergebnis konnte nicht plausibilisiert werden.");
     }
 
-    const hasTypingDisplayName = await hasColumn(env, "typing_game_scores", "display_name");
-    if (hasTypingDisplayName) {
-      await env.DB.prepare(
+    await withSchemaFallback(
+      () => env.DB.prepare(
         `INSERT INTO typing_game_scores
           (user_id, display_name, wpm, accuracy, correct_chars, total_chars, duration_ms)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
-      ).bind(user.id, user.displayName, wpm, accuracy, correctChars, totalChars, durationMs).run();
-    } else {
-      await env.DB.prepare(
+      ).bind(user.id, user.displayName, wpm, accuracy, correctChars, totalChars, durationMs).run(),
+      () => env.DB.prepare(
         `INSERT INTO typing_game_scores
           (user_id, wpm, accuracy, correct_chars, total_chars, duration_ms)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
-      ).bind(user.id, wpm, accuracy, correctChars, totalChars, durationMs).run();
-    }
+      ).bind(user.id, wpm, accuracy, correctChars, totalChars, durationMs).run(),
+    );
 
     return json({ ok: true }, { status: 201 });
   }

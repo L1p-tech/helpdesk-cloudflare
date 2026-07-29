@@ -1090,7 +1090,7 @@ async function handleUsersListClick(event) {
 
   if (action === "delete") {
     const confirmed = window.confirm(
-      `${userName} wirklich löschen? Das geht nur, wenn keine Inhalte oder Spielstände mit dem Konto verknüpft sind.`,
+      `${userName} wirklich löschen? Vorhandene Inhalte, Vorschläge und Spielstände bleiben mit Namen erhalten.`,
     );
     if (!confirmed) return;
 
