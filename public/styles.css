@@ -467,3 +467,59 @@ dialog::backdrop { background: rgba(0,0,0,.68); backdrop-filter: blur(2px); }
   .quickbar-head, .panel-title-row { align-items: stretch; flex-direction: column; }
   .history-row { grid-template-columns: 1fr; }
 }
+
+
+.favorite-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted-dark);
+  font-size: 18px;
+  line-height: 1;
+}
+.favorite-button:hover { color: #d8b24e; }
+.favorite-button.active { color: #e0b84f; }
+.favorite-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.quickbar-section + .quickbar-section { margin-top: 10px; }
+.quickbar-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted-dark);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.quick-item.favorite { border-color: #574c28; color: #d8b85d; }
+
+.main-tabs {
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #343846 transparent;
+}
+.main-tabs::-webkit-scrollbar { height: 5px; }
+.main-tabs::-webkit-scrollbar-thumb {
+  background: #343846;
+  border-radius: 999px;
+}
+
+#game-canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.game-status {
+  color: var(--muted);
+  font-size: 12px;
+}

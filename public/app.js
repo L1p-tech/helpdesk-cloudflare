@@ -63,6 +63,56 @@ function roleLabel(role) {
 }
 
 
+function normalizeFavorites(value) {
+  const favorites = value && typeof value === "object" ? value : {};
+  return {
+    templates: Array.isArray(favorites.templates)
+      ? favorites.templates.map(Number).filter(Number.isInteger)
+      : [],
+    commands: Array.isArray(favorites.commands)
+      ? favorites.commands.map(Number).filter(Number.isInteger)
+      : [],
+  };
+}
+
+function isFavorite(type, id) {
+  const collection = type === "template"
+    ? state.settings.favorites.templates
+    : state.settings.favorites.commands;
+  return collection.includes(Number(id));
+}
+
+async function persistSettings() {
+  await api("/api/settings", {
+    method: "PUT",
+    body: JSON.stringify({
+      signatureName: state.settings.signatureName,
+      favorites: state.settings.favorites,
+      preferences: {},
+    }),
+  });
+}
+
+async function toggleFavorite(type, id) {
+  const key = type === "template" ? "templates" : "commands";
+  const numericId = Number(id);
+  const values = new Set(state.settings.favorites[key]);
+
+  if (values.has(numericId)) {
+    values.delete(numericId);
+  } else {
+    values.add(numericId);
+  }
+
+  state.settings.favorites[key] = [...values];
+  await persistSettings();
+  renderTemplates();
+  renderCommands();
+  renderQuickbar();
+  showToast(values.has(numericId) ? "Zu Favoriten hinzugefügt." : "Favorit entfernt.");
+}
+
+
 const DIAGNOSTICS = {
   "Netzwerk / Internet": [
     "IP-Konfiguration dokumentiert",
@@ -145,16 +195,39 @@ function renderQuickbar() {
   const container = $("#quickbar-items");
   if (!container) return;
 
-  container.innerHTML = state.recentItems.length
-    ? state.recentItems.map((item) => `
-      <button
-        class="quick-item"
-        type="button"
-        data-recent-type="${escapeHtml(item.type)}"
-        data-recent-id="${Number(item.id)}"
-      >${escapeHtml(item.label)}</button>
-    `).join("")
-    : '<span class="quick-empty">Noch keine zuletzt verwendeten Inhalte.</span>';
+  const favoriteTemplates = state.templates
+    .filter((item) => isFavorite("template", item.id))
+    .map((item) => ({ type: "template", id: item.id, label: item.title }));
+
+  const favoriteCommands = state.commands
+    .filter((item) => isFavorite("command", item.id))
+    .map((item) => ({ type: "command", id: item.id, label: item.name }));
+
+  const favorites = [...favoriteTemplates, ...favoriteCommands];
+
+  const renderItems = (items, extraClass = "") => items.map((item) => `
+    <button
+      class="quick-item ${extraClass}"
+      type="button"
+      data-recent-type="${escapeHtml(item.type)}"
+      data-recent-id="${Number(item.id)}"
+    >${escapeHtml(item.label)}</button>
+  `).join("");
+
+  container.innerHTML = `
+    <div class="quickbar-section">
+      <span class="quickbar-label">Favoriten</span>
+      ${favorites.length
+        ? renderItems(favorites, "favorite")
+        : '<span class="quick-empty">Noch keine Favoriten markiert.</span>'}
+    </div>
+    <div class="quickbar-section">
+      <span class="quickbar-label">Zuletzt verwendet</span>
+      ${state.recentItems.length
+        ? renderItems(state.recentItems)
+        : '<span class="quick-empty">Noch keine zuletzt verwendeten Inhalte.</span>'}
+    </div>
+  `;
 }
 
 function renderDiagnosticChecklist() {
@@ -338,9 +411,18 @@ async function loadBootstrap() {
   state.categories = data.categories;
   state.templates = data.templates;
   state.commands = data.commands;
+  let parsedFavorites = {};
+  try {
+    parsedFavorites = JSON.parse(
+      data.settings.favorites_json || '{"templates":[],"commands":[]}',
+    );
+  } catch {
+    parsedFavorites = {};
+  }
+
   state.settings = {
     signatureName: data.settings.signature_name || "",
-    favorites: JSON.parse(data.settings.favorites_json || '{"templates":[],"commands":[]}'),
+    favorites: normalizeFavorites(parsedFavorites),
   };
 
   $("#current-user").innerHTML = `<strong>${escapeHtml(state.user.displayName)}</strong><br>${roleLabel(state.user.role)}`;
@@ -371,9 +453,19 @@ async function copyText(text) {
 
 function templateCard(template) {
   const updatedAt = formatDate(template.updated_at);
+  const favorite = isFavorite("template", template.id);
+
   return `
     <details class="card">
       <summary>
+        <button
+          class="favorite-button ${favorite ? "active" : ""}"
+          type="button"
+          data-favorite-template="${template.id}"
+          aria-label="${favorite ? "Vorlage aus Favoriten entfernen" : "Vorlage favorisieren"}"
+          aria-pressed="${favorite}"
+          title="${favorite ? "Favorit entfernen" : "Als Favorit markieren"}"
+        >★</button>
         <div class="summary-main">
           <span
             class="badge category-badge"
@@ -419,10 +511,19 @@ function commandCard(command) {
     : command.risk_level === "medium"
       ? "Mittleres Risiko"
       : "Niedriges Risiko";
+  const favorite = isFavorite("command", command.id);
 
   return `
     <details class="card">
       <summary>
+        <button
+          class="favorite-button ${favorite ? "active" : ""}"
+          type="button"
+          data-favorite-command="${command.id}"
+          aria-label="${favorite ? "Befehl aus Favoriten entfernen" : "Befehl favorisieren"}"
+          aria-pressed="${favorite}"
+          title="${favorite ? "Favorit entfernen" : "Als Favorit markieren"}"
+        >★</button>
         <div class="summary-main">
           <span class="badge">${escapeHtml(command.category)}</span>
           <span class="summary-title">${escapeHtml(command.name)}</span>
@@ -625,33 +726,223 @@ async function loadLeaderboard() {
 function initializeGame() {
   const canvas = $("#game-canvas");
   const context = canvas.getContext("2d");
-  let running = false;
-  let frame = 0;
-  let startTime = 0;
-  let score = 0;
-  let playerY = 200;
-  let velocityY = 0;
-  let obstacleX = 800;
+  const groundY = 221;
+  const dino = {
+    x: 62,
+    y: groundY - 42,
+    width: 42,
+    height: 42,
+    velocityY: 0,
+    ducking: false,
+  };
 
-  function jump() {
-    if (running && playerY >= 199) velocityY = -12;
+  let running = false;
+  let gameOver = false;
+  let frame = 0;
+  let score = 0;
+  let highScore = 0;
+  let startTime = 0;
+  let animationId = null;
+  let nextObstacleFrame = 90;
+  let obstacles = [];
+  let clouds = [
+    { x: 180, y: 50, speed: .25 },
+    { x: 520, y: 82, speed: .18 },
+  ];
+
+  function resetGame() {
+    running = true;
+    gameOver = false;
+    frame = 0;
+    score = 0;
+    startTime = Date.now();
+    dino.y = groundY - dino.height;
+    dino.velocityY = 0;
+    dino.ducking = false;
+    obstacles = [];
+    nextObstacleFrame = 80;
+    $("#game-score").textContent = "00000";
   }
 
-  function draw() {
+  function jump() {
+    if (!running) return;
+    const onGround = dino.y >= groundY - dino.height - .5;
+    if (onGround) {
+      dino.velocityY = -12.8;
+      dino.ducking = false;
+    }
+  }
+
+  function setDucking(value) {
+    dino.ducking = value && running;
+  }
+
+  function spawnObstacle() {
+    const allowBird = score > 180;
+    const bird = allowBird && Math.random() < .24;
+
+    if (bird) {
+      obstacles.push({
+        type: "bird",
+        x: canvas.width + 20,
+        y: Math.random() < .5 ? 157 : 182,
+        width: 40,
+        height: 24,
+      });
+    } else {
+      const large = Math.random() < .35;
+      obstacles.push({
+        type: "cactus",
+        x: canvas.width + 20,
+        y: groundY - (large ? 50 : 38),
+        width: large ? 28 : 20,
+        height: large ? 50 : 38,
+      });
+    }
+
+    nextObstacleFrame = frame + 70 + Math.floor(Math.random() * 70);
+  }
+
+  function drawCloud(cloud) {
+    context.fillStyle = "#555a68";
+    context.fillRect(Math.round(cloud.x), cloud.y + 6, 38, 2);
+    context.fillRect(Math.round(cloud.x + 8), cloud.y, 14, 2);
+    context.fillRect(Math.round(cloud.x + 4), cloud.y + 2, 26, 2);
+    context.fillRect(Math.round(cloud.x + 2), cloud.y + 4, 32, 2);
+  }
+
+  function drawDino() {
+    const x = Math.round(dino.x);
+    const y = Math.round(dino.y);
+    const bodyHeight = dino.ducking ? 26 : 38;
+    const top = dino.ducking ? y + 14 : y;
+    const legFrame = Math.floor(frame / 5) % 2;
+
+    context.fillStyle = "#d4d6dc";
+    context.fillRect(x + 9, top + 8, 24, bodyHeight - 12);
+    context.fillRect(x + 24, top, 18, 15);
+    context.fillRect(x + 37, top + 5, 7, 5);
+    context.fillRect(x + 2, top + 16, 12, 8);
+    context.fillRect(x, top + 12, 8, 5);
+    context.fillStyle = "#0f1117";
+    context.fillRect(x + 34, top + 4, 3, 3);
+
+    context.fillStyle = "#d4d6dc";
+    if (dino.ducking) {
+      context.fillRect(x + 13, top + 20, 12, 5);
+      context.fillRect(x + 29, top + 20, 12, 5);
+    } else if (dino.y < groundY - dino.height - 1) {
+      context.fillRect(x + 12, top + 32, 7, 9);
+      context.fillRect(x + 27, top + 32, 7, 9);
+    } else {
+      context.fillRect(x + (legFrame ? 12 : 16), top + 32, 7, 10);
+      context.fillRect(x + (legFrame ? 29 : 25), top + 32, 7, 10);
+    }
+  }
+
+  function drawCactus(obstacle) {
+    const x = Math.round(obstacle.x);
+    const y = obstacle.y;
+    context.fillStyle = "#74b785";
+    context.fillRect(x + 7, y, obstacle.width - 14, obstacle.height);
+    context.fillRect(x, y + 14, 9, 7);
+    context.fillRect(x + 2, y + 8, 5, 16);
+    context.fillRect(x + obstacle.width - 7, y + 20, 9, 7);
+    context.fillRect(x + obstacle.width - 2, y + 13, 5, 16);
+  }
+
+  function drawBird(obstacle) {
+    const x = Math.round(obstacle.x);
+    const y = obstacle.y;
+    const wingUp = Math.floor(frame / 7) % 2 === 0;
+    context.fillStyle = "#c9ccd4";
+    context.fillRect(x + 10, y + 8, 24, 10);
+    context.fillRect(x + 30, y + 5, 9, 8);
+    context.fillRect(x + 2, y + 11, 10, 5);
+    context.fillRect(x + 14, wingUp ? y : y + 16, 16, 5);
+  }
+
+  function drawScene() {
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "#2a2d3a";
-    context.fillRect(0, 230, canvas.width, 2);
+    context.fillStyle = "#12141b";
+    context.fillRect(0, 0, canvas.width, canvas.height);
 
-    context.fillStyle = "#4a7cff";
-    context.fillRect(70, playerY, 28, 30);
+    clouds.forEach(drawCloud);
 
-    context.fillStyle = "#d55f5f";
-    context.fillRect(obstacleX, 195, 22, 35);
+    context.fillStyle = "#626674";
+    context.fillRect(0, groundY, canvas.width, 2);
+
+    const groundOffset = (frame * 6) % 32;
+    context.fillStyle = "#3c404d";
+    for (let x = -groundOffset; x < canvas.width; x += 32) {
+      context.fillRect(x, groundY + 8, 11, 2);
+      context.fillRect(x + 18, groundY + 15, 6, 2);
+    }
+
+    obstacles.forEach((obstacle) => {
+      if (obstacle.type === "bird") drawBird(obstacle);
+      else drawCactus(obstacle);
+    });
+
+    drawDino();
+
+    context.fillStyle = "#8b8f9d";
+    context.font = "14px monospace";
+    context.textAlign = "right";
+    context.fillText(
+      `HI ${String(highScore).padStart(5, "0")}  ${String(score).padStart(5, "0")}`,
+      canvas.width - 18,
+      26,
+    );
+
+    if (!running) {
+      context.textAlign = "center";
+      context.fillStyle = "#b7bac4";
+      context.font = "16px monospace";
+      context.fillText(
+        gameOver ? "GAME OVER" : "LEERTASTE ZUM STARTEN",
+        canvas.width / 2,
+        105,
+      );
+      if (gameOver) {
+        context.font = "12px monospace";
+        context.fillText("Leertaste oder Button für Neustart", canvas.width / 2, 128);
+      }
+    }
+  }
+
+  function collides(obstacle) {
+    const dinoBox = {
+      x: dino.x + 7,
+      y: dino.ducking ? dino.y + 15 : dino.y + 5,
+      width: dino.ducking ? 37 : 31,
+      height: dino.ducking ? 21 : 35,
+    };
+    const obstacleBox = {
+      x: obstacle.x + 3,
+      y: obstacle.y + 3,
+      width: obstacle.width - 6,
+      height: obstacle.height - 5,
+    };
+
+    return (
+      dinoBox.x < obstacleBox.x + obstacleBox.width &&
+      dinoBox.x + dinoBox.width > obstacleBox.x &&
+      dinoBox.y < obstacleBox.y + obstacleBox.height &&
+      dinoBox.y + dinoBox.height > obstacleBox.y
+    );
   }
 
   async function finish() {
     running = false;
+    gameOver = true;
+    cancelAnimationFrame(animationId);
+    highScore = Math.max(highScore, score);
+    drawScene();
+
     const durationMs = Date.now() - startTime;
+    if (durationMs < 1000) return;
+
     try {
       await api("/api/game/scores", {
         method: "POST",
@@ -659,54 +950,76 @@ function initializeGame() {
       });
       await loadLeaderboard();
     } catch (error) {
-      console.error(error);
+      console.error("Score konnte nicht gespeichert werden:", error);
     }
   }
 
   function tick() {
     if (!running) return;
+
     frame += 1;
-    score = Math.floor(frame / 4);
-    $("#game-score").textContent = String(score);
+    score = Math.floor(frame / 5);
+    $("#game-score").textContent = String(score).padStart(5, "0");
 
-    velocityY += .65;
-    playerY = Math.min(200, playerY + velocityY);
-    obstacleX -= 6 + Math.min(5, score / 200);
-    if (obstacleX < -30) obstacleX = 800 + Math.random() * 300;
+    dino.velocityY += .68;
+    dino.y = Math.min(groundY - dino.height, dino.y + dino.velocityY);
+    if (dino.y >= groundY - dino.height) dino.velocityY = 0;
 
-    const collision =
-      obstacleX < 98 &&
-      obstacleX + 22 > 70 &&
-      playerY + 30 > 195;
+    const speed = 6 + Math.min(6, score / 250);
+    clouds.forEach((cloud) => {
+      cloud.x -= cloud.speed;
+      if (cloud.x < -50) cloud.x = canvas.width + Math.random() * 250;
+    });
 
-    draw();
-    if (collision) {
+    if (frame >= nextObstacleFrame) spawnObstacle();
+    obstacles.forEach((obstacle) => {
+      obstacle.x -= speed;
+    });
+    obstacles = obstacles.filter((obstacle) => obstacle.x + obstacle.width > -10);
+
+    if (obstacles.some(collides)) {
       finish();
       return;
     }
-    requestAnimationFrame(tick);
+
+    drawScene();
+    animationId = requestAnimationFrame(tick);
   }
 
-  $("#game-start").addEventListener("click", () => {
-    running = true;
-    frame = 0;
-    score = 0;
-    startTime = Date.now();
-    playerY = 200;
-    velocityY = 0;
-    obstacleX = 800;
-    tick();
+  function start() {
+    if (running) return;
+    cancelAnimationFrame(animationId);
+    resetGame();
+    drawScene();
+    animationId = requestAnimationFrame(tick);
+  }
+
+  $("#game-start").addEventListener("click", start);
+  canvas.addEventListener("click", () => {
+    if (!running) start();
+    else jump();
   });
 
-  canvas.addEventListener("click", jump);
   window.addEventListener("keydown", (event) => {
-    if (event.code === "Space" && state.activeView === "game") {
+    if (state.activeView !== "game") return;
+
+    if (event.code === "Space" || event.code === "ArrowUp") {
       event.preventDefault();
-      jump();
+      if (!running) start();
+      else jump();
+    }
+
+    if (event.code === "ArrowDown") {
+      event.preventDefault();
+      setDucking(true);
     }
   });
 
-  draw();
+  window.addEventListener("keyup", (event) => {
+    if (event.code === "ArrowDown") setDucking(false);
+  });
+
+  drawScene();
 }
 
 async function initialize() {
@@ -747,6 +1060,32 @@ $("#main-nav").addEventListener("click", (event) => {
   if (button) switchView(button.dataset.view);
 });
 
+$("#main-nav").addEventListener("wheel", (event) => {
+  const nav = event.currentTarget;
+  if (nav.scrollWidth <= nav.clientWidth) return;
+
+  const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+    ? event.deltaY
+    : event.deltaX;
+
+  if (delta === 0) return;
+  event.preventDefault();
+  nav.scrollLeft += delta;
+}, { passive: false });
+
+$$("dialog").forEach((dialog) => {
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+});
+
+document.addEventListener("click", (event) => {
+  const closeButton = event.target.closest("[data-close-dialog]");
+  if (!closeButton) return;
+  const dialog = closeButton.closest("dialog");
+  if (dialog?.open) dialog.close();
+});
+
 $("#template-search").addEventListener("input", renderTemplates);
 $("#template-category-filter").addEventListener("change", renderTemplates);
 $("#command-search").addEventListener("input", renderCommands);
@@ -755,6 +1094,15 @@ $("#proposal-form").addEventListener("submit", submitProposal);
 $("#check-duplicate-button").addEventListener("click", () => checkDuplicate().catch((error) => alert(error.message)));
 
 $("#templates-list").addEventListener("click", (event) => {
+  const favoriteButton = event.target.closest("[data-favorite-template]");
+  if (favoriteButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleFavorite("template", Number(favoriteButton.dataset.favoriteTemplate))
+      .catch((error) => alert(error.message));
+    return;
+  }
+
   const copyButton = event.target.closest("[data-copy-template]");
   if (copyButton) {
     const template = state.templates.find((item) => item.id === Number(copyButton.dataset.copyTemplate));
@@ -772,6 +1120,15 @@ $("#templates-list").addEventListener("click", (event) => {
 });
 
 $("#commands-list").addEventListener("click", (event) => {
+  const favoriteButton = event.target.closest("[data-favorite-command]");
+  if (favoriteButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleFavorite("command", Number(favoriteButton.dataset.favoriteCommand))
+      .catch((error) => alert(error.message));
+    return;
+  }
+
   const button = event.target.closest("[data-copy-command]");
   if (!button) return;
   const command = state.commands.find((item) => item.id === Number(button.dataset.copyCommand));
@@ -794,16 +1151,13 @@ $("#review-form").addEventListener("click", (event) => {
 
 $("#settings-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  await api("/api/settings", {
-    method: "PUT",
-    body: JSON.stringify({
-      signatureName: $("#signature-name").value,
-      favorites: state.settings.favorites,
-      preferences: {},
-    }),
-  });
   state.settings.signatureName = $("#signature-name").value.trim();
-  showToast("Einstellungen gespeichert.");
+  try {
+    await persistSettings();
+    showToast("Einstellungen gespeichert.");
+  } catch (error) {
+    alert(error.message);
+  }
 });
 
 $("#user-form").addEventListener("submit", async (event) => {

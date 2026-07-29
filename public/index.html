@@ -209,7 +209,7 @@
           <div class="game-grid">
             <div class="panel">
               <div class="game-header">
-                <div><h3>Helpdesk Runner</h3><p>Leertaste oder Klick zum Springen</p></div>
+                <div><h3>Helpdesk Runner</h3><p>Leertaste/Klick: springen · Pfeil runter: ducken</p></div>
                 <strong id="game-score">0</strong>
               </div>
               <canvas id="game-canvas" width="800" height="260"></canvas>
@@ -265,7 +265,7 @@
     <form method="dialog" id="proposal-form" class="modal">
       <div class="modal-header">
         <h2 id="proposal-dialog-title">Vorlage vorschlagen</h2>
-        <button class="modal-close" value="cancel" type="submit">✕</button>
+        <button class="modal-close" type="button" data-close-dialog aria-label="Dialog schließen">✕</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="proposal-template-id">
@@ -286,7 +286,7 @@
     <form method="dialog" id="review-form" class="modal">
       <div class="modal-header">
         <h2>Vorschlag prüfen</h2>
-        <button class="modal-close" value="cancel" type="submit">✕</button>
+        <button class="modal-close" type="button" data-close-dialog aria-label="Dialog schließen">✕</button>
       </div>
       <div class="modal-body">
         <div id="review-content"></div>
@@ -304,7 +304,7 @@
     <form method="dialog" id="command-form" class="modal">
       <div class="modal-header">
         <h2>Befehl hinzufügen</h2>
-        <button class="modal-close" value="cancel" type="submit">✕</button>
+        <button class="modal-close" type="button" data-close-dialog aria-label="Dialog schließen">✕</button>
       </div>
       <div class="modal-body">
         <label>Name<input id="command-name" required></label>
