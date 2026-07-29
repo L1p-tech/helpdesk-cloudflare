@@ -492,16 +492,66 @@ function templateCard(template) {
     </details>`;
 }
 
+function compareText(left, right) {
+  return String(left ?? "").localeCompare(String(right ?? ""), "de", {
+    sensitivity: "base",
+    numeric: true,
+  });
+}
+
+function compareUpdatedAt(left, right) {
+  const leftTime = Date.parse(left.updated_at || "") || 0;
+  const rightTime = Date.parse(right.updated_at || "") || 0;
+  return leftTime - rightTime;
+}
+
+function sortTemplates(templates) {
+  const sortBy = $("#template-sort")?.value || "updated-desc";
+  const sorted = [...templates];
+
+  sorted.sort((left, right) => {
+    if (sortBy === "updated-asc") {
+      return compareUpdatedAt(left, right) ||
+        compareText(left.title, right.title);
+    }
+
+    if (sortBy === "title-asc") {
+      return compareText(left.title, right.title) ||
+        compareText(left.category_name, right.category_name);
+    }
+
+    if (sortBy === "title-desc") {
+      return compareText(right.title, left.title) ||
+        compareText(right.category_name, left.category_name);
+    }
+
+    if (sortBy === "category-asc") {
+      return compareText(left.category_name, right.category_name) ||
+        compareText(left.title, right.title);
+    }
+
+    if (sortBy === "category-desc") {
+      return compareText(right.category_name, left.category_name) ||
+        compareText(left.title, right.title);
+    }
+
+    return compareUpdatedAt(right, left) ||
+      compareText(left.title, right.title);
+  });
+
+  return sorted;
+}
+
 function renderTemplates() {
   const search = $("#template-search").value.trim().toLowerCase();
   const category = $("#template-category-filter").value;
-  const templates = state.templates.filter((template) => {
+  const templates = sortTemplates(state.templates.filter((template) => {
     const matchesSearch = !search ||
       template.title.toLowerCase().includes(search) ||
       template.body.toLowerCase().includes(search);
     const matchesCategory = !category || String(template.category_id) === category;
     return matchesSearch && matchesCategory;
-  });
+  }));
 
   $("#templates-list").innerHTML = templates.length
     ? templates.map(templateCard).join("")
@@ -1091,6 +1141,7 @@ document.addEventListener("click", (event) => {
 
 $("#template-search").addEventListener("input", renderTemplates);
 $("#template-category-filter").addEventListener("change", renderTemplates);
+$("#template-sort").addEventListener("change", renderTemplates);
 $("#command-search").addEventListener("input", renderCommands);
 $("#new-proposal-button").addEventListener("click", () => openProposal());
 $("#proposal-form").addEventListener("submit", submitProposal);
