@@ -1422,6 +1422,13 @@ function initializeTypingGame() {
   let running = false;
   let remainingSeconds = 30;
 
+  function getFirstMismatchIndex(value) {
+    for (let index = 0; index < value.length; index += 1) {
+      if (value[index] !== currentPrompt[index]) return index;
+    }
+    return -1;
+  }
+
   function resetTypingGame() {
     clearInterval(timerId);
     currentPrompt = "";
@@ -1438,21 +1445,26 @@ function initializeTypingGame() {
   }
 
   function renderPrompt() {
-    const typedLength = input.value.length;
-    const typedPart = escapeHtml(currentPrompt.slice(0, typedLength));
-    const remainingPart = escapeHtml(currentPrompt.slice(typedLength));
-    promptElement.innerHTML = `<span class="typing-done">${typedPart}</span><span>${remainingPart}</span>`;
+    const typedValue = input.value;
+    const mismatchIndex = getFirstMismatchIndex(typedValue);
+    const doneLength = mismatchIndex === -1 ? typedValue.length : mismatchIndex;
+    const errorLength = mismatchIndex === -1 ? 0 : Math.min(1, typedValue.length - mismatchIndex);
+    const typedPart = escapeHtml(currentPrompt.slice(0, doneLength));
+    const errorPart = errorLength ? escapeHtml(currentPrompt.slice(mismatchIndex, mismatchIndex + errorLength)) : "";
+    const remainingPart = escapeHtml(currentPrompt.slice(doneLength + errorLength));
+    promptElement.innerHTML = `
+      <span class="typing-done">${typedPart}</span><span class="typing-error">${errorPart}</span><span>${remainingPart}</span>
+    `;
   }
 
   function currentResult() {
     const typed = input.value;
-    let correctChars = 0;
-    for (let index = 0; index < typed.length; index += 1) {
-      if (typed[index] === currentPrompt[index]) correctChars += 1;
-    }
+    const mismatchIndex = getFirstMismatchIndex(typed);
+    const correctChars = mismatchIndex === -1 ? typed.length : mismatchIndex;
+    const errorChars = mismatchIndex === -1 ? 0 : typed.length - correctChars;
 
     const elapsedMs = Math.max(1, Date.now() - startTime);
-    const accuracy = typed.length ? Math.round((correctChars / typed.length) * 100) : 100;
+    const accuracy = typed.length ? Math.round((correctChars / (correctChars + errorChars)) * 100) : 100;
     const wpm = Math.round((correctChars / 5) / (elapsedMs / 60_000));
 
     wpmElement.textContent = `${Math.max(0, wpm)} WPM`;
@@ -1522,6 +1534,11 @@ function initializeTypingGame() {
 
   input.addEventListener("input", () => {
     if (!running) return;
+    const mismatchIndex = getFirstMismatchIndex(input.value);
+    const maxLength = mismatchIndex === -1 ? currentPrompt.length : mismatchIndex + 1;
+    if (input.value.length > maxLength) {
+      input.value = input.value.slice(0, maxLength);
+    }
     if (input.value.length > currentPrompt.length) {
       input.value = input.value.slice(0, currentPrompt.length);
     }

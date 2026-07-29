@@ -42,7 +42,8 @@ interface ProposalRow {
   title: string;
   body: string;
   status: string;
-  submitted_by: number;
+  submitted_by: number | null;
+  submitted_by_name: string;
 }
 
 interface CategoryRow {
@@ -58,7 +59,7 @@ interface FeedbackRow {
   title: string;
   message: string;
   status: "open" | "planned" | "closed";
-  submitted_by: number;
+  submitted_by: number | null;
   submitted_by_name: string;
   admin_note: string | null;
   created_at: string;
@@ -351,11 +352,10 @@ async function handleProposals(
     const adminView = user.role === "admin" || user.role === "editor";
     const result = await env.DB.prepare(
       `SELECT p.*, c.name AS category_name, c.color AS category_color,
-              u.display_name AS submitted_by_name,
+              p.submitted_by_name,
               d.title AS duplicate_title
        FROM template_proposals p
        LEFT JOIN categories c ON c.id = p.category_id
-       JOIN users u ON u.id = p.submitted_by
        LEFT JOIN templates d ON d.id = p.duplicate_template_id
        WHERE ${adminView ? "p.status = 'pending'" : "p.submitted_by = ?1"}
        ORDER BY p.updated_at DESC`,
@@ -417,8 +417,8 @@ async function handleProposals(
       `INSERT INTO template_proposals
         (template_id, base_version, proposal_type, category_id, proposed_category_name,
          proposed_category_color, title, body, reason, status, duplicate_score,
-         duplicate_template_id, submitted_by, submitted_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10, ?11, ?12, CURRENT_TIMESTAMP)`,
+         duplicate_template_id, submitted_by, submitted_by_name, submitted_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10, ?11, ?12, ?13, CURRENT_TIMESTAMP)`,
     )
       .bind(
         templateId,
@@ -433,6 +433,7 @@ async function handleProposals(
         duplicate.score,
         duplicate.templateId,
         user.id,
+        user.displayName,
       )
       .run();
 
@@ -547,13 +548,15 @@ async function handleProposals(
          WHERE id = ?4`,
       ).bind(user.id, note, templateId, proposalId).run();
 
-      await notify(
-        env,
-        proposal.submitted_by,
-        "proposal_approved",
-        "Vorlage genehmigt",
-        `Dein Vorschlag „${proposal.title}“ wurde genehmigt.`,
-      );
+      if (proposal.submitted_by !== null) {
+        await notify(
+          env,
+          proposal.submitted_by,
+          "proposal_approved",
+          "Vorlage genehmigt",
+          `Dein Vorschlag „${proposal.title}“ wurde genehmigt.`,
+        );
+      }
       await audit(env, user.id, "approve", "template_proposal", proposalId, { templateId });
 
       return json({ ok: true, templateId });
@@ -571,13 +574,15 @@ async function handleProposals(
        WHERE id = ?4`,
     ).bind(status, user.id, note, proposalId).run();
 
-    await notify(
-      env,
-      proposal.submitted_by,
-      status === "rejected" ? "proposal_rejected" : "changes_requested",
-      status === "rejected" ? "Vorlage abgelehnt" : "Überarbeitung angefordert",
-      `„${proposal.title}“: ${note}`,
-    );
+    if (proposal.submitted_by !== null) {
+      await notify(
+        env,
+        proposal.submitted_by,
+        status === "rejected" ? "proposal_rejected" : "changes_requested",
+        status === "rejected" ? "Vorlage abgelehnt" : "Überarbeitung angefordert",
+        `„${proposal.title}“: ${note}`,
+      );
+    }
     await audit(env, user.id, action, "template_proposal", proposalId, { note });
 
     return json({ ok: true });
@@ -802,10 +807,9 @@ async function handleFeedback(
     const adminView = user.role === "admin";
     const query = env.DB.prepare(
       `SELECT f.id, f.type, f.title, f.message, f.status, f.submitted_by,
-              u.display_name AS submitted_by_name, f.admin_note,
+              f.submitted_by_name, f.admin_note,
               f.created_at, f.updated_at
        FROM feedback_items f
-       JOIN users u ON u.id = f.submitted_by
        WHERE ${adminView ? "1 = 1" : "f.submitted_by = ?1"}
        ORDER BY f.created_at DESC`,
     );
@@ -828,9 +832,9 @@ async function handleFeedback(
     }
 
     const result = await env.DB.prepare(
-      `INSERT INTO feedback_items (type, title, message, submitted_by)
-       VALUES (?1, ?2, ?3, ?4)`,
-    ).bind(type, title, message, user.id).run();
+      `INSERT INTO feedback_items (type, title, message, submitted_by, submitted_by_name)
+       VALUES (?1, ?2, ?3, ?4, ?5)`,
+    ).bind(type, title, message, user.id, user.displayName).run();
 
     const feedbackId = Number(result.meta.last_row_id);
     await audit(env, user.id, "submit", "feedback_item", feedbackId, { type });
@@ -990,10 +994,6 @@ async function handleUsers(
       ["Vorlagen", "SELECT COUNT(*) AS count FROM templates WHERE created_by = ?1 OR updated_by = ?1"],
       ["Befehle", "SELECT COUNT(*) AS count FROM commands WHERE created_by = ?1 OR updated_by = ?1"],
       ["Vorlagenverlauf", "SELECT COUNT(*) AS count FROM template_versions WHERE changed_by = ?1"],
-      ["Vorlagenvorschläge", "SELECT COUNT(*) AS count FROM template_proposals WHERE submitted_by = ?1"],
-      ["Verbesserungsvorschläge", "SELECT COUNT(*) AS count FROM feedback_items WHERE submitted_by = ?1"],
-      ["Spielstände", "SELECT COUNT(*) AS count FROM game_scores WHERE user_id = ?1"],
-      ["Typing-Spielstände", "SELECT COUNT(*) AS count FROM typing_game_scores WHERE user_id = ?1"],
     ] as const;
 
     for (const [label, query] of dependencyChecks) {
@@ -1148,10 +1148,9 @@ async function handleGame(
 ): Promise<Response | null> {
   if (path === "/api/game/leaderboard" && request.method === "GET") {
     const result = await env.DB.prepare(
-      `SELECT u.display_name, MAX(g.score) AS score, MAX(g.created_at) AS achieved_at
+      `SELECT g.display_name, MAX(g.score) AS score, MAX(g.created_at) AS achieved_at
        FROM game_scores g
-       JOIN users u ON u.id = g.user_id
-       GROUP BY g.user_id, u.display_name
+       GROUP BY g.display_name
        ORDER BY score DESC, achieved_at ASC
        LIMIT 20`,
     ).all();
@@ -1176,21 +1175,20 @@ async function handleGame(
     }
 
     await env.DB.prepare(
-      "INSERT INTO game_scores (user_id, score, duration_ms) VALUES (?1, ?2, ?3)",
-    ).bind(user.id, score, durationMs).run();
+      "INSERT INTO game_scores (user_id, display_name, score, duration_ms) VALUES (?1, ?2, ?3, ?4)",
+    ).bind(user.id, user.displayName, score, durationMs).run();
 
     return json({ ok: true }, { status: 201 });
   }
 
   if (path === "/api/game/typing/leaderboard" && request.method === "GET") {
     const result = await env.DB.prepare(
-      `SELECT u.display_name,
+      `SELECT t.display_name,
               MAX(t.wpm) AS wpm,
               MAX(t.accuracy) AS accuracy,
               MAX(t.created_at) AS achieved_at
        FROM typing_game_scores t
-       JOIN users u ON u.id = t.user_id
-       GROUP BY t.user_id, u.display_name
+       GROUP BY t.display_name
        ORDER BY wpm DESC, accuracy DESC, achieved_at ASC
        LIMIT 20`,
     ).all();
@@ -1231,9 +1229,9 @@ async function handleGame(
 
     await env.DB.prepare(
       `INSERT INTO typing_game_scores
-        (user_id, wpm, accuracy, correct_chars, total_chars, duration_ms)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
-    ).bind(user.id, wpm, accuracy, correctChars, totalChars, durationMs).run();
+        (user_id, display_name, wpm, accuracy, correct_chars, total_chars, duration_ms)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+    ).bind(user.id, user.displayName, wpm, accuracy, correctChars, totalChars, durationMs).run();
 
     return json({ ok: true }, { status: 201 });
   }

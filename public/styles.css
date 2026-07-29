@@ -733,6 +733,11 @@ dialog::backdrop {
 .typing-done {
   color: var(--success);
 }
+.typing-error {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  border-radius: 6px;
+}
 #typing-input {
   margin-bottom: 12px;
 }
