@@ -457,6 +457,9 @@ async function copyText(text) {
 function templateCard(template) {
   const updatedAt = formatDate(template.updated_at);
   const favorite = isFavorite("template", template.id);
+  const submittedBy = template.created_by_name
+    ? `Eingereicht von ${escapeHtml(template.created_by_name)} · `
+    : "";
 
   return `
     <details class="card">
@@ -479,7 +482,7 @@ function templateCard(template) {
           <span class="summary-title">${escapeHtml(template.title)}</span>
         </div>
         <span class="summary-meta">
-          ${updatedAt ? `Aktualisiert am ${updatedAt} · ` : ""}Version ${template.version}
+          ${submittedBy}${updatedAt ? `Aktualisiert am ${updatedAt} · ` : ""}Version ${template.version}
         </span>
       </summary>
       <div class="card-content">

@@ -201,9 +201,11 @@ async function handleBootstrap(
     env.DB.prepare(
       `SELECT t.id, t.title, t.body, t.version, t.updated_at,
               c.id AS category_id, c.name AS category_name, c.color AS category_color,
+              cu.display_name AS created_by_name,
               u.display_name AS updated_by_name
        FROM templates t
        JOIN categories c ON c.id = t.category_id
+       JOIN users cu ON cu.id = t.created_by
        JOIN users u ON u.id = t.updated_by
        WHERE t.active = 1
        ORDER BY t.updated_at DESC`,
