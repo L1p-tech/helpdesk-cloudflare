@@ -265,6 +265,13 @@ h1, h2, h3, h4, p { margin-top: 0; }
   color: var(--text-strong);
   letter-spacing: -0.04em;
 }
+.section-description {
+  margin: 10px 0 0;
+  max-width: 760px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
 .section-kicker {
   display: inline-block;
   padding: 6px 10px;

@@ -922,21 +922,66 @@ async function switchView(view) {
   $$("#main-nav button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
 
   const config = {
-    templates: ["Gemeinsame Inhalte", "Ticket-Vorlagen"],
-    proposals: ["Persönlich", "Meine Vorschläge"],
-    approvals: ["Prüfung", "Freigaben"],
-    commands: ["Werkzeuge", "Befehle"],
-    feedback: ["Produkt", "Verbesserungen & Bugs"],
-    diagnose: ["Werkzeuge", "Diagnose"],
-    generator: ["Dokumentation", "Ticket-Generator"],
-    history: ["Nachvollziehbarkeit", "Versionen & Papierkorb"],
-    game: ["Pause", "Helpdesk Runner"],
-    admin: ["Verwaltung", "Administration"],
-    settings: ["Persönlich", "Einstellungen"],
+    templates: [
+      "Gemeinsame Inhalte",
+      "Ticket-Vorlagen",
+      "Hier findest du freigegebene Ticket-Vorlagen zum schnellen Kopieren und Wiederverwenden.",
+    ],
+    proposals: [
+      "Persönlich",
+      "Meine Vorschläge",
+      "Hier siehst du deine eingereichten Vorlagen und ihren aktuellen Freigabestatus.",
+    ],
+    approvals: [
+      "Prüfung",
+      "Freigaben",
+      "Hier prüfen Redakteure und Admins neue Vorlagen, Änderungen und vorgeschlagene Kategorien.",
+    ],
+    commands: [
+      "Werkzeuge",
+      "Befehle",
+      "Hier liegen freigegebene Support-Befehle zum Nachschlagen und Kopieren.",
+    ],
+    feedback: [
+      "Produkt",
+      "Verbesserungen & Bugs",
+      "Hier können Mitarbeiter Probleme melden oder Ideen einreichen, die Admins gesammelt bearbeiten.",
+    ],
+    diagnose: [
+      "Werkzeuge",
+      "Diagnose",
+      "Hier erstellst du strukturierte Prüflisten und Diagnosetexte für Supportfälle.",
+    ],
+    generator: [
+      "Dokumentation",
+      "Ticket-Generator",
+      "Hier erzeugst du saubere Tickettexte für Lösungen, Zwischenstände und Eskalationen.",
+    ],
+    history: [
+      "Nachvollziehbarkeit",
+      "Versionen & Papierkorb",
+      "Hier findest du ältere Vorlagenstände und archivierte Einträge zur Wiederherstellung.",
+    ],
+    game: [
+      "Pause",
+      "Helpdesk Runner",
+      "Hier kannst du kurz abschalten und deinen Punktestand mit dem Team vergleichen.",
+    ],
+    admin: [
+      "Verwaltung",
+      "Administration",
+      "Hier verwaltest du Benutzer, Kategorien und zentrale Bereiche der Anwendung.",
+    ],
+    settings: [
+      "Persönlich",
+      "Einstellungen",
+      "Hier speicherst du persönliche Werte wie Signatur und Theme für dein Konto.",
+    ],
   }[view];
 
   $("#view-eyebrow").textContent = config[0];
   $("#view-title").textContent = config[1];
+  $("#view-description").textContent = config[2];
   $("#new-proposal-button").classList.toggle("hidden", view !== "templates");
 
   if (view === "proposals" || view === "approvals") await loadProposals(view);
