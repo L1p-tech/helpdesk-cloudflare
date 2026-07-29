@@ -364,7 +364,17 @@ async function handleProposals(
     requireRole(user, ["editor", "admin"]);
 
     const proposalId = positiveInteger(reviewMatch[1], "Vorschlags-ID");
-    const action = reviewMatch[2];
+    const actionValue = reviewMatch[2];
+
+    if (
+      actionValue !== "approve" &&
+      actionValue !== "reject" &&
+      actionValue !== "changes"
+    ) {
+      throw new HttpError(400, "Ungültige Freigabeaktion.");
+    }
+
+    const action = actionValue;
     const body = await readJson<Record<string, unknown>>(request);
     const note = optionalString(body.note, 2000);
 
