@@ -660,6 +660,7 @@ dialog::backdrop {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
   gap: 16px;
+  margin-bottom: 16px;
 }
 .game-header {
   display: flex;
@@ -682,10 +683,39 @@ dialog::backdrop {
   cursor: pointer;
 }
 #leaderboard { padding-left: 22px; }
-#leaderboard li {
+#leaderboard li,
+#typing-leaderboard li {
   padding: 8px 0;
   border-bottom: 1px solid rgba(112, 91, 71, 0.08);
   font-size: 13px;
+}
+#typing-leaderboard {
+  padding-left: 22px;
+}
+.typing-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.typing-prompt {
+  min-height: 120px;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.75;
+}
+.typing-done {
+  color: var(--success);
+}
+#typing-input {
+  margin-bottom: 12px;
 }
 
 .quickbar {

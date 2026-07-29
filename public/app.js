@@ -20,6 +20,14 @@ const THEMES = {
   dune: { label: "Dune", next: "forest" },
 };
 
+const TYPING_PROMPTS = [
+  "Bitte pruefen Sie zuerst die Netzwerkverbindung und bestaetigen Sie dann den aktuellen Fehlerzeitpunkt im Ticket.",
+  "Der Benutzer wurde ueber die durchgefuehrten Schritte informiert und gebeten den Rechner einmal neu zu starten.",
+  "Vor der Eskalation bitte Logdateien sichern, Screenshot anhaengen und den betroffenen Arbeitsplatz dokumentieren.",
+  "Die Vorlage wurde aktualisiert und kann ab sofort fuer Rueckmeldungen an Mitarbeitende direkt verwendet werden.",
+  "Bitte kontrollieren Sie ob das VPN Profil korrekt ausgewaehlt ist und die Mehrfaktor Anmeldung erfolgreich abgeschlossen wurde.",
+];
+
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
@@ -988,7 +996,10 @@ async function switchView(view) {
   if (view === "feedback") await loadFeedback();
   if (view === "admin") await loadUsers();
   if (view === "history") await loadHistory();
-  if (view === "game") await loadLeaderboard();
+  if (view === "game") {
+    await loadLeaderboard();
+    await loadTypingLeaderboard();
+  }
 }
 
 async function saveFeedbackAdmin(itemId) {
@@ -1018,6 +1029,15 @@ async function loadLeaderboard() {
   $("#leaderboard").innerHTML = data.leaderboard.length
     ? data.leaderboard.map((entry) => `<li><strong>${escapeHtml(entry.display_name)}</strong> – ${entry.score}</li>`).join("")
     : "<li>Noch keine Scores.</li>";
+}
+
+async function loadTypingLeaderboard() {
+  const data = await api("/api/game/typing/leaderboard");
+  $("#typing-leaderboard").innerHTML = data.leaderboard.length
+    ? data.leaderboard.map((entry) => `
+      <li><strong>${escapeHtml(entry.display_name)}</strong> – ${entry.wpm} WPM · ${entry.accuracy} %</li>
+    `).join("")
+    : "<li>Noch keine Ergebnisse.</li>";
 }
 
 function initializeGame() {
@@ -1317,6 +1337,133 @@ function initializeGame() {
   });
 
   drawScene();
+}
+
+function initializeTypingGame() {
+  const promptElement = $("#typing-prompt");
+  const input = $("#typing-input");
+  const wpmElement = $("#typing-wpm");
+  const accuracyElement = $("#typing-accuracy");
+  const timerElement = $("#typing-timer");
+  const startButton = $("#typing-start");
+
+  let currentPrompt = "";
+  let startTime = 0;
+  let timerId = null;
+  let running = false;
+  let remainingSeconds = 30;
+
+  function resetTypingGame() {
+    clearInterval(timerId);
+    currentPrompt = "";
+    startTime = 0;
+    running = false;
+    remainingSeconds = 30;
+    input.value = "";
+    input.disabled = true;
+    promptElement.textContent = "Klicke auf Start, um den ersten Text zu laden.";
+    wpmElement.textContent = "0 WPM";
+    accuracyElement.textContent = "0 % Genauigkeit";
+    timerElement.textContent = "30s";
+    startButton.textContent = "Starten";
+  }
+
+  function renderPrompt() {
+    const typedLength = input.value.length;
+    const typedPart = escapeHtml(currentPrompt.slice(0, typedLength));
+    const remainingPart = escapeHtml(currentPrompt.slice(typedLength));
+    promptElement.innerHTML = `<span class="typing-done">${typedPart}</span><span>${remainingPart}</span>`;
+  }
+
+  function currentResult() {
+    const typed = input.value;
+    let correctChars = 0;
+    for (let index = 0; index < typed.length; index += 1) {
+      if (typed[index] === currentPrompt[index]) correctChars += 1;
+    }
+
+    const elapsedMs = Math.max(1, Date.now() - startTime);
+    const accuracy = typed.length ? Math.round((correctChars / typed.length) * 100) : 100;
+    const wpm = Math.round((correctChars / 5) / (elapsedMs / 60_000));
+
+    wpmElement.textContent = `${Math.max(0, wpm)} WPM`;
+    accuracyElement.textContent = `${Math.max(0, accuracy)} % Genauigkeit`;
+
+    return {
+      wpm: Math.max(0, wpm),
+      accuracy: Math.max(0, accuracy),
+      correctChars,
+      totalChars: Math.max(1, typed.length),
+      durationMs: elapsedMs,
+    };
+  }
+
+  async function finishTypingGame() {
+    if (!running) return;
+    running = false;
+    clearInterval(timerId);
+    input.disabled = true;
+    startButton.textContent = "Nochmal spielen";
+
+    const result = currentResult();
+    if (result.durationMs < 10_000) return;
+
+    try {
+      await api("/api/game/typing/scores", {
+        method: "POST",
+        body: JSON.stringify(result),
+      });
+      await loadTypingLeaderboard();
+      showToast("Typing-Ergebnis gespeichert.");
+    } catch (error) {
+      console.error("Typing-Ergebnis konnte nicht gespeichert werden:", error);
+    }
+  }
+
+  function tick() {
+    remainingSeconds -= 1;
+    timerElement.textContent = `${remainingSeconds}s`;
+    currentResult();
+    if (remainingSeconds <= 0) finishTypingGame();
+  }
+
+  function startTypingGame() {
+    currentPrompt = TYPING_PROMPTS[Math.floor(Math.random() * TYPING_PROMPTS.length)];
+    startTime = Date.now();
+    running = true;
+    remainingSeconds = 30;
+    input.disabled = false;
+    input.value = "";
+    input.focus();
+    startButton.textContent = "Laeuft...";
+    timerElement.textContent = "30s";
+    accuracyElement.textContent = "100 % Genauigkeit";
+    wpmElement.textContent = "0 WPM";
+    renderPrompt();
+    clearInterval(timerId);
+    timerId = setInterval(tick, 1000);
+  }
+
+  $("#typing-start").addEventListener("click", () => {
+    if (running) return;
+    startTypingGame();
+  });
+
+  $("#typing-reset").addEventListener("click", resetTypingGame);
+
+  input.addEventListener("input", () => {
+    if (!running) return;
+    if (input.value.length > currentPrompt.length) {
+      input.value = input.value.slice(0, currentPrompt.length);
+    }
+    renderPrompt();
+    currentResult();
+    if (input.value === currentPrompt) {
+      finishTypingGame();
+    }
+  });
+
+  resetTypingGame();
 }
 
 async function initialize() {
@@ -1637,6 +1784,7 @@ $("#command-form").addEventListener("submit", async (event) => {
 
 initializeDiagnostics();
 initializeGame();
+initializeTypingGame();
 initialize().catch((error) => {
   console.error(error);
   $("#login-message").textContent = "Anwendung konnte nicht geladen werden.";

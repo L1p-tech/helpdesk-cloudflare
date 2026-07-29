@@ -260,6 +260,31 @@
               <ol id="leaderboard"></ol>
             </div>
           </div>
+          <div class="game-grid">
+            <div class="panel">
+              <div class="game-header">
+                <div>
+                  <h3>Typing Speed Game</h3>
+                  <p>Tippe den angezeigten Text möglichst schnell und sauber ab.</p>
+                </div>
+                <strong id="typing-wpm">0 WPM</strong>
+              </div>
+              <div class="typing-stats">
+                <span id="typing-accuracy">0 % Genauigkeit</span>
+                <span id="typing-timer">30s</span>
+              </div>
+              <div class="typing-prompt" id="typing-prompt">Klicke auf Start, um den ersten Text zu laden.</div>
+              <textarea id="typing-input" rows="5" placeholder="Text hier tippen…" disabled></textarea>
+              <div class="card-actions">
+                <button class="btn-primary" id="typing-start" type="button">Starten</button>
+                <button id="typing-reset" type="button">Zurücksetzen</button>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Typing Leaderboard</h3>
+              <ol id="typing-leaderboard"></ol>
+            </div>
+          </div>
         </section>
 
         <section class="view hidden" id="view-admin">

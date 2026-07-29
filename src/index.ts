@@ -1145,6 +1145,62 @@ async function handleGame(
     return json({ ok: true }, { status: 201 });
   }
 
+  if (path === "/api/game/typing/leaderboard" && request.method === "GET") {
+    const result = await env.DB.prepare(
+      `SELECT u.display_name,
+              MAX(t.wpm) AS wpm,
+              MAX(t.accuracy) AS accuracy,
+              MAX(t.created_at) AS achieved_at
+       FROM typing_game_scores t
+       JOIN users u ON u.id = t.user_id
+       GROUP BY t.user_id, u.display_name
+       ORDER BY wpm DESC, accuracy DESC, achieved_at ASC
+       LIMIT 20`,
+    ).all();
+    return json({ leaderboard: result.results });
+  }
+
+  if (path === "/api/game/typing/scores" && request.method === "POST") {
+    const body = await readJson<Record<string, unknown>>(request);
+    const wpm = Number(body.wpm);
+    const accuracy = Number(body.accuracy);
+    const correctChars = Number(body.correctChars);
+    const totalChars = Number(body.totalChars);
+    const durationMs = Number(body.durationMs);
+
+    if (!Number.isInteger(wpm) || wpm < 0 || wpm > 400) {
+      throw new HttpError(400, "Ungültige Schreibgeschwindigkeit.");
+    }
+    if (!Number.isInteger(accuracy) || accuracy < 0 || accuracy > 100) {
+      throw new HttpError(400, "Ungültige Genauigkeit.");
+    }
+    if (!Number.isInteger(correctChars) || correctChars < 0) {
+      throw new HttpError(400, "Ungültige Zeichenzahl.");
+    }
+    if (!Number.isInteger(totalChars) || totalChars < 1) {
+      throw new HttpError(400, "Ungültige Gesamtzeichenzahl.");
+    }
+    if (!Number.isInteger(durationMs) || durationMs < 10_000 || durationMs > 300_000) {
+      throw new HttpError(400, "Ungültige Spieldauer.");
+    }
+    if (correctChars > totalChars) {
+      throw new HttpError(400, "Ungültige Trefferzahl.");
+    }
+
+    const plausibleWpm = Math.ceil((correctChars / 5) / (durationMs / 60_000)) + 5;
+    if (wpm > plausibleWpm) {
+      throw new HttpError(400, "Ergebnis konnte nicht plausibilisiert werden.");
+    }
+
+    await env.DB.prepare(
+      `INSERT INTO typing_game_scores
+        (user_id, wpm, accuracy, correct_chars, total_chars, duration_ms)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+    ).bind(user.id, wpm, accuracy, correctChars, totalChars, durationMs).run();
+
+    return json({ ok: true }, { status: 201 });
+  }
+
   return null;
 }
 
