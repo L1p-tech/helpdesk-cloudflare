@@ -278,18 +278,25 @@ async function handleBootstrap(
     env.DB.prepare(
       "SELECT id, slug, name, color FROM categories WHERE active = 1 ORDER BY name COLLATE NOCASE",
     ).all(),
-    env.DB.prepare(
-      `SELECT t.id, t.title, t.body, t.version, t.updated_at,
-              c.id AS category_id, c.name AS category_name, c.color AS category_color,
-              cu.display_name AS created_by_name,
-              u.display_name AS updated_by_name
-       FROM templates t
-       JOIN categories c ON c.id = t.category_id
-       JOIN users cu ON cu.id = t.created_by
-       JOIN users u ON u.id = t.updated_by
-       WHERE t.active = 1
-       ORDER BY t.updated_at DESC`,
-    ).all(),
+    (async () => {
+      const hasTemplateNames = await hasColumn(env, "templates", "created_by_name");
+      return env.DB.prepare(
+        `SELECT t.id, t.title, t.body, t.version, t.updated_at,
+                c.id AS category_id, c.name AS category_name, c.color AS category_color,
+                ${hasTemplateNames
+    ? "COALESCE(t.created_by_name, cu.display_name, 'Ehemaliger Mitarbeiter')"
+    : "cu.display_name"} AS created_by_name,
+                ${hasTemplateNames
+    ? "COALESCE(t.updated_by_name, u.display_name, 'Ehemaliger Mitarbeiter')"
+    : "u.display_name"} AS updated_by_name
+         FROM templates t
+         JOIN categories c ON c.id = t.category_id
+         ${hasTemplateNames ? "LEFT JOIN users cu ON cu.id = t.created_by" : "JOIN users cu ON cu.id = t.created_by"}
+         ${hasTemplateNames ? "LEFT JOIN users u ON u.id = t.updated_by" : "JOIN users u ON u.id = t.updated_by"}
+         WHERE t.active = 1
+         ORDER BY t.updated_at DESC`,
+      ).all();
+    })(),
     env.DB.prepare(
       `SELECT id, category, name, command, description, shell, requires_admin,
               risk_level, remote_capable, restart_required
@@ -518,19 +525,36 @@ async function handleProposals(
       );
       let templateId: number;
       if (proposal.proposal_type === "create") {
-        const result = await env.DB.prepare(
-          `INSERT INTO templates
-            (category_id, title, body, version, created_by, updated_by)
-           VALUES (?1, ?2, ?3, 1, ?4, ?5)`,
-        )
-          .bind(
-            resolvedCategoryId,
-            proposal.title,
-            proposal.body,
-            proposal.submitted_by,
-            user.id,
+        const hasTemplateNames = await hasColumn(env, "templates", "created_by_name");
+        const result = hasTemplateNames
+          ? await env.DB.prepare(
+            `INSERT INTO templates
+              (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
+             VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7)`,
           )
-          .run();
+            .bind(
+              resolvedCategoryId,
+              proposal.title,
+              proposal.body,
+              proposal.submitted_by,
+              proposal.submitted_by_name,
+              user.id,
+              user.displayName,
+            )
+            .run()
+          : await env.DB.prepare(
+            `INSERT INTO templates
+              (category_id, title, body, version, created_by, updated_by)
+             VALUES (?1, ?2, ?3, 1, ?4, ?5)`,
+          )
+            .bind(
+              resolvedCategoryId,
+              proposal.title,
+              proposal.body,
+              proposal.submitted_by,
+              user.id,
+            )
+            .run();
         templateId = Number(result.meta.last_row_id);
       } else {
         if (!proposal.template_id) throw new HttpError(409, "Zielvorlage fehlt.");
@@ -547,25 +571,42 @@ async function handleProposals(
           );
         }
 
-        await env.DB.prepare(
-          `INSERT INTO template_versions
-            (template_id, version, category_id, title, body, changed_by, change_note)
-           SELECT id, version, category_id, title, body, ?2, ?3
-           FROM templates WHERE id = ?1`,
-        ).bind(proposal.template_id, user.id, note).run();
+        const hasVersionNames = await hasColumn(env, "template_versions", "changed_by_name");
+        const hasTemplateNames = await hasColumn(env, "templates", "updated_by_name");
 
         await env.DB.prepare(
-          `UPDATE templates
-           SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
-               updated_by = ?4, updated_at = CURRENT_TIMESTAMP
-           WHERE id = ?5`,
+          hasVersionNames
+            ? `INSERT INTO template_versions
+                (template_id, version, category_id, title, body, changed_by, changed_by_name, change_note)
+               SELECT id, version, category_id, title, body, ?2, ?3, ?4
+               FROM templates WHERE id = ?1`
+            : `INSERT INTO template_versions
+                (template_id, version, category_id, title, body, changed_by, change_note)
+               SELECT id, version, category_id, title, body, ?2, ?3
+               FROM templates WHERE id = ?1`,
+        ).bind(
+          proposal.template_id,
+          user.id,
+          ...(hasVersionNames ? [user.displayName, note] : [note]),
+        ).run();
+
+        await env.DB.prepare(
+          hasTemplateNames
+            ? `UPDATE templates
+               SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
+                   updated_by = ?4, updated_by_name = ?5, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?6`
+            : `UPDATE templates
+               SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
+                   updated_by = ?4, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?5`,
         )
           .bind(
             resolvedCategoryId,
             proposal.title,
             proposal.body,
             user.id,
-            proposal.template_id,
+            ...(hasTemplateNames ? [user.displayName, proposal.template_id] : [proposal.template_id]),
           )
           .run();
 
@@ -682,11 +723,17 @@ async function handleTemplates(
     const categoryId = positiveInteger(body.categoryId, "Kategorie");
     const note = optionalString(body.note, 1000) ?? "Direktbearbeitung durch Administrator";
 
+    const hasVersionNames = await hasColumn(env, "template_versions", "changed_by_name");
+    const hasTemplateNames = await hasColumn(env, "templates", "updated_by_name");
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO template_versions
-          (template_id, version, category_id, title, body, changed_by, change_note)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+        hasVersionNames
+          ? `INSERT INTO template_versions
+              (template_id, version, category_id, title, body, changed_by, changed_by_name, change_note)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
+          : `INSERT INTO template_versions
+              (template_id, version, category_id, title, body, changed_by, change_note)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
       ).bind(
         current.id,
         current.version,
@@ -694,14 +741,25 @@ async function handleTemplates(
         current.title,
         current.body,
         user.id,
-        note,
+        ...(hasVersionNames ? [user.displayName, note] : [note]),
       ),
       env.DB.prepare(
-        `UPDATE templates
-         SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
-             updated_by = ?4, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?5`,
-      ).bind(categoryId, title, templateBody, user.id, templateId),
+        hasTemplateNames
+          ? `UPDATE templates
+             SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
+                 updated_by = ?4, updated_by_name = ?5, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?6`
+          : `UPDATE templates
+             SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
+                 updated_by = ?4, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?5`,
+      ).bind(
+        categoryId,
+        title,
+        templateBody,
+        user.id,
+        ...(hasTemplateNames ? [user.displayName, templateId] : [templateId]),
+      ),
     ]);
 
     await audit(env, user.id, "update", "template", templateId, { direct: true });
@@ -726,11 +784,17 @@ async function handleTemplates(
 
   if (!current) throw new HttpError(404, "Vorlage wurde nicht gefunden.");
 
+  const hasVersionNames = await hasColumn(env, "template_versions", "changed_by_name");
+  const hasTemplateNames = await hasColumn(env, "templates", "updated_by_name");
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO template_versions
-        (template_id, version, category_id, title, body, changed_by, change_note)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+      hasVersionNames
+        ? `INSERT INTO template_versions
+            (template_id, version, category_id, title, body, changed_by, changed_by_name, change_note)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
+        : `INSERT INTO template_versions
+            (template_id, version, category_id, title, body, changed_by, change_note)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
     ).bind(
       current.id,
       current.version,
@@ -738,13 +802,20 @@ async function handleTemplates(
       current.title,
       current.body,
       user.id,
-      "Vorlage archiviert",
+      ...(hasVersionNames ? [user.displayName, "Vorlage archiviert"] : ["Vorlage archiviert"]),
     ),
     env.DB.prepare(
-      `UPDATE templates
-       SET active = 0, updated_by = ?1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?2`,
-    ).bind(user.id, templateId),
+      hasTemplateNames
+        ? `UPDATE templates
+           SET active = 0, updated_by = ?1, updated_by_name = ?2, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?3`
+        : `UPDATE templates
+           SET active = 0, updated_by = ?1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?2`,
+    ).bind(
+      user.id,
+      ...(hasTemplateNames ? [user.displayName, templateId] : [templateId]),
+    ),
   ]);
 
   await audit(env, user.id, "delete", "template", templateId);
@@ -783,25 +854,47 @@ async function handleCommands(
 
     if (duplicate) throw new HttpError(409, "Befehl oder Bezeichnung existiert bereits.");
 
-    const result = await env.DB.prepare(
-      `INSERT INTO commands
-        (category, name, command, description, shell, requires_admin, risk_level,
-         remote_capable, restart_required, created_by, updated_by)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)`,
-    )
-      .bind(
-        category,
-        name,
-        command,
-        description,
-        shell,
-        body.requiresAdmin ? 1 : 0,
-        riskLevel,
-        body.remoteCapable ? 1 : 0,
-        body.restartRequired ? 1 : 0,
-        user.id,
+    const hasCommandNames = await hasColumn(env, "commands", "created_by_name");
+    const result = hasCommandNames
+      ? await env.DB.prepare(
+        `INSERT INTO commands
+          (category, name, command, description, shell, requires_admin, risk_level,
+           remote_capable, restart_required, created_by, created_by_name, updated_by, updated_by_name)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?10, ?11)`,
       )
-      .run();
+        .bind(
+          category,
+          name,
+          command,
+          description,
+          shell,
+          body.requiresAdmin ? 1 : 0,
+          riskLevel,
+          body.remoteCapable ? 1 : 0,
+          body.restartRequired ? 1 : 0,
+          user.id,
+          user.displayName,
+        )
+        .run()
+      : await env.DB.prepare(
+        `INSERT INTO commands
+          (category, name, command, description, shell, requires_admin, risk_level,
+           remote_capable, restart_required, created_by, updated_by)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)`,
+      )
+        .bind(
+          category,
+          name,
+          command,
+          description,
+          shell,
+          body.requiresAdmin ? 1 : 0,
+          riskLevel,
+          body.remoteCapable ? 1 : 0,
+          body.restartRequired ? 1 : 0,
+          user.id,
+        )
+        .run();
 
     await audit(env, user.id, "create", "command", Number(result.meta.last_row_id));
     return json({ id: Number(result.meta.last_row_id) }, { status: 201 });
@@ -812,11 +905,16 @@ async function handleCommands(
     requireRole(user, ["admin"]);
     const commandId = positiveInteger(commandMatch[1], "Befehls-ID");
 
+    const hasCommandNames = await hasColumn(env, "commands", "updated_by_name");
     const result = await env.DB.prepare(
-      `UPDATE commands
-       SET active = 0, updated_by = ?1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?2 AND active = 1`,
-    ).bind(user.id, commandId).run();
+      hasCommandNames
+        ? `UPDATE commands
+           SET active = 0, updated_by = ?1, updated_by_name = ?2, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?3 AND active = 1`
+        : `UPDATE commands
+           SET active = 0, updated_by = ?1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?2 AND active = 1`,
+    ).bind(user.id, ...(hasCommandNames ? [user.displayName, commandId] : [commandId])).run();
 
     if ((result.meta.changes ?? 0) === 0) {
       throw new HttpError(404, "Befehl wurde nicht gefunden.");
@@ -1032,21 +1130,41 @@ async function handleUsers(
       throw new HttpError(400, "Das eigene Konto kann nicht gelöscht werden.");
     }
 
-    const dependencyChecks = [
-      ["Vorlagen", "SELECT COUNT(*) AS count FROM templates WHERE created_by = ?1 OR updated_by = ?1"],
-      ["Befehle", "SELECT COUNT(*) AS count FROM commands WHERE created_by = ?1 OR updated_by = ?1"],
-      ["Vorlagenverlauf", "SELECT COUNT(*) AS count FROM template_versions WHERE changed_by = ?1"],
-    ] as const;
+    const hasTemplateNames = await hasColumn(env, "templates", "created_by_name");
+    const hasCommandNames = await hasColumn(env, "commands", "created_by_name");
+    const hasVersionNames = await hasColumn(env, "template_versions", "changed_by_name");
 
-    for (const [label, query] of dependencyChecks) {
-      const result = await env.DB.prepare(query).bind(targetId).first<{ count: number }>();
-      if (Number(result?.count ?? 0) > 0) {
-        throw new HttpError(
-          409,
-          `Benutzer kann nicht gelöscht werden, weil noch ${label.toLowerCase()} vorhanden sind. Bitte stattdessen sperren.`,
-        );
-      }
-    }
+    await env.DB.batch([
+      env.DB.prepare(
+        hasTemplateNames
+          ? `UPDATE templates SET created_by = NULL WHERE created_by = ?1`
+          : `UPDATE templates
+             SET created_by = ?2, updated_at = updated_at
+             WHERE created_by = ?1`,
+      ).bind(targetId, user.id),
+      env.DB.prepare(
+        hasTemplateNames
+          ? `UPDATE templates SET updated_by = NULL WHERE updated_by = ?1`
+          : `UPDATE templates
+             SET updated_by = ?2, updated_at = updated_at
+             WHERE updated_by = ?1`,
+      ).bind(targetId, user.id),
+      env.DB.prepare(
+        hasCommandNames
+          ? `UPDATE commands SET created_by = NULL WHERE created_by = ?1`
+          : `UPDATE commands SET created_by = ?2 WHERE created_by = ?1`,
+      ).bind(targetId, user.id),
+      env.DB.prepare(
+        hasCommandNames
+          ? `UPDATE commands SET updated_by = NULL WHERE updated_by = ?1`
+          : `UPDATE commands SET updated_by = ?2 WHERE updated_by = ?1`,
+      ).bind(targetId, user.id),
+      env.DB.prepare(
+        hasVersionNames
+          ? `UPDATE template_versions SET changed_by = NULL WHERE changed_by = ?1`
+          : `UPDATE template_versions SET changed_by = ?2 WHERE changed_by = ?1`,
+      ).bind(targetId, user.id),
+    ]);
 
     const deleteResult = await env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(targetId).run();
     if (!deleteResult.meta.changes) {
@@ -1068,12 +1186,15 @@ async function handleHistory(
   path: string,
 ): Promise<Response | null> {
   if (path === "/api/history" && request.method === "GET") {
+    const hasVersionNames = await hasColumn(env, "template_versions", "changed_by_name");
     const [versions, trash] = await Promise.all([
       env.DB.prepare(
         `SELECT v.id, v.template_id, v.version, v.title, v.created_at,
-                u.display_name AS changed_by_name
+                ${hasVersionNames
+    ? "COALESCE(v.changed_by_name, u.display_name, 'Ehemaliger Mitarbeiter')"
+    : "u.display_name"} AS changed_by_name
          FROM template_versions v
-         JOIN users u ON u.id = v.changed_by
+         ${hasVersionNames ? "LEFT JOIN users u ON u.id = v.changed_by" : "JOIN users u ON u.id = v.changed_by"}
          ORDER BY v.created_at DESC
          LIMIT 100`,
       ).all(),
@@ -1125,11 +1246,17 @@ async function handleHistory(
 
     if (!current) throw new HttpError(404, "Zielvorlage wurde nicht gefunden.");
 
+    const hasVersionNames = await hasColumn(env, "template_versions", "changed_by_name");
+    const hasTemplateNames = await hasColumn(env, "templates", "updated_by_name");
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO template_versions
-          (template_id, version, category_id, title, body, changed_by, change_note)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+        hasVersionNames
+          ? `INSERT INTO template_versions
+              (template_id, version, category_id, title, body, changed_by, changed_by_name, change_note)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
+          : `INSERT INTO template_versions
+              (template_id, version, category_id, title, body, changed_by, change_note)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
       ).bind(
         current.id,
         current.version,
@@ -1137,19 +1264,24 @@ async function handleHistory(
         current.title,
         current.body,
         user.id,
-        `Automatische Sicherung vor Wiederherstellung von Version ${version.version}`,
+        ...(hasVersionNames ? [user.displayName, `Automatische Sicherung vor Wiederherstellung von Version ${version.version}`] : [`Automatische Sicherung vor Wiederherstellung von Version ${version.version}`]),
       ),
       env.DB.prepare(
-        `UPDATE templates
-         SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
-             active = 1, updated_by = ?4, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?5`,
+        hasTemplateNames
+          ? `UPDATE templates
+             SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
+                 active = 1, updated_by = ?4, updated_by_name = ?5, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?6`
+          : `UPDATE templates
+             SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
+                 active = 1, updated_by = ?4, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?5`,
       ).bind(
         version.category_id,
         version.title,
         version.body,
         user.id,
-        version.template_id,
+        ...(hasTemplateNames ? [user.displayName, version.template_id] : [version.template_id]),
       ),
     ]);
 
@@ -1165,11 +1297,16 @@ async function handleHistory(
     requireRole(user, ["editor", "admin"]);
     const templateId = positiveInteger(templateMatch[1], "Vorlagen-ID");
 
+    const hasTemplateNames = await hasColumn(env, "templates", "updated_by_name");
     const result = await env.DB.prepare(
-      `UPDATE templates
-       SET active = 1, updated_by = ?1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?2 AND active = 0`,
-    ).bind(user.id, templateId).run();
+      hasTemplateNames
+        ? `UPDATE templates
+           SET active = 1, updated_by = ?1, updated_by_name = ?2, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?3 AND active = 0`
+        : `UPDATE templates
+           SET active = 1, updated_by = ?1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?2 AND active = 0`,
+    ).bind(user.id, ...(hasTemplateNames ? [user.displayName, templateId] : [templateId])).run();
 
     if ((result.meta.changes ?? 0) === 0) {
       throw new HttpError(404, "Archivierte Vorlage wurde nicht gefunden.");
