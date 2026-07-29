@@ -649,12 +649,31 @@ dialog::backdrop {
 .check input { width: auto; }
 .user-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 140px 90px;
+  grid-template-columns: minmax(0, 1.3fr) 140px 110px minmax(220px, 1fr);
   gap: 10px;
   align-items: center;
   padding: 12px 0;
   border-bottom: 1px solid rgba(112, 91, 71, 0.08);
   font-size: 13px;
+}
+.user-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.user-row-main span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.user-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.user-row-actions button {
+  min-width: 96px;
 }
 .game-grid {
   display: grid;

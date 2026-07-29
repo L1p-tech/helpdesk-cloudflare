@@ -978,6 +978,43 @@ async function handleUsers(
     return json({ ok: true });
   }
 
+  if (userMatch && request.method === "DELETE") {
+    requireRole(user, ["admin"]);
+    const targetId = positiveInteger(userMatch[1], "Benutzer-ID");
+
+    if (targetId === user.id) {
+      throw new HttpError(400, "Das eigene Konto kann nicht gelöscht werden.");
+    }
+
+    const dependencyChecks = [
+      ["Vorlagen", "SELECT COUNT(*) AS count FROM templates WHERE created_by = ?1 OR updated_by = ?1"],
+      ["Befehle", "SELECT COUNT(*) AS count FROM commands WHERE created_by = ?1 OR updated_by = ?1"],
+      ["Vorlagenverlauf", "SELECT COUNT(*) AS count FROM template_versions WHERE changed_by = ?1"],
+      ["Vorlagenvorschläge", "SELECT COUNT(*) AS count FROM template_proposals WHERE submitted_by = ?1"],
+      ["Verbesserungsvorschläge", "SELECT COUNT(*) AS count FROM feedback_items WHERE submitted_by = ?1"],
+      ["Spielstände", "SELECT COUNT(*) AS count FROM game_scores WHERE user_id = ?1"],
+      ["Typing-Spielstände", "SELECT COUNT(*) AS count FROM typing_game_scores WHERE user_id = ?1"],
+    ] as const;
+
+    for (const [label, query] of dependencyChecks) {
+      const result = await env.DB.prepare(query).bind(targetId).first<{ count: number }>();
+      if (Number(result?.count ?? 0) > 0) {
+        throw new HttpError(
+          409,
+          `Benutzer kann nicht gelöscht werden, weil noch ${label.toLowerCase()} vorhanden sind. Bitte stattdessen sperren.`,
+        );
+      }
+    }
+
+    const deleteResult = await env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(targetId).run();
+    if (!deleteResult.meta.changes) {
+      throw new HttpError(404, "Benutzer nicht gefunden.");
+    }
+
+    await audit(env, user.id, "delete", "user", targetId);
+    return json({ ok: true });
+  }
+
   return null;
 }
 

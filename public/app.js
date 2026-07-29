@@ -1017,11 +1017,80 @@ async function loadUsers() {
   const data = await api("/api/users");
   $("#users-list").innerHTML = data.users.map((user) => `
     <div class="user-row">
-      <strong>${escapeHtml(user.display_name)}</strong>
-      <span>${escapeHtml(user.username)}</span>
+      <div class="user-row-main">
+        <strong>${escapeHtml(user.display_name)}</strong>
+        <span>${escapeHtml(user.username)}</span>
+      </div>
       <span>${roleLabel(user.role)}</span>
       <span>${user.active ? "Aktiv" : "Gesperrt"}</span>
+      <div class="user-row-actions">
+        <button class="btn-ghost" type="button" data-user-action="toggle-active" data-user-id="${user.id}" data-user-name="${escapeHtml(user.display_name)}" data-user-active="${user.active ? "1" : "0"}">
+          ${user.active ? "Sperren" : "Entsperren"}
+        </button>
+        <button class="btn-ghost" type="button" data-user-action="reset-password" data-user-id="${user.id}" data-user-name="${escapeHtml(user.display_name)}">
+          Passwort
+        </button>
+        <button class="btn-danger" type="button" data-user-action="delete" data-user-id="${user.id}" data-user-name="${escapeHtml(user.display_name)}">
+          Löschen
+        </button>
+      </div>
     </div>`).join("");
+}
+
+async function updateUserAdmin(userId, payload) {
+  await api(`/api/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  await loadUsers();
+}
+
+async function handleUsersListClick(event) {
+  const button = event.target.closest("[data-user-action]");
+  if (!button) return;
+
+  const userId = Number(button.dataset.userId);
+  const userName = button.dataset.userName || "dieser Benutzer";
+  const action = button.dataset.userAction;
+
+  if (!userId || !action) return;
+
+  if (action === "toggle-active") {
+    const currentlyActive = button.dataset.userActive === "1";
+    const shouldActivate = !currentlyActive;
+    const confirmed = window.confirm(
+      shouldActivate ? `${userName} wieder entsperren?` : `${userName} wirklich sperren?`,
+    );
+    if (!confirmed) return;
+
+    await updateUserAdmin(userId, { active: shouldActivate });
+    showToast(shouldActivate ? "Benutzer entsperrt." : "Benutzer gesperrt.");
+    return;
+  }
+
+  if (action === "reset-password") {
+    const password = window.prompt(`Neues Passwort für ${userName}:`);
+    if (password === null) return;
+    if (password.trim().length < 12) {
+      showToast("Das Passwort muss mindestens 12 Zeichen lang sein.");
+      return;
+    }
+
+    await updateUserAdmin(userId, { password: password.trim() });
+    showToast("Passwort aktualisiert.");
+    return;
+  }
+
+  if (action === "delete") {
+    const confirmed = window.confirm(
+      `${userName} wirklich löschen? Das geht nur, wenn keine Inhalte oder Spielstände mit dem Konto verknüpft sind.`,
+    );
+    if (!confirmed) return;
+
+    await api(`/api/users/${userId}`, { method: "DELETE" });
+    await loadUsers();
+    showToast("Benutzer gelöscht.");
+  }
 }
 
 async function loadLeaderboard() {
@@ -1575,6 +1644,9 @@ $("#feedback-list").addEventListener("click", (event) => {
   if (!button) return;
   saveFeedbackAdmin(Number(button.dataset.feedbackSave))
     .catch((error) => alert(error.message));
+});
+$("#users-list").addEventListener("click", (event) => {
+  handleUsersListClick(event).catch((error) => alert(error.message));
 });
 
 $("#templates-list").addEventListener("click", (event) => {
