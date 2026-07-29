@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>2nd Level Helpdesk</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main id="app">
+    <section class="auth-shell" id="login-view">
+      <form class="panel auth-card" id="login-form">
+        <p class="eyebrow">Interner Bereich</p>
+        <h1>2nd Level Helpdesk</h1>
+        <p class="muted">Mit Benutzername und Passwort anmelden.</p>
+        <label>Benutzername<input id="login-username" autocomplete="username" required></label>
+        <label>Passwort<input id="login-password" type="password" autocomplete="current-password" required></label>
+        <button class="primary" type="submit">Anmelden</button>
+        <p class="form-message" id="login-message"></p>
+      </form>
+    </section>
+
+    <section class="app-shell hidden" id="app-view">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">2nd Level</p>
+          <h1>Helpdesk</h1>
+        </div>
+        <nav id="main-nav">
+          <button data-view="templates" class="active">Vorlagen</button>
+          <button data-view="proposals">Meine Vorschläge</button>
+          <button data-view="approvals" data-role="reviewer">Freigaben <span id="approval-count"></span></button>
+          <button data-view="commands">Befehle</button>
+          <button data-view="game">Pause</button>
+          <button data-view="admin" data-role="admin">Administration</button>
+          <button data-view="settings">Einstellungen</button>
+        </nav>
+        <div class="sidebar-footer">
+          <div id="current-user"></div>
+          <button id="logout-button">Abmelden</button>
+        </div>
+      </aside>
+
+      <section class="content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="view-eyebrow">Gemeinsame Inhalte</p>
+            <h2 id="view-title">Ticket-Vorlagen</h2>
+          </div>
+          <button class="primary" id="new-proposal-button">Neue Vorlage vorschlagen</button>
+        </header>
+
+        <div id="toast" class="toast hidden"></div>
+
+        <section class="view" id="view-templates">
+          <div class="toolbar">
+            <input class="grow" id="template-search" placeholder="Vorlagen durchsuchen">
+            <select id="template-category-filter"><option value="">Alle Kategorien</option></select>
+          </div>
+          <div id="templates-list" class="card-list"></div>
+        </section>
+
+        <section class="view hidden" id="view-proposals">
+          <div id="my-proposals-list" class="card-list"></div>
+        </section>
+
+        <section class="view hidden" id="view-approvals">
+          <div id="approvals-list" class="card-list"></div>
+        </section>
+
+        <section class="view hidden" id="view-commands">
+          <div class="toolbar">
+            <input class="grow" id="command-search" placeholder="Befehle durchsuchen">
+            <button id="new-command-button" data-role="reviewer">Befehl hinzufügen</button>
+          </div>
+          <div id="commands-list" class="card-list"></div>
+        </section>
+
+        <section class="view hidden" id="view-game">
+          <div class="game-grid">
+            <div class="panel">
+              <div class="game-header">
+                <div><strong>Helpdesk Runner</strong><p class="muted">Leertaste oder Klick zum Springen</p></div>
+                <strong id="game-score">0</strong>
+              </div>
+              <canvas id="game-canvas" width="800" height="260"></canvas>
+              <button class="primary" id="game-start">Spiel starten</button>
+            </div>
+            <div class="panel">
+              <h3>Leaderboard</h3>
+              <ol id="leaderboard"></ol>
+            </div>
+          </div>
+        </section>
+
+        <section class="view hidden" id="view-admin">
+          <div class="grid-two">
+            <form class="panel" id="user-form">
+              <h3>Benutzer anlegen</h3>
+              <label>Benutzername<input id="user-username" required></label>
+              <label>Anzeigename<input id="user-display-name" required></label>
+              <label>Startpasswort<input id="user-password" type="password" minlength="12" required></label>
+              <label>Rolle<select id="user-role">
+                <option value="employee">Mitarbeiter</option>
+                <option value="editor">Redakteur</option>
+                <option value="admin">Administrator</option>
+              </select></label>
+              <button class="primary" type="submit">Benutzer anlegen</button>
+            </form>
+            <form class="panel" id="category-form">
+              <h3>Kategorie anlegen</h3>
+              <label>Name<input id="category-name" required></label>
+              <label>Farbe<input id="category-color" type="color" value="#4a7cff"></label>
+              <button class="primary" type="submit">Kategorie anlegen</button>
+            </form>
+          </div>
+          <div class="panel">
+            <h3>Benutzer</h3>
+            <div id="users-list"></div>
+          </div>
+        </section>
+
+        <section class="view hidden" id="view-settings">
+          <form class="panel narrow" id="settings-form">
+            <h3>Persönliche Einstellungen</h3>
+            <label>Wert für <code>[ICH]</code><input id="signature-name" placeholder="Max Mustermann"></label>
+            <p class="muted">Dieser Wert wird nur für dein Konto gespeichert.</p>
+            <button class="primary" type="submit">Speichern</button>
+          </form>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="proposal-dialog">
+    <form method="dialog" id="proposal-form">
+      <header><h3 id="proposal-dialog-title">Vorlage vorschlagen</h3><button class="icon" value="cancel">×</button></header>
+      <input type="hidden" id="proposal-template-id">
+      <label>Titel<input id="proposal-title" maxlength="160" required></label>
+      <label>Kategorie<select id="proposal-category" required></select></label>
+      <label>Vorlagentext<textarea id="proposal-body" rows="12" required></textarea></label>
+      <label>Begründung<textarea id="proposal-reason" rows="3"></textarea></label>
+      <div id="duplicate-result" class="notice hidden"></div>
+      <footer>
+        <button type="button" id="check-duplicate-button">Duplikate prüfen</button>
+        <button class="primary" type="submit">Zur Freigabe einreichen</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="review-dialog">
+    <form method="dialog" id="review-form">
+      <header><h3>Vorschlag prüfen</h3><button class="icon" value="cancel">×</button></header>
+      <div id="review-content"></div>
+      <label>Kommentar<textarea id="review-note" rows="4"></textarea></label>
+      <footer>
+        <button type="button" class="danger" data-review="reject">Ablehnen</button>
+        <button type="button" data-review="changes">Änderung anfordern</button>
+        <button type="button" class="primary" data-review="approve">Genehmigen</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="command-dialog">
+    <form method="dialog" id="command-form">
+      <header><h3>Befehl hinzufügen</h3><button class="icon" value="cancel">×</button></header>
+      <label>Name<input id="command-name" required></label>
+      <label>Kategorie<input id="command-category" required></label>
+      <label>Befehl<textarea id="command-code" rows="5" required></textarea></label>
+      <label>Beschreibung<textarea id="command-description" rows="4" required></textarea></label>
+      <div class="grid-two">
+        <label>Umgebung<select id="command-shell">
+          <option value="cmd">CMD</option>
+          <option value="powershell">PowerShell</option>
+          <option value="windows">Windows</option>
+        </select></label>
+        <label>Risiko<select id="command-risk">
+          <option value="low">Niedrig</option>
+          <option value="medium">Mittel</option>
+          <option value="high">Hoch</option>
+        </select></label>
+      </div>
+      <label class="check"><input id="command-admin" type="checkbox"> Administrator erforderlich</label>
+      <label class="check"><input id="command-remote" type="checkbox"> Remote ausführbar</label>
+      <label class="check"><input id="command-restart" type="checkbox"> Neustart erforderlich</label>
+      <footer><button class="primary" type="submit">Speichern</button></footer>
+    </form>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
