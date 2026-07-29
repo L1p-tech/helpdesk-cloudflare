@@ -1286,13 +1286,13 @@ function initializeGame() {
       context.fillStyle = "#b7bac4";
       context.font = "16px monospace";
       context.fillText(
-        gameOver ? "GAME OVER" : "LEERTASTE ZUM STARTEN",
+        gameOver ? "GAME OVER" : "KLICKE AUF START",
         canvas.width / 2,
         105,
       );
       if (gameOver) {
         context.font = "12px monospace";
-        context.fillText("Leertaste oder Button für Neustart", canvas.width / 2, 128);
+        context.fillText("Nutze den Button fuer einen Neustart", canvas.width / 2, 128);
       }
     }
   }
@@ -1382,20 +1382,20 @@ function initializeGame() {
 
   $("#game-start").addEventListener("click", start);
   canvas.addEventListener("click", () => {
-    if (!running) start();
-    else jump();
+    if (running) jump();
   });
 
   window.addEventListener("keydown", (event) => {
     if (state.activeView !== "game") return;
 
     if (event.code === "Space" || event.code === "ArrowUp") {
+      if (!running) return;
       event.preventDefault();
-      if (!running) start();
-      else jump();
+      jump();
     }
 
     if (event.code === "ArrowDown") {
+      if (!running) return;
       event.preventDefault();
       setDucking(true);
     }
