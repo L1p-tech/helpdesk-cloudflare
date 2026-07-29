@@ -26,6 +26,13 @@ const TYPING_PROMPTS = [
   "Vor der Eskalation bitte Logdateien sichern, Screenshot anhaengen und den betroffenen Arbeitsplatz dokumentieren.",
   "Die Vorlage wurde aktualisiert und kann ab sofort fuer Rueckmeldungen an Mitarbeitende direkt verwendet werden.",
   "Bitte kontrollieren Sie ob das VPN Profil korrekt ausgewaehlt ist und die Mehrfaktor Anmeldung erfolgreich abgeschlossen wurde.",
+  "Falls der Druckauftrag weiterhin haengen bleibt, leeren Sie bitte die Warteschlange und testen den Druck erneut mit einer kleinen Datei.",
+  "Dokumentieren Sie im Ticket, welche Systeme betroffen sind, seit wann die Stoerung besteht und welche Auswirkungen fuer den Mitarbeiter sichtbar sind.",
+  "Bevor ein Zugriff entfernt wird, sollte die Freigabe des Fachbereichs vorliegen und im Vorgang eindeutig nachvollziehbar abgelegt werden.",
+  "Wenn die Anmeldung im Browser fehlschlaegt, pruefen Sie Cookies, gespeicherte Sitzungen und einen moeglichen Hinweis auf eine gesperrte Identitaet.",
+  "Bei einer Softwareinstallation bitte immer Version, Quelle, benoetigte Rechte und einen erfolgreichen Funktionstest im Ticket vermerken.",
+  "Wird ein Konto entsperrt, sollte der Benutzer zusaetzlich auf Passwortaenderung, Mehrfaktor Anmeldung und die geltenden Sicherheitsregeln hingewiesen werden.",
+  "Fuer eine saubere Eskalation brauchen wir Reproduktionsschritte, Zeitpunkt, Fehlermeldung, betroffene Umgebung und die bereits getesteten Massnahmen.",
 ];
 
 const $ = (selector) => document.querySelector(selector);
@@ -1420,7 +1427,21 @@ function initializeTypingGame() {
   let startTime = 0;
   let timerId = null;
   let running = false;
-  let remainingSeconds = 30;
+  let remainingSeconds = 60;
+  let totalCorrectChars = 0;
+  let totalTypedChars = 0;
+
+  function pickPrompt() {
+    if (TYPING_PROMPTS.length < 2 || !currentPrompt) {
+      return TYPING_PROMPTS[Math.floor(Math.random() * TYPING_PROMPTS.length)];
+    }
+
+    let nextPrompt = currentPrompt;
+    while (nextPrompt === currentPrompt) {
+      nextPrompt = TYPING_PROMPTS[Math.floor(Math.random() * TYPING_PROMPTS.length)];
+    }
+    return nextPrompt;
+  }
 
   function getFirstMismatchIndex(value) {
     for (let index = 0; index < value.length; index += 1) {
@@ -1434,13 +1455,15 @@ function initializeTypingGame() {
     currentPrompt = "";
     startTime = 0;
     running = false;
-    remainingSeconds = 30;
+    remainingSeconds = 60;
+    totalCorrectChars = 0;
+    totalTypedChars = 0;
     input.value = "";
     input.disabled = true;
     promptElement.textContent = "Klicke auf Start, um den ersten Text zu laden.";
     wpmElement.textContent = "0 WPM";
     accuracyElement.textContent = "0 % Genauigkeit";
-    timerElement.textContent = "30s";
+    timerElement.textContent = "60s";
     startButton.textContent = "Starten";
   }
 
@@ -1460,11 +1483,14 @@ function initializeTypingGame() {
   function currentResult() {
     const typed = input.value;
     const mismatchIndex = getFirstMismatchIndex(typed);
-    const correctChars = mismatchIndex === -1 ? typed.length : mismatchIndex;
-    const errorChars = mismatchIndex === -1 ? 0 : typed.length - correctChars;
+    const currentCorrectChars = mismatchIndex === -1 ? typed.length : mismatchIndex;
+    const currentTypedChars = typed.length;
+    const correctChars = totalCorrectChars + currentCorrectChars;
+    const totalChars = totalTypedChars + currentTypedChars;
+    const errorChars = Math.max(0, totalChars - correctChars);
 
     const elapsedMs = Math.max(1, Date.now() - startTime);
-    const accuracy = typed.length ? Math.round((correctChars / (correctChars + errorChars)) * 100) : 100;
+    const accuracy = totalChars ? Math.round((correctChars / (correctChars + errorChars)) * 100) : 100;
     const wpm = Math.round((correctChars / 5) / (elapsedMs / 60_000));
 
     wpmElement.textContent = `${Math.max(0, wpm)} WPM`;
@@ -1474,9 +1500,18 @@ function initializeTypingGame() {
       wpm: Math.max(0, wpm),
       accuracy: Math.max(0, accuracy),
       correctChars,
-      totalChars: Math.max(1, typed.length),
+      totalChars: Math.max(1, totalChars),
       durationMs: elapsedMs,
     };
+  }
+
+  function advancePrompt() {
+    totalCorrectChars += currentPrompt.length;
+    totalTypedChars += currentPrompt.length;
+    currentPrompt = pickPrompt();
+    input.value = "";
+    renderPrompt();
+    currentResult();
   }
 
   async function finishTypingGame() {
@@ -1487,8 +1522,6 @@ function initializeTypingGame() {
     startButton.textContent = "Nochmal spielen";
 
     const result = currentResult();
-    if (result.durationMs < 10_000) return;
-
     try {
       await api("/api/game/typing/scores", {
         method: "POST",
@@ -1509,15 +1542,17 @@ function initializeTypingGame() {
   }
 
   function startTypingGame() {
-    currentPrompt = TYPING_PROMPTS[Math.floor(Math.random() * TYPING_PROMPTS.length)];
+    currentPrompt = pickPrompt();
     startTime = Date.now();
     running = true;
-    remainingSeconds = 30;
+    remainingSeconds = 60;
+    totalCorrectChars = 0;
+    totalTypedChars = 0;
     input.disabled = false;
     input.value = "";
     input.focus();
     startButton.textContent = "Laeuft...";
-    timerElement.textContent = "30s";
+    timerElement.textContent = "60s";
     accuracyElement.textContent = "100 % Genauigkeit";
     wpmElement.textContent = "0 WPM";
     renderPrompt();
@@ -1545,7 +1580,7 @@ function initializeTypingGame() {
     renderPrompt();
     currentResult();
     if (input.value === currentPrompt) {
-      finishTypingGame();
+      advancePrompt();
     }
   });
 
