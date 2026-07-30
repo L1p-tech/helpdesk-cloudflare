@@ -1482,7 +1482,10 @@ function initializeGame() {
   let animationId = null;
   let obstacles = [];
   let clouds = [];
-  let jumpKeyHeld = false;
+  // Ist die Sprungtaste (oder Maus/Touch) gerade gedrueckt? Steuert zweierlei:
+  // die Tastenwiederholung beim Halten und den sofortigen Anschlusssprung
+  // direkt nach der Landung.
+  let jumpHeld = false;
 
   /** Bodenhoehe des T-Rex in der aktuellen Haltung. */
   function trexGroundY() {
@@ -1582,6 +1585,12 @@ function initializeGame() {
         trex.velocityY = 0;
         trex.jumping = false;
         trex.speedDrop = false;
+
+        // Haelt der Spieler die Sprungtaste weiterhin gedrueckt, wird direkt
+        // beim Aufsetzen neu abgesprungen. Ohne das muesste man loslassen und
+        // erneut druecken -- bei eng aufeinanderfolgenden Hindernissen bleibt
+        // dafuer keine Zeit.
+        if (jumpHeld) startJump();
       }
     } else {
       trex.y = trexGroundY();
@@ -1746,22 +1755,24 @@ function initializeGame() {
     box(24, 12, 9, 8);
 
     // Rumpf: oben breit, zum Schwanz hin schmaler -- das gibt die
-    // charakteristische Keilform des Originals.
-    box(17, 19, 16, 11);
-    box(19, 29, 13, 6);
+    // charakteristische Keilform des Originals. Er reicht bewusst tief herunter,
+    // damit der T-Rex gedrungen wirkt und nicht langbeinig.
+    box(17, 19, 16, 12);
+    box(19, 31, 14, 7);
 
     // Schwanz: laeuft in zwei Stufen nach hinten aus, leicht abfallend.
     box(9, 22, 10, 6);
     box(3, 25, 7, 4);
 
-    // Kurzer Arm, deutlich vom Rumpf abgesetzt nach vorn unten.
-    box(33, 24, 6, 3);
-    box(37, 26, 3, 3);
+    // Winziger Arm direkt an der Brust. Bewusst nur eine kleine Stufe an der
+    // Rumpfkante: Steht er weiter ab, liest sich die Silhouette wie ein zweites
+    // Bein statt wie der typische Stummelarm des T-Rex.
+    box(31, 24, 4, 3);
 
     if (trex.jumping) {
       // Im Sprung beide Beine angezogen
-      box(20, 34, 6, 11);
-      box(28, 34, 6, 11);
+      box(20, 37, 6, 8);
+      box(28, 37, 6, 8);
     } else {
       // Laufanimation: Der Takt haengt an der Strecke, nicht an der Zeit --
       // dadurch trippeln die Beine bei hohem Tempo sichtbar schneller.
@@ -1771,13 +1782,13 @@ function initializeGame() {
       // sichtbar; ohne ihn wirkt die Animation fast statisch.
       const legFrame = Math.floor(distance / 8) % 2;
       if (legFrame) {
-        box(20, 34, 6, 13);   // hinteres Bein gestreckt
-        box(20, 44, 10, 3);   // Fuss
-        box(28, 34, 6, 7);    // vorderes Bein angewinkelt
+        box(20, 37, 6, 10);   // hinteres Bein gestreckt
+        box(20, 44, 9, 3);    // Fuss
+        box(28, 37, 6, 5);    // vorderes Bein angewinkelt
       } else {
-        box(20, 34, 6, 7);    // hinteres Bein angewinkelt
-        box(28, 34, 6, 13);   // vorderes Bein gestreckt
-        box(28, 44, 10, 3);   // Fuss
+        box(20, 37, 6, 5);    // hinteres Bein angewinkelt
+        box(28, 37, 6, 10);   // vorderes Bein gestreckt
+        box(28, 44, 9, 3);    // Fuss
       }
     }
   }
@@ -2037,6 +2048,9 @@ function initializeGame() {
   function start() {
     if (running) return;
     cancelAnimationFrame(animationId);
+    // Der Klick auf "Spiel starten" darf nicht als gehaltene Sprungtaste in die
+    // neue Runde uebernommen werden.
+    jumpHeld = false;
     resetGame();
     drawScene();
     animationId = requestAnimationFrame(tick);
@@ -2044,11 +2058,16 @@ function initializeGame() {
 
   $("#game-start").addEventListener("click", start);
   canvas.addEventListener("pointerdown", () => {
-    if (running) startJump();
+    if (!running) return;
+    jumpHeld = true;
+    startJump();
   });
+  // Auch ausserhalb des Canvas loslassen zaehlt, sonst bliebe jumpHeld haengen.
   canvas.addEventListener("pointerup", () => {
+    jumpHeld = false;
     if (running) endJump();
   });
+  window.addEventListener("pointerup", () => { jumpHeld = false; });
 
   window.addEventListener("keydown", (event) => {
     if (state.activeView !== "game") return;
@@ -2056,8 +2075,8 @@ function initializeGame() {
     if (event.code === "Space" || event.code === "ArrowUp") {
       if (!running) return;
       event.preventDefault();
-      if (!jumpKeyHeld) {
-        jumpKeyHeld = true;
+      if (!jumpHeld) {
+        jumpHeld = true;
         startJump();
       }
     }
@@ -2073,7 +2092,7 @@ function initializeGame() {
     if (state.activeView !== "game") return;
 
     if (event.code === "Space" || event.code === "ArrowUp") {
-      jumpKeyHeld = false;
+      jumpHeld = false;
       endJump();
     }
 
