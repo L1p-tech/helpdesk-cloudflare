@@ -1,4 +1,4 @@
-CREATE TABLE feedback_items (
+CREATE TABLE IF NOT EXISTS feedback_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   type TEXT NOT NULL CHECK (type IN ('bug', 'improvement')),
   title TEXT NOT NULL,
@@ -13,5 +13,5 @@ CREATE TABLE feedback_items (
   FOREIGN KEY (reviewed_by) REFERENCES users(id)
 );
 
-CREATE INDEX idx_feedback_status ON feedback_items(status, created_at DESC);
-CREATE INDEX idx_feedback_submitted_by ON feedback_items(submitted_by, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback_items(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_feedback_submitted_by ON feedback_items(submitted_by, created_at DESC);

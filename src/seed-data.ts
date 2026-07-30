@@ -476,6 +476,198 @@ den Schletter-Ordner finden Sie unter folgendem Pfad:
 Mit freundlichen Grüßen
 [ICH]`,
   },
+  {
+    categorySlug: "passwort",
+    title: "Windows-Passwort ändern – Anleitung",
+    body: `Hallo [USERNAME],
+
+bitte ändern Sie einmal Ihr Windows-Passwort:
+
+1. Strg + Alt + Entf drücken und "Kennwort ändern" auswählen. Anschließend ein neues Kennwort vergeben.
+2. Nachdem das Passwort geändert ist, Windows-Taste + L drücken und sich mit dem neuen Passwort anmelden.
+3. Wenn Sie wieder auf der Desktop-Oberfläche sind, bitte 5 Minuten warten und den PC neu starten.
+
+Nach dem Neustart sollte die Anmeldung überall wieder funktionieren.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "mfa",
+    title: "MFA zurückgesetzt",
+    body: `Hallo [USERNAME],
+
+die Multi-Faktor-Authentifizierung (MFA) für Ihren Account wurde zurückgesetzt.
+
+Bitte melden Sie sich erneut an und schließen Sie die Einrichtung der MFA ab, indem Sie den Anweisungen auf dem Bildschirm folgen.
+
+Sollte es weiterhin zu Problemen kommen, melden Sie sich gerne bei uns.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "mfa",
+    title: "Global MFA Reset anfordern (intern)",
+    body: `Dear Global AD-Team,
+
+could you reset the MFA of the following user please:
+
+[E-MAIL-ADRESSE]
+
+Thanks in advance and best regards
+[ICH]`,
+  },
+  {
+    categorySlug: "e-mail",
+    title: "Postfachzugriff entfernt",
+    body: `Hallo [USERNAME],
+
+wir haben den Zugriff auf das entsprechende Postfach entfernt. Die Änderung wurde bereits umgesetzt und ist ab sofort wirksam.
+
+Falls Sie noch Fragen haben oder es dabei zu Problemen kommt, geben Sie gerne Bescheid – wir unterstützen Sie jederzeit.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "e-mail",
+    title: "Postfach voll – Speicherplatz schaffen",
+    body: `Hallo [USERNAME],
+
+Ihr Postfach ist serverseitig voll, weshalb aktuell keine E-Mails bei Ihnen ankommen können.
+
+Bitte versuchen Sie Folgendes, um schnell Platz zu schaffen:
+
+1. Öffnen Sie Outlook und leeren Sie den Ordner "Gelöschte Elemente" (Rechtsklick auf den Ordner, dann "Ordner leeren").
+2. Leeren Sie anschließend auch den Ordner "Junk-E-Mail".
+3. Löschen Sie große E-Mails mit Anhängen, die Sie nicht mehr benötigen. Tipp: Sortieren Sie Ihren Posteingang nach Größe, um die größten E-Mails schnell zu finden.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "e-mail",
+    title: "E-Mail aus Quarantäne freigegeben",
+    body: `Hallo [USERNAME],
+
+ich habe die Information vom Global Service Portal erhalten, dass die E-Mail aus der Quarantäne gelöst wurde.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "e-mail",
+    title: "Quarantäne-Freigabe – Angaben erforderlich",
+    body: `Hallo [USERNAME],
+
+um Ihre E-Mail aus der Quarantäne freigeben zu können, benötigen wir von Ihnen folgende Informationen:
+
+- Absender-E-Mail-Adresse des betroffenen Senders
+- Empfänger-E-Mail-Adresse
+- Betreff der E-Mail
+- Empfangsdatum der E-Mail
+- Details zum Vorgang (zum Beispiel Inhalt oder Kontext der E-Mail)
+- Geschäftliche Begründung, warum die E-Mail freigegeben werden soll
+
+Bitte reichen Sie diese Angaben nach, damit wir Ihre Anfrage weiter bearbeiten können.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "vpn",
+    title: "VPN – Windows Updates erforderlich",
+    body: `Hallo [USERNAME],
+
+die angezeigte Fehlermeldung weist darauf hin, dass Ihr Gerät die Sicherheitsanforderungen für die VPN-Verbindung aktuell nicht erfüllt. Bitte prüfen Sie, ob alle Windows Updates installiert sind:
+
+1. Klicken Sie auf Start und öffnen Sie die Einstellungen (Zahnrad-Symbol).
+2. Gehen Sie auf "Windows Update" (bei Windows 11 direkt im linken Menü).
+3. Klicken Sie auf "Nach Updates suchen" und installieren Sie alle verfügbaren Updates.
+4. Starten Sie Ihren Rechner anschließend neu und versuchen Sie die VPN-Verbindung erneut.
+
+Sollte das Problem danach weiterhin bestehen, melden Sie sich gerne noch einmal bei uns.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "software",
+    title: "Office-Lizenz zugewiesen",
+    body: `Hallo [USERNAME],
+
+für [MITARBEITER] wurde die Office-Lizenz gemäß den hinterlegten Daten zugewiesen. Die Nutzung ist ab sofort möglich.
+
+Die Zugangsdaten und Erstanmeldeinformationen erhalten Sie in einer separaten E-Mail.
+
+Bei Rückfragen stehe ich Ihnen gerne zur Verfügung.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "fachanwendungen",
+    title: "indeX-App löst HIS-Profile ab",
+    body: `Hallo [USERNAME],
+
+seit einigen Tagen gibt es die neue indeX-App, welche die HIS-Profile ablöst.
+
+Der Zugriff auf die HIS-Datenbank wurde in diesem Zuge eingeschränkt. Weitere Informationen finden Sie in der Ankündigung im Intranet: [LINK]
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "hardware",
+    title: "Laptop-Kauf – Preis und Formular",
+    body: `Hallo [USERNAME],
+
+der Preis würde hier bei [PREIS] liegen.
+
+Falls Sie das Gerät kaufen möchten, füllen Sie bitte das beigefügte Formular aus und fügen es wieder in das Ticket ein.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "hardware",
+    title: "Formular für Verkauf an Mitarbeiter",
+    body: `Hallo [USERNAME],
+
+bitte füllen Sie das beigefügte Formular aus und fügen es wieder in das Ticket ein.
+
+Formular: [FORMULARNAME]
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "allgemein",
+    title: "Browser-Cache leeren",
+    body: `Hallo [USERNAME],
+
+versuchen Sie bitte einmal, Ihren Browser-Cache zu löschen:
+
+Drei-Punkte-Menü oben rechts → Einstellungen → Datenschutz, Suche und Dienste → Abschnitt "Browserdaten löschen" → "Zu löschende Elemente auswählen" → bei "Zeitbereich" die Option "Gesamte Zeit" wählen → Haken bei "Zwischengespeicherte Bilder und Dateien" setzen → "Jetzt löschen".
+
+Starten Sie den Browser anschließend einmal neu und probieren Sie es erneut.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
+  {
+    categorySlug: "allgemein",
+    title: "Ticket wegen Inaktivität geschlossen",
+    body: `Hallo [USERNAME],
+
+das Ticket wird aufgrund von Inaktivität geschlossen.
+
+Falls das Problem weiterhin besteht, öffnen Sie das Ticket bitte einfach erneut.
+
+Mit freundlichen Grüßen
+[ICH]`,
+  },
 ];
 
 export const DEFAULT_COMMAND_SEEDS: DefaultCommandSeed[] = [

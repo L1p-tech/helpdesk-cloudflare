@@ -1,4 +1,4 @@
-CREATE TABLE typing_game_scores (
+CREATE TABLE IF NOT EXISTS typing_game_scores (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
   wpm INTEGER NOT NULL CHECK (wpm >= 0 AND wpm <= 400),
@@ -10,5 +10,5 @@ CREATE TABLE typing_game_scores (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_typing_scores_wpm ON typing_game_scores(wpm DESC, accuracy DESC);
-CREATE INDEX idx_typing_scores_user ON typing_game_scores(user_id, wpm DESC);
+CREATE INDEX IF NOT EXISTS idx_typing_scores_wpm ON typing_game_scores(wpm DESC, accuracy DESC);
+CREATE INDEX IF NOT EXISTS idx_typing_scores_user ON typing_game_scores(user_id, wpm DESC);
