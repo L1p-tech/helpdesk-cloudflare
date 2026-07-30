@@ -1309,6 +1309,8 @@ function initializeGame() {
   let gameOver = false;
   let speed = START_SPEED;
   let distance = 0;
+  // Startversatz von `distance`; wird beim Punktezaehlen wieder abgezogen.
+  let scoreOffset = 0;
   let score = 0;
   let highScore = 0;
   let startTime = 0;
@@ -1327,10 +1329,29 @@ function initializeGame() {
     running = true;
     gameOver = false;
     speed = START_SPEED;
-    distance = 0;
     score = 0;
     obstacles = [];
     clouds = [];
+
+    // Der Punktestand startet immer bei 0, die zurueckgelegte Strecke dagegen
+    // an einer zufaelligen Stelle. `distance` steuert das Bodenmuster und den
+    // Laufzyklus, deshalb sieht jede Runde anders aus statt jedes Mal mit
+    // demselben Bild zu beginnen. Der Versatz wird beim Punktezaehlen wieder
+    // abgezogen (siehe scoreOffset).
+    distance = Math.random() * 10_000;
+    scoreOffset = distance;
+
+    // Wolken vorab verteilen, damit der Himmel nicht bei jedem Start leer ist
+    // und sich erst nach und nach fuellt.
+    let cloudX = Math.random() * 200;
+    while (cloudX < canvas.width) {
+      clouds.push({
+        x: cloudX,
+        y: px(30 + Math.floor(Math.random() * 40)),
+        gap: 100 + Math.floor(Math.random() * 200),
+      });
+      cloudX += px(100 + Math.random() * 200);
+    }
     trex.ducking = false;
     trex.jumping = false;
     trex.speedDrop = false;
@@ -1481,9 +1502,14 @@ function initializeGame() {
     obstacles = obstacles.filter((obstacle) => obstacle.x + obstacle.width > 0);
 
     // Neues Hindernis, sobald das letzte weit genug hereingelaufen ist.
+    //
+    // Das erste Hindernis einer Runde bekommt zusaetzlich einen zufaelligen
+    // Vorlauf, damit nicht jede Runde mit demselben Anlauf beginnt.
     const last = lastObstacle();
     if (!last) {
       spawnObstacle();
+      const first = lastObstacle();
+      if (first) first.x += px(60 + Math.random() * 220);
     } else if (last.x + last.width + px(last.gap) < canvas.width) {
       spawnObstacle();
     }
@@ -1544,30 +1570,34 @@ function initializeGame() {
       return;
     }
 
-    // Kopf mit Schnauze und Kiefer
-    box(26, 0, 18, 14);   // Kopfform
-    box(42, 6, 4, 4);     // Schnauzenspitze
-    box(26, 13, 14, 4);   // Unterkiefer
+    // Kopf: kompakter Block oben rechts, Schnauze ragt nach vorn ueber.
+    box(27, 2, 15, 11);   // Schaedel
+    box(42, 6, 4, 5);     // Schnauzenspitze
+    box(27, 13, 11, 3);   // Unterkiefer
     context.fillStyle = "#12141b";
-    box(38, 3, 3, 3);     // Auge
+    box(37, 5, 3, 3);     // Auge als Aussparung
     context.fillStyle = "#d4d6dc";
 
-    // Hals und Rumpf
-    box(22, 10, 12, 12);
-    box(14, 18, 20, 16);
+    // Hals: schmaler als Kopf und Rumpf, dadurch bleibt der Kopf abgesetzt.
+    box(24, 12, 9, 8);
 
-    // Schwanz -- abfallend nach hinten, gibt die typische Silhouette
-    box(6, 20, 10, 8);
-    box(0, 24, 8, 6);
+    // Rumpf: oben breit, zum Schwanz hin schmaler -- das gibt die
+    // charakteristische Keilform des Originals.
+    box(17, 19, 16, 11);
+    box(19, 29, 13, 6);
 
-    // Kurzer Arm vor der Brust
-    box(30, 22, 8, 4);
-    box(35, 25, 4, 3);
+    // Schwanz: laeuft in zwei Stufen nach hinten aus, leicht abfallend.
+    box(9, 22, 10, 6);
+    box(3, 25, 7, 4);
+
+    // Kurzer Arm, deutlich vom Rumpf abgesetzt nach vorn unten.
+    box(33, 24, 6, 3);
+    box(37, 26, 3, 3);
 
     if (trex.jumping) {
       // Im Sprung beide Beine angezogen
-      box(16, 33, 7, 12);
-      box(26, 33, 7, 12);
+      box(20, 34, 6, 11);
+      box(28, 34, 6, 11);
     } else {
       // Laufanimation: Der Takt haengt an der Strecke, nicht an der Zeit --
       // dadurch trippeln die Beine bei hohem Tempo sichtbar schneller.
@@ -1577,13 +1607,13 @@ function initializeGame() {
       // sichtbar; ohne ihn wirkt die Animation fast statisch.
       const legFrame = Math.floor(distance / 8) % 2;
       if (legFrame) {
-        box(15, 33, 7, 14);   // hinteres Bein gestreckt
-        box(15, 44, 11, 3);   // Fuss
-        box(27, 33, 7, 8);    // vorderes Bein angewinkelt
+        box(20, 34, 6, 13);   // hinteres Bein gestreckt
+        box(20, 44, 10, 3);   // Fuss
+        box(28, 34, 6, 7);    // vorderes Bein angewinkelt
       } else {
-        box(15, 33, 7, 8);    // hinteres Bein angewinkelt
-        box(27, 33, 7, 14);   // vorderes Bein gestreckt
-        box(27, 44, 11, 3);   // Fuss
+        box(20, 34, 6, 7);    // hinteres Bein angewinkelt
+        box(28, 34, 6, 13);   // vorderes Bein gestreckt
+        box(28, 44, 10, 3);   // Fuss
       }
     }
   }
@@ -1824,7 +1854,7 @@ function initializeGame() {
     }
 
     distance += speed * deltaFrames;
-    score = Math.floor(distance * SCORE_COEFFICIENT);
+    score = Math.floor((distance - scoreOffset) * SCORE_COEFFICIENT);
     $("#game-score").textContent = String(score).padStart(5, "0");
 
     updateTrex(deltaFrames);
