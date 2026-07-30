@@ -196,11 +196,28 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .app-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  /* Mittig statt oben, seit links das Logo neben der Überschrift steht. */
+  align-items: center;
   gap: 20px;
   padding: 24px 26px;
   border-radius: 30px;
   margin-bottom: 16px;
+}
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+/*
+ * Das Bild liegt in doppelter Auflösung vor (96px Quelle auf 48px Anzeige),
+ * damit es auf hochauflösenden Bildschirmen scharf bleibt.
+ */
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 .app-header h1 {
   margin: 0;
@@ -208,11 +225,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
   line-height: 1;
   letter-spacing: -0.05em;
   color: var(--text-strong);
-}
-.app-header p {
-  margin: 10px 0 0;
-  font-size: 14px;
-  color: var(--muted);
 }
 .user-area {
   display: flex;
