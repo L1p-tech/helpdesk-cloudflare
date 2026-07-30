@@ -412,6 +412,30 @@
     </form>
   </dialog>
 
+  <dialog id="user-dialog">
+    <form method="dialog" id="user-form" class="modal">
+      <div class="modal-header">
+        <h2>Benutzer bearbeiten</h2>
+        <button class="modal-close" type="button" data-close-dialog aria-label="Dialog schließen">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-hint">Anmeldename: <strong id="user-edit-username"></strong></p>
+        <label>Anzeigename<input id="user-edit-name" maxlength="80" required></label>
+        <label>Rolle<select id="user-edit-role">
+          <option value="employee">Mitarbeiter</option>
+          <option value="editor">Redakteur</option>
+          <option value="admin">Administrator</option>
+        </select></label>
+        <p class="modal-hint" id="user-edit-self-hint" hidden>
+          Das eigene Konto: Die Rolle lässt sich hier nicht ändern.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-save" type="submit">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
   <script type="module" src="/app.js"></script>
 </body>
 </html>

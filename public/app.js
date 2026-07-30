@@ -1057,14 +1057,11 @@ async function loadUsers() {
       <span>${roleLabel(user.role)}</span>
       <span>${user.active ? "Aktiv" : "Gesperrt"}</span>
       <div class="user-row-actions">
-        <button class="btn-ghost" type="button" data-user-action="toggle-active" data-user-id="${user.id}" data-user-name="${escapeHtml(user.display_name)}" data-user-active="${user.active ? "1" : "0"}">
-          ${user.active ? "Sperren" : "Entsperren"}
+        <button class="btn-ghost" type="button" data-user-action="edit" data-user-id="${user.id}" data-user-name="${escapeHtml(user.display_name)}" data-user-login="${escapeHtml(user.username)}" data-user-role="${user.role}">
+          Bearbeiten
         </button>
         <button class="btn-ghost" type="button" data-user-action="reset-password" data-user-id="${user.id}" data-user-name="${escapeHtml(user.display_name)}">
           Passwort
-        </button>
-        <button class="btn-danger" type="button" data-user-action="delete" data-user-id="${user.id}" data-user-name="${escapeHtml(user.display_name)}">
-          Löschen
         </button>
       </div>
     </div>`).join("");
@@ -1078,6 +1075,55 @@ async function updateUserAdmin(userId, payload) {
   await loadUsers();
 }
 
+/**
+ * Oeffnet den Dialog zum Bearbeiten von Anzeigename und Rolle.
+ *
+ * Beim eigenen Konto ist die Rollenauswahl gesperrt: Wer sich selbst die
+ * Adminrechte entzieht, verliert den Zugang zur Benutzerverwaltung. Der Worker
+ * lehnt das ohnehin ab -- hier wird es nur sichtbar gemacht, statt den Fehler
+ * erst nach dem Speichern zu zeigen.
+ */
+function openUserDialog(button) {
+  const dialog = $("#user-dialog");
+  const isSelf = Number(button.dataset.userId) === state.user?.id;
+
+  dialog.dataset.userId = button.dataset.userId;
+  $("#user-edit-username").textContent = button.dataset.userLogin || "";
+  $("#user-edit-name").value = button.dataset.userName || "";
+  $("#user-edit-role").value = button.dataset.userRole || "employee";
+  $("#user-edit-role").disabled = isSelf;
+  $("#user-edit-self-hint").hidden = !isSelf;
+
+  dialog.showModal();
+}
+
+async function submitUserEdit(event) {
+  event.preventDefault();
+
+  const dialog = $("#user-dialog");
+  const userId = Number(dialog.dataset.userId);
+  const displayName = $("#user-edit-name").value.trim();
+
+  if (!displayName) {
+    showToast("Bitte einen Anzeigenamen eintragen.");
+    return;
+  }
+
+  // Beim eigenen Konto bleibt das Rollenfeld gesperrt und wird nicht gesendet.
+  const payload = { displayName };
+  if (!$("#user-edit-role").disabled) {
+    payload.role = $("#user-edit-role").value;
+  }
+
+  try {
+    await updateUserAdmin(userId, payload);
+    dialog.close();
+    showToast("Benutzer aktualisiert.");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
 async function handleUsersListClick(event) {
   const button = event.target.closest("[data-user-action]");
   if (!button) return;
@@ -1088,16 +1134,8 @@ async function handleUsersListClick(event) {
 
   if (!userId || !action) return;
 
-  if (action === "toggle-active") {
-    const currentlyActive = button.dataset.userActive === "1";
-    const shouldActivate = !currentlyActive;
-    const confirmed = window.confirm(
-      shouldActivate ? `${userName} wieder entsperren?` : `${userName} wirklich sperren?`,
-    );
-    if (!confirmed) return;
-
-    await updateUserAdmin(userId, { active: shouldActivate });
-    showToast(shouldActivate ? "Benutzer entsperrt." : "Benutzer gesperrt.");
+  if (action === "edit") {
+    openUserDialog(button);
     return;
   }
 
@@ -1111,18 +1149,6 @@ async function handleUsersListClick(event) {
 
     await updateUserAdmin(userId, { password: password.trim() });
     showToast("Passwort aktualisiert.");
-    return;
-  }
-
-  if (action === "delete") {
-    const confirmed = window.confirm(
-      `${userName} wirklich löschen? Vorhandene Inhalte, Vorschläge und Spielstände bleiben mit Namen erhalten.`,
-    );
-    if (!confirmed) return;
-
-    await api(`/api/users/${userId}`, { method: "DELETE" });
-    await loadUsers();
-    showToast("Benutzer gelöscht.");
   }
 }
 
@@ -2149,6 +2175,8 @@ $("#feedback-list").addEventListener("click", (event) => {
 $("#users-list").addEventListener("click", (event) => {
   handleUsersListClick(event).catch((error) => alert(error.message));
 });
+
+$("#user-form").addEventListener("submit", submitUserEdit);
 
 $("#templates-list").addEventListener("click", (event) => {
   const favoriteButton = event.target.closest("[data-favorite-template]");

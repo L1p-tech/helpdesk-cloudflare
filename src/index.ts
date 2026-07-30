@@ -1022,9 +1022,14 @@ async function handleUsers(
     const body = await readJson<Record<string, unknown>>(request);
     const role = body.role ? oneOf(body.role, ROLES, "Ungültige Rolle.") : null;
 
-    // Selbstaussperrung verhindern: Ein Admin darf sich nicht selbst deaktivieren.
+    // Selbstaussperrung verhindern: Ein Admin darf sich weder selbst
+    // deaktivieren noch sich die eigenen Adminrechte entziehen -- sonst waere
+    // die Benutzerverwaltung unter Umstaenden fuer niemanden mehr erreichbar.
     if (targetId === user.id && body.active === false) {
       throw new HttpError(400, "Das eigene Konto kann nicht deaktiviert werden.");
+    }
+    if (targetId === user.id && role !== null && role !== "admin") {
+      throw new HttpError(400, "Die eigene Administratorrolle kann nicht entzogen werden.");
     }
 
     await env.DB.prepare(
