@@ -110,6 +110,23 @@
               <span class="search-icon">⌕</span>
               <input id="command-search" placeholder="Befehl oder Beschreibung suchen…">
             </div>
+            <select id="command-category-filter" class="filter-select" aria-label="Nach Bereich filtern">
+              <option value="">Alle Bereiche</option>
+            </select>
+            <select id="command-shell-filter" class="filter-select" aria-label="Nach Umgebung filtern">
+              <option value="">Alle Umgebungen</option>
+              <option value="cmd">CMD</option>
+              <option value="powershell">PowerShell</option>
+              <option value="windows">Windows</option>
+            </select>
+            <select id="command-sort" class="filter-select" aria-label="Befehle sortieren">
+              <option value="category-asc">Bereich A-Z</option>
+              <option value="name-asc">Name A-Z</option>
+              <option value="name-desc">Name Z-A</option>
+              <option value="risk-asc">Risiko aufsteigend</option>
+              <option value="risk-desc">Risiko absteigend</option>
+              <option value="no-admin">Ohne Adminrechte zuerst</option>
+            </select>
             <button class="btn-tool" id="new-command-button" data-role="reviewer" type="button">+ Befehl hinzufügen</button>
           </div>
           <p class="commands-intro">

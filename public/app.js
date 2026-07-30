@@ -762,6 +762,7 @@ async function loadBootstrap() {
   $("#signature-name").value = state.settings.signatureName;
   $("#theme-select").value = state.settings.preferences.theme;
   populateCategories();
+  populateCommandCategories();
   applyRoleVisibility();
   renderTemplates();
   renderCommands();
@@ -992,14 +993,68 @@ function commandCard(command) {
     </details>`;
 }
 
+/** Rangfolge der Risikostufen fuer die Sortierung. */
+const RISK_ORDER = { low: 0, medium: 1, high: 2 };
+
+function sortCommands(commands) {
+  const sortBy = $("#command-sort")?.value || "category-asc";
+  const sorted = [...commands];
+
+  sorted.sort((left, right) => {
+    if (sortBy === "name-asc") return compareText(left.name, right.name);
+    if (sortBy === "name-desc") return compareText(right.name, left.name);
+
+    if (sortBy === "risk-asc" || sortBy === "risk-desc") {
+      const difference = (RISK_ORDER[left.risk_level] ?? 0)
+        - (RISK_ORDER[right.risk_level] ?? 0);
+      if (difference !== 0) return sortBy === "risk-asc" ? difference : -difference;
+      return compareText(left.name, right.name);
+    }
+
+    // Befehle ohne Adminrechte zuerst -- die kann man dem Benutzer direkt geben.
+    if (sortBy === "no-admin") {
+      const difference = (left.requires_admin ? 1 : 0) - (right.requires_admin ? 1 : 0);
+      if (difference !== 0) return difference;
+      return compareText(left.name, right.name);
+    }
+
+    return compareText(left.category, right.category)
+      || compareText(left.name, right.name);
+  });
+
+  return sorted;
+}
+
+/** Fuellt den Bereichsfilter aus den tatsaechlich vorhandenen Befehlen. */
+function populateCommandCategories() {
+  const select = $("#command-category-filter");
+  if (!select) return;
+
+  const previous = select.value;
+  const categories = [...new Set(state.commands.map((command) => command.category))]
+    .sort((left, right) => compareText(left, right));
+
+  select.innerHTML = `<option value="">Alle Bereiche</option>${
+    categories.map((category) =>
+      `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join("")
+  }`;
+  // Auswahl beibehalten, sofern der Bereich noch existiert.
+  if (categories.includes(previous)) select.value = previous;
+}
+
 function renderCommands() {
   const search = $("#command-search").value.trim().toLowerCase();
-  const commands = state.commands.filter((command) =>
-    !search ||
-    command.name.toLowerCase().includes(search) ||
-    command.command.toLowerCase().includes(search) ||
-    command.description.toLowerCase().includes(search)
-  );
+  const category = $("#command-category-filter")?.value || "";
+  const shell = $("#command-shell-filter")?.value || "";
+
+  const commands = sortCommands(state.commands.filter((command) =>
+    (!category || command.category === category) &&
+    (!shell || command.shell === shell) &&
+    (!search ||
+      command.name.toLowerCase().includes(search) ||
+      command.command.toLowerCase().includes(search) ||
+      command.description.toLowerCase().includes(search))
+  ));
 
   $("#commands-list").innerHTML = commands.length
     ? commands.map(commandCard).join("")
@@ -2529,6 +2584,9 @@ $("#template-search").addEventListener("input", renderTemplates);
 $("#template-category-filter").addEventListener("change", renderTemplates);
 $("#template-sort").addEventListener("change", renderTemplates);
 $("#command-search").addEventListener("input", renderCommands);
+$("#command-category-filter").addEventListener("change", renderCommands);
+$("#command-shell-filter").addEventListener("change", renderCommands);
+$("#command-sort").addEventListener("change", renderCommands);
 $("#theme-button").addEventListener("click", () => {
   cycleTheme().catch((error) => alert(error.message));
 });
