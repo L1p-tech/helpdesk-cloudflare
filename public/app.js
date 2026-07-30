@@ -2176,7 +2176,10 @@ $("#users-list").addEventListener("click", (event) => {
   handleUsersListClick(event).catch((error) => alert(error.message));
 });
 
-$("#user-form").addEventListener("submit", submitUserEdit);
+// Achtung: "#user-form" ist das Formular zum Anlegen neuer Benutzer im
+// Admin-Bereich. Der Bearbeiten-Dialog heisst bewusst anders, sonst wuerde
+// $() nur das erste Element mit der ID finden.
+$("#user-edit-form").addEventListener("submit", submitUserEdit);
 
 $("#templates-list").addEventListener("click", (event) => {
   const favoriteButton = event.target.closest("[data-favorite-template]");
