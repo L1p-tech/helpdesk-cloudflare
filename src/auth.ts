@@ -150,30 +150,36 @@ export async function login(
     );
   }
 
-  await env.DB.prepare(
-    `UPDATE users
-     SET failed_login_count = 0, locked_until = NULL, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ?1`,
-  ).bind(row.id).run();
-
   const token = randomToken();
   const tokenHash = await sha256(token);
   const ttlHours = Math.max(1, Number(env.SESSION_TTL_HOURS) || 12);
   const maxAgeSeconds = ttlHours * 60 * 60;
 
-  await env.DB.prepare(
-    `INSERT INTO sessions
-      (user_id, token_hash, expires_at, user_agent, ip_address)
-     VALUES (?1, ?2, datetime('now', '+' || ?3 || ' hours'), ?4, ?5)`,
-  )
-    .bind(
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE users
+       SET failed_login_count = 0, locked_until = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?1`,
+    ).bind(row.id),
+
+    // Abgelaufene Sitzungen entfernen. Ohne das waechst die Tabelle mit jedem
+    // Login dauerhaft an, denn geloescht wird sonst nur beim expliziten Logout.
+    // Der Login ist dafuer der passende Zeitpunkt: selten genug, um nicht zu
+    // stoeren, und haeufig genug, damit sich nichts ansammelt.
+    env.DB.prepare("DELETE FROM sessions WHERE expires_at <= CURRENT_TIMESTAMP"),
+
+    env.DB.prepare(
+      `INSERT INTO sessions
+        (user_id, token_hash, expires_at, user_agent, ip_address)
+       VALUES (?1, ?2, datetime('now', '+' || ?3 || ' hours'), ?4, ?5)`,
+    ).bind(
       row.id,
       tokenHash,
       ttlHours,
       request.headers.get("user-agent")?.slice(0, 300) ?? "",
       getClientIp(request),
-    )
-    .run();
+    ),
+  ]);
 
   return {
     user: {

@@ -88,6 +88,8 @@
               <option value="">Alle Kategorien</option>
             </select>
             <select id="template-sort" class="filter-select" aria-label="Vorlagen sortieren">
+              <option value="recent-used">Zuletzt benutzt</option>
+              <option value="most-used">Am häufigsten benutzt</option>
               <option value="updated-desc">Neueste zuerst</option>
               <option value="updated-asc">Älteste zuerst</option>
               <option value="title-asc">Titel A-Z</option>
@@ -310,6 +312,28 @@
           <div class="panel">
             <h3>Benutzer</h3>
             <div id="users-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Änderungsprotokoll</h3>
+                <p class="panel-hint">Die letzten 200 Aktionen aller Benutzer.</p>
+              </div>
+              <div class="panel-header-actions">
+                <select id="audit-filter" class="filter-select" aria-label="Protokoll filtern">
+                  <option value="">Alle Bereiche</option>
+                  <option value="template">Vorlagen</option>
+                  <option value="template_proposal">Vorschläge</option>
+                  <option value="command">Befehle</option>
+                  <option value="user">Benutzer</option>
+                  <option value="category">Kategorien</option>
+                  <option value="feedback_item">Feedback</option>
+                  <option value="session">Anmeldungen</option>
+                </select>
+                <button class="btn-ghost" id="audit-refresh" type="button">Aktualisieren</button>
+              </div>
+            </div>
+            <div id="audit-list" class="audit-list"></div>
           </div>
         </section>
 

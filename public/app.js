@@ -5,6 +5,7 @@ const state = {
   commands: [],
   proposals: [],
   feedbackItems: [],
+  auditEntries: [],
   settings: {
     signatureName: "",
     favorites: { templates: [], commands: [] },
@@ -46,12 +47,44 @@ async function api(path, options = {}) {
   });
 
   const data = await response.json().catch(() => ({}));
+
+  // Abgelaufene Sitzung: Nach Ablauf der Sitzungsdauer (Standard 12 Stunden)
+  // beantwortet der Worker jede Anfrage mit 401. Ohne Behandlung liefe jede
+  // Aktion in eine unverstaendliche Fehlermeldung, deshalb hier zurueck zum
+  // Login. Der Login-Aufruf selbst ist ausgenommen -- dort ist 401 die normale
+  // Antwort auf falsche Zugangsdaten und gehoert ins Formular.
+  if (response.status === 401 && !path.startsWith("/api/auth/")) {
+    handleExpiredSession();
+    throw new Error("Sitzung abgelaufen.");
+  }
+
   if (!response.ok) {
     const error = new Error(data.error || "Anfrage fehlgeschlagen.");
     error.details = data.details;
     throw error;
   }
   return data;
+}
+
+/**
+ * Bringt die Oberflaeche nach einer abgelaufenen Sitzung zurueck zum Login.
+ *
+ * `sessionExpired` verhindert, dass parallele Anfragen den Hinweis mehrfach
+ * anzeigen -- beim Laden der Seite laufen mehrere Requests gleichzeitig.
+ */
+let sessionExpired = false;
+
+function handleExpiredSession() {
+  if (sessionExpired) return;
+  sessionExpired = true;
+
+  $("#app-view").classList.add("hidden");
+  $("#login-view").classList.remove("hidden");
+  $("#login-message").textContent =
+    "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.";
+  $("#login-password").value = "";
+  if (state.user) $("#login-username").value = state.user.username;
+  state.user = null;
 }
 
 function escapeHtml(value) {
@@ -67,6 +100,31 @@ function formatDate(value) {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+  }).format(date);
+}
+
+/**
+ * Datum mit Uhrzeit -- fuer das Aenderungsprotokoll, wo die Reihenfolge
+ * innerhalb eines Tages zaehlt.
+ *
+ * D1 liefert Zeitstempel als "YYYY-MM-DD HH:MM:SS" in UTC. Ohne das
+ * angehaengte "Z" wuerde der Browser sie als Ortszeit deuten und die Uhrzeit
+ * um den Zeitzonenversatz verschieben.
+ */
+function formatDateTime(value) {
+  if (!value) return "";
+  const normalized = String(value).includes("T")
+    ? String(value)
+    : `${String(value).replace(" ", "T")}Z`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(date);
 }
 
@@ -566,6 +624,24 @@ async function copyText(text) {
   showToast("In Zwischenablage kopiert.");
 }
 
+/**
+ * Kopiert eine Vorlage und vermerkt die Nutzung.
+ *
+ * Der Zaehler steuert die Sortierung "zuletzt benutzt". Er wird bewusst ohne
+ * await und mit verschlucktem Fehler gezaehlt: Das Kopieren soll nie daran
+ * scheitern, dass die Statistik nicht geschrieben werden konnte.
+ */
+async function copyTemplate(template) {
+  await copyText(replacePersonalPlaceholders(template.body));
+  addRecentItem("template", template.id, template.title);
+
+  template.use_count = (template.use_count || 0) + 1;
+  template.last_used_at = new Date().toISOString().replace("T", " ").slice(0, 19);
+
+  api(`/api/templates/${template.id}/use`, { method: "POST", body: "{}" })
+    .catch(() => {});
+}
+
 function templateCard(template) {
   const updatedAt = formatDate(template.updated_at);
   const favorite = isFavorite("template", template.id);
@@ -594,7 +670,7 @@ function templateCard(template) {
           <span class="summary-title">${escapeHtml(template.title)}</span>
         </div>
         <span class="summary-meta">
-          ${submittedBy}${updatedAt ? `Aktualisiert am ${updatedAt} · ` : ""}Version ${template.version}
+          ${template.use_count > 0 ? `<span class="usage-badge" title="So oft hast du diese Vorlage kopiert">${template.use_count}× benutzt</span> · ` : ""}${submittedBy}${updatedAt ? `Aktualisiert am ${updatedAt} · ` : ""}Version ${template.version}
         </span>
       </summary>
       <div class="card-content">
@@ -622,10 +698,25 @@ function compareUpdatedAt(left, right) {
 }
 
 function sortTemplates(templates) {
-  const sortBy = $("#template-sort")?.value || "updated-desc";
+  const sortBy = $("#template-sort")?.value || "recent-used";
   const sorted = [...templates];
 
   sorted.sort((left, right) => {
+    // Zuletzt benutzte zuerst; noch nie benutzte Vorlagen rutschen ans Ende
+    // und werden dort nach Aktualitaet sortiert.
+    if (sortBy === "recent-used") {
+      const leftUsed = left.last_used_at || "";
+      const rightUsed = right.last_used_at || "";
+      if (leftUsed !== rightUsed) return rightUsed.localeCompare(leftUsed);
+      return compareUpdatedAt(right, left) || compareText(left.title, right.title);
+    }
+
+    if (sortBy === "most-used") {
+      const difference = (right.use_count || 0) - (left.use_count || 0);
+      if (difference !== 0) return difference;
+      return compareUpdatedAt(right, left) || compareText(left.title, right.title);
+    }
+
     if (sortBy === "updated-asc") {
       return compareUpdatedAt(left, right) ||
         compareText(left.title, right.title);
@@ -1027,7 +1118,7 @@ async function switchView(view) {
 
   if (view === "proposals" || view === "approvals") await loadProposals(view);
   if (view === "feedback") await loadFeedback();
-  if (view === "admin") await loadUsers();
+  if (view === "admin") await Promise.all([loadUsers(), loadAudit()]);
   if (view === "history") await loadHistory();
   if (view === "game") {
     await loadLeaderboard();
@@ -1065,6 +1156,79 @@ async function loadUsers() {
         </button>
       </div>
     </div>`).join("");
+}
+
+// Rohwerte aus dem Protokoll in lesbare Bezeichnungen uebersetzen.
+const AUDIT_ACTIONS = {
+  create: "angelegt",
+  update: "geändert",
+  delete: "archiviert",
+  purge: "endgültig gelöscht",
+  restore: "wiederhergestellt",
+  approve: "genehmigt",
+  reject: "abgelehnt",
+  changes: "Überarbeitung angefordert",
+  submit: "eingereicht",
+  login: "angemeldet",
+  logout: "abgemeldet",
+  setup_admin: "Ersteinrichtung",
+};
+
+const AUDIT_ENTITIES = {
+  template: "Vorlage",
+  template_proposal: "Vorschlag",
+  template_version: "Vorlagen-Version",
+  command: "Befehl",
+  user: "Benutzer",
+  category: "Kategorie",
+  feedback_item: "Feedback",
+  session: "Sitzung",
+};
+
+/** Formuliert einen Protokolleintrag als lesbaren Satz. */
+function auditSummary(entry) {
+  const action = AUDIT_ACTIONS[entry.action] || entry.action;
+  const entity = AUDIT_ENTITIES[entry.entity_type] || entry.entity_type;
+
+  if (entry.entity_type === "session") {
+    return action === "angemeldet" ? "hat sich angemeldet" : "hat sich abgemeldet";
+  }
+
+  let detail = "";
+  try {
+    const details = JSON.parse(entry.details_json || "{}");
+    if (details.title) detail = ` „${details.title}“`;
+    else if (details.role) detail = ` (${roleLabel(details.role)})`;
+  } catch {
+    detail = "";
+  }
+
+  const reference = entry.entity_id ? ` #${entry.entity_id}` : "";
+  return `hat ${entity}${detail || reference} ${action}`;
+}
+
+async function loadAudit() {
+  const data = await api("/api/audit");
+  state.auditEntries = data.entries;
+  renderAudit();
+}
+
+function renderAudit() {
+  const filter = $("#audit-filter")?.value || "";
+  const entries = (state.auditEntries || []).filter(
+    (entry) => !filter || entry.entity_type === filter,
+  );
+
+  $("#audit-list").innerHTML = entries.length
+    ? entries.map((entry) => `
+      <div class="audit-row">
+        <span class="audit-action audit-${escapeHtml(entry.action)}">${escapeHtml(AUDIT_ACTIONS[entry.action] || entry.action)}</span>
+        <div class="audit-main">
+          <strong>${escapeHtml(entry.user_name)}</strong> ${escapeHtml(auditSummary(entry))}
+        </div>
+        <span class="audit-time">${formatDateTime(entry.created_at)}</span>
+      </div>`).join("")
+    : '<div class="history-empty">Keine Einträge für diesen Filter.</div>';
 }
 
 async function updateUserAdmin(userId, payload) {
@@ -2112,6 +2276,8 @@ $("#login-form").addEventListener("submit", async (event) => {
         password: $("#login-password").value,
       }),
     });
+    sessionExpired = false;
+    $("#login-message").textContent = "";
     $("#login-view").classList.add("hidden");
     $("#app-view").classList.remove("hidden");
     await loadBootstrap();
@@ -2211,6 +2377,11 @@ $("#users-list").addEventListener("click", (event) => {
 // $() nur das erste Element mit der ID finden.
 $("#user-edit-form").addEventListener("submit", submitUserEdit);
 
+$("#audit-filter").addEventListener("change", renderAudit);
+$("#audit-refresh").addEventListener("click", () => {
+  loadAudit().catch((error) => alert(error.message));
+});
+
 $("#templates-list").addEventListener("click", (event) => {
   const favoriteButton = event.target.closest("[data-favorite-template]");
   if (favoriteButton) {
@@ -2224,10 +2395,7 @@ $("#templates-list").addEventListener("click", (event) => {
   const copyButton = event.target.closest("[data-copy-template]");
   if (copyButton) {
     const template = state.templates.find((item) => item.id === Number(copyButton.dataset.copyTemplate));
-    if (template) {
-      copyText(replacePersonalPlaceholders(template.body));
-      addRecentItem("template", template.id, template.title);
-    }
+    if (template) copyTemplate(template);
   }
 
   const editButton = event.target.closest("[data-edit-template]");
@@ -2346,10 +2514,7 @@ $("#quickbar-items").addEventListener("click", (event) => {
   const id = Number(button.dataset.recentId);
   if (button.dataset.recentType === "template") {
     const template = state.templates.find((item) => item.id === id);
-    if (template) {
-      copyText(replacePersonalPlaceholders(template.body));
-      addRecentItem("template", template.id, template.title);
-    }
+    if (template) copyTemplate(template);
     return;
   }
 

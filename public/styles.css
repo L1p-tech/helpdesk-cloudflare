@@ -116,7 +116,28 @@ body::after {
 }
 
 button, input, textarea, select { font: inherit; }
-button { cursor: pointer; }
+button {
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease,
+    transform .12s ease;
+}
+/* Gedrueckter Zustand: kurzes Einsinken als haptische Rueckmeldung. */
+button:active { transform: translateY(1px); }
+
+/*
+ * Sichtbarer Fokusring fuer Tastaturbedienung. `:focus-visible` statt `:focus`,
+ * damit der Ring nur bei Tastatur erscheint und nicht bei jedem Mausklick.
+ */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
 h1, h2, h3, h4, p { margin-top: 0; }
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
@@ -588,6 +609,12 @@ details.card[open] summary::after { transform: rotate(225deg); }
   border-radius: 18px;
   padding: 12px 16px;
   box-shadow: 0 14px 30px rgba(47, 108, 99, 0.25);
+  /* Gleitet von rechts ein, statt hart aufzupoppen. */
+  animation: toast-in .22s ease-out;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 dialog {
@@ -863,6 +890,92 @@ dialog::backdrop {
   border: 1px solid var(--border);
   border-radius: 18px;
 }
+/* --- Änderungsprotokoll ------------------------------------------------- */
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.panel-header h3 { margin: 0; }
+.panel-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.audit-list {
+  display: grid;
+  gap: 6px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.audit-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--surface-soft);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  font-size: 12px;
+  transition: background .15s ease, border-color .15s ease;
+}
+.audit-row:hover {
+  background: var(--surface-soft-hover);
+  border-color: var(--border);
+}
+.audit-main { color: var(--muted); }
+.audit-main strong { color: var(--text-strong); font-weight: 600; }
+.audit-time {
+  color: var(--muted-dark);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Farbcode nach Art der Aktion: aufbauend grün, abbauend rot, neutral grau. */
+.audit-action {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  background: var(--surface-soft-hover);
+  color: var(--muted);
+}
+.audit-create,
+.audit-approve,
+.audit-restore {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+}
+.audit-delete,
+.audit-purge,
+.audit-reject {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+.audit-update,
+.audit-submit {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+/* Zähler auf der Vorlagenkarte: wie oft der Benutzer sie kopiert hat. */
+.usage-badge {
+  color: var(--primary);
+  font-weight: 600;
+}
+
 /* Aktionsspalte einer Papierkorb-/Historienzeile (Wiederherstellen, Löschen). */
 .history-actions {
   display: flex;
@@ -967,4 +1080,18 @@ dialog::backdrop {
   .content { padding: 18px; border-radius: 24px; }
   .app-header,
   .main-tabs { border-radius: 24px; }
+}
+
+/*
+ * Nutzer, die in ihrem System "Bewegung reduzieren" eingestellt haben, bekommen
+ * keine Animationen. Betrifft vor allem Menschen, die auf Bewegung empfindlich
+ * reagieren -- der Zustand bleibt derselbe, nur der Weg dorthin entfaellt.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

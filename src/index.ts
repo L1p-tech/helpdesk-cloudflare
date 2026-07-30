@@ -170,6 +170,20 @@ async function ensureTypingScoresTable(env: Env): Promise<void> {
   ).run();
 }
 
+async function ensureTemplateUsageTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS template_usage (
+      user_id INTEGER NOT NULL,
+      template_id INTEGER NOT NULL,
+      use_count INTEGER NOT NULL DEFAULT 0,
+      last_used_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, template_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (template_id) REFERENCES templates(id) ON DELETE CASCADE
+    )`,
+  ).run();
+}
+
 /**
  * Sucht die aehnlichste aktive Vorlage.
  *
@@ -405,23 +419,30 @@ async function handleBootstrap(
   if (path !== "/api/bootstrap" || request.method !== "GET") return null;
 
   await ensureDefaultLibrary(env, { id: user.id, displayName: user.displayName });
+  await ensureTemplateUsageTable(env);
 
   const [categories, templates, commands, settings, notifications] = await Promise.all([
     env.DB.prepare(
       "SELECT id, slug, name, color FROM categories WHERE active = 1 ORDER BY name COLLATE NOCASE",
     ).all(),
+    // Nutzungszahlen des aktuellen Benutzers kommen per LEFT JOIN mit, damit
+    // das Frontend nach "zuletzt benutzt" sortieren kann, ohne zweite Anfrage.
     env.DB.prepare(
       `SELECT t.id, t.title, t.body, t.version, t.updated_at,
               c.id AS category_id, c.name AS category_name, c.color AS category_color,
               COALESCE(t.created_by_name, cu.display_name, ?1) AS created_by_name,
-              COALESCE(t.updated_by_name, u.display_name, ?1) AS updated_by_name
+              COALESCE(t.updated_by_name, u.display_name, ?1) AS updated_by_name,
+              COALESCE(usage.use_count, 0) AS use_count,
+              usage.last_used_at
        FROM templates t
        JOIN categories c ON c.id = t.category_id
        LEFT JOIN users cu ON cu.id = t.created_by
        LEFT JOIN users u ON u.id = t.updated_by
+       LEFT JOIN template_usage usage
+         ON usage.template_id = t.id AND usage.user_id = ?2
        WHERE t.active = 1
        ORDER BY t.updated_at DESC`,
-    ).bind(DELETED_USER_LABEL).all(),
+    ).bind(DELETED_USER_LABEL, user.id).all(),
     env.DB.prepare(
       `SELECT id, category, name, command, description, shell, requires_admin,
               risk_level, remote_capable, restart_required
@@ -775,6 +796,30 @@ async function handleTemplates(
   user: AuthUser,
   path: string,
 ): Promise<Response | null> {
+  // Nutzung protokollieren: Wird beim Kopieren einer Vorlage aufgerufen und
+  // steuert die Sortierung "zuletzt benutzt". Fuer alle Rollen offen, denn
+  // jeder zaehlt nur seine eigene Nutzung hoch.
+  const usageMatch = path.match(/^\/api\/templates\/(\d+)\/use$/);
+  if (usageMatch && request.method === "POST") {
+    const templateId = positiveInteger(usageMatch[1], "Vorlagen-ID");
+    await ensureTemplateUsageTable(env);
+
+    const result = await env.DB.prepare(
+      `INSERT INTO template_usage (user_id, template_id, use_count, last_used_at)
+       SELECT ?1, ?2, 1, CURRENT_TIMESTAMP
+       WHERE EXISTS (SELECT 1 FROM templates WHERE id = ?2 AND active = 1)
+       ON CONFLICT (user_id, template_id) DO UPDATE SET
+         use_count = use_count + 1,
+         last_used_at = CURRENT_TIMESTAMP`,
+    ).bind(user.id, templateId).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Vorlage wurde nicht gefunden.");
+    }
+
+    return json({ ok: true });
+  }
+
   const templateMatch = path.match(/^\/api\/templates\/(\d+)$/);
   if (!templateMatch) return null;
   if (request.method !== "PUT" && request.method !== "DELETE") return null;
@@ -976,6 +1021,24 @@ async function handleUsers(
   user: AuthUser,
   path: string,
 ): Promise<Response | null> {
+  // Aenderungsprotokoll: Der Worker schreibt bei jeder Aktion einen Eintrag,
+  // bisher gab es aber keine Moeglichkeit, ihn zu lesen. Nur fuer Admins, weil
+  // dort steht, wer was wann getan hat.
+  if (path === "/api/audit" && request.method === "GET") {
+    requireRole(user, ["admin"]);
+
+    const result = await env.DB.prepare(
+      `SELECT a.id, a.action, a.entity_type, a.entity_id, a.details_json, a.created_at,
+              COALESCE(u.display_name, ?1) AS user_name
+       FROM audit_log a
+       LEFT JOIN users u ON u.id = a.user_id
+       ORDER BY a.created_at DESC, a.id DESC
+       LIMIT 200`,
+    ).bind(DELETED_USER_LABEL).all();
+
+    return json({ entries: result.results });
+  }
+
   if (path === "/api/users" && request.method === "GET") {
     requireRole(user, ["admin"]);
     const result = await env.DB.prepare(
