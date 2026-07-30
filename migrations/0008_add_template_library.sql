@@ -1,29 +1,44 @@
+-- Erweitert die Standardbibliothek um zusaetzliche Kategorien und Vorlagen.
+--
+-- Zwei Eigenschaften sind hier wichtig:
+--   1. Idempotent: Jedes INSERT ist durch ein NOT EXISTS abgesichert, die
+--      Migration kann also gefahrlos auf eine bereits befuellte DB laufen.
+--   2. Alle Inserts haengen an einem vorhandenen Admin ("... FROM users WHERE
+--      role = 'admin'"). Existiert noch kein Admin -- also vor dem Setup --,
+--      liefert die Subquery keine Zeile und die Migration wird zum No-Op.
+--      Die Bibliothek wird dann spaeter von ensureDefaultLibrary() im Worker
+--      angelegt (siehe src/library.ts).
+--
+-- Seit Migration 0007 sind templates.created_by_name / updated_by_name NOT NULL
+-- ohne Default. Die Inserts muessen diese Spalten daher mitfuellen, sonst
+-- bricht die gesamte Migration mit "NOT NULL constraint failed" ab.
+
 INSERT INTO categories (slug, name, color, created_by)
 SELECT 'berechtigungen', 'Berechtigungen', '#5b8def', a.id
-FROM (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+FROM (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'berechtigungen' OR lower(name) = lower('Berechtigungen'));
 
 INSERT INTO categories (slug, name, color, created_by)
 SELECT 'mobilfunk', 'Mobilfunk', '#1f9d8b', a.id
-FROM (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+FROM (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'mobilfunk' OR lower(name) = lower('Mobilfunk'));
 
 INSERT INTO categories (slug, name, color, created_by)
 SELECT 'e-mail', 'E-Mail', '#d97706', a.id
-FROM (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+FROM (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'e-mail' OR lower(name) = lower('E-Mail'));
 
 INSERT INTO categories (slug, name, color, created_by)
 SELECT 'mfa', 'MFA', '#8b5cf6', a.id
-FROM (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+FROM (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'mfa' OR lower(name) = lower('MFA'));
 
 INSERT INTO categories (slug, name, color, created_by)
 SELECT 'fachanwendungen', 'Fachanwendungen', '#c05621', a.id
-FROM (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+FROM (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'fachanwendungen' OR lower(name) = lower('Fachanwendungen'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Telefonische Rückmeldung erbeten',
 'Hallo [USERNAME],
 
@@ -34,12 +49,12 @@ Bitte melden Sie sich bei uns unter der 089 44459333 und lassen Sie sich zu mir 
 Vielen Dank für Ihre Mithilfe.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'allgemein'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Telefonische Rückmeldung erbeten'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'VPN nach Neustart wieder funktionsfähig',
 'Hallo [USERNAME],
 
@@ -54,12 +69,12 @@ Falls das Problem weiterhin besteht, geben Sie uns bitte Bescheid.
 Vielen Dank für Ihre Mithilfe.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'vpn'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('VPN nach Neustart wieder funktionsfähig'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Berechtigung über BBV-App beantragen',
 'Hallo [USERNAME],
 
@@ -70,12 +85,12 @@ Sie finden die Anwendung im SalesNet.
 Vielen Dank für Ihre Mithilfe.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'berechtigungen'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Berechtigung über BBV-App beantragen'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Software über Ivanti bereitgestellt',
 'Hallo [USERNAME],
 
@@ -84,12 +99,12 @@ ich habe das Programm für Sie über Ivanti bereitgestellt.
 Die Installation erfolgt im Laufe des Tages im Hintergrund.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'software'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Software über Ivanti bereitgestellt'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Datenvolumen erhöht',
 'Hallo [USERNAME],
 
@@ -98,12 +113,12 @@ Ihr Datenvolumen wurde auf [DATENVOLUMEN] erhöht.
 Bei weiteren Fragen erreichen Sie uns gerne unter der 089 44459333.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'mobilfunk'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Datenvolumen erhöht'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'HP-Ticket erstellt',
 'Hallo [USERNAME],
 
@@ -118,12 +133,12 @@ Bitte hinterlegen Sie im Ticket neue Informationen, Screenshots und den E-Mail-V
 Vielen Dank für Ihre Mithilfe.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'hardware'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('HP-Ticket erstellt'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'HP-Ticket erstellt – Rückmeldung mit PIN',
 'Hallo [USERNAME],
 
@@ -140,12 +155,12 @@ Bitte hinterlegen Sie im Ticket neue Informationen, Screenshots und den E-Mail-V
 Vielen Dank für Ihre Mithilfe.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'hardware'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('HP-Ticket erstellt – Rückmeldung mit PIN'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Notebook startet nicht – Hard Reset',
 'Hallo [USERNAME],
 
@@ -160,12 +175,12 @@ bitte führen Sie einmal einen Hard Reset am Notebook durch:
 Bitte geben Sie im Ticket Bescheid, ob die Meldung danach erneut auftritt.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'hardware'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Notebook startet nicht – Hard Reset'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Postfachberechtigung vergeben',
 'Hallo [USERNAME],
 
@@ -176,12 +191,12 @@ Das Postfach sollte innerhalb weniger Minuten sichtbar sein.
 Falls es noch nicht angezeigt wird, starten Sie Outlook bitte einmal neu.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'e-mail'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Postfachberechtigung vergeben'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Authenticator-Telefonnummer ändern',
 'Hallo [USERNAME],
 
@@ -197,12 +212,12 @@ Es ist empfehlenswert, mehr als eine Anmeldemethode zu hinterlegen, zum Beispiel
 Ich freue mich auf Ihre Rückmeldung.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'mfa'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Authenticator-Telefonnummer ändern'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'AS400-Passwort zurückgesetzt',
 'Hallo [USERNAME],
 
@@ -213,12 +228,12 @@ Temporäres Passwort: [TEMP-PASSWORT]
 Wenn Sie ein neues Passwort vergeben, beachten Sie bitte die geltenden Kennwortregeln für AS400.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'fachanwendungen'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('AS400-Passwort zurückgesetzt'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Astro per RemoteApp einrichten',
 'Hallo [USERNAME],
 
@@ -231,12 +246,12 @@ https://HCETERM.ETG-FROESCHL.LOCAL/RDWEB/FEED/
 4. Melden Sie sich anschließend mit Ihrer Windows-Kennung an, also mit Ihrer E-Mail-Adresse und Ihrem Windows-Passwort.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'fachanwendungen'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Astro per RemoteApp einrichten'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Neuen PC zur Einrichtung vorbereiten',
 'Hallo [USERNAME],
 
@@ -255,12 +270,12 @@ Bitte führen Sie danach noch die folgenden drei Schritte aus:
 Sobald diese Punkte erledigt sind, melden Sie sich bitte unter der 089 44459333 und lassen Sie sich zu mir durchstellen. Dann können wir den PC gemeinsam einrichten.
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'hardware'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Neuen PC zur Einrichtung vorbereiten'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Office-Desktop-Lizenz nicht verfügbar',
 'Hallo [USERNAME],
 
@@ -271,12 +286,12 @@ Bitte verwenden Sie stattdessen die Web-Versionen. Diese finden Sie im SalesNet.
 Falls Sie die Desktop-Versionen dennoch benötigen, beantragen Sie die Berechtigung bitte im SalesNet unter "Berechtigungen".
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'berechtigungen'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Office-Desktop-Lizenz nicht verfügbar'));
 
-INSERT INTO templates (category_id, title, body, version, created_by, updated_by)
+INSERT INTO templates (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
 SELECT c.id, 'Schletter-Ordnerpfad',
 'Hallo [USERNAME],
 
@@ -285,7 +300,7 @@ den Schletter-Ordner finden Sie unter folgendem Pfad:
 \\rexepm\Packages\Boudi\Scalc3\2.0
 
 Mit freundlichen Grüßen
-[ICH]', 1, a.id, a.id
-FROM categories c, (SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
+[ICH]', 1, a.id, a.display_name, a.id, a.display_name
+FROM categories c, (SELECT id, display_name FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) a
 WHERE c.slug = 'fachanwendungen'
 AND NOT EXISTS (SELECT 1 FROM templates WHERE lower(title) = lower('Schletter-Ordnerpfad'));
