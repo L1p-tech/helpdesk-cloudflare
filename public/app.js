@@ -1116,143 +1116,507 @@ async function loadTypingLeaderboard() {
     : "<li>Noch keine Ergebnisse.</li>";
 }
 
+/**
+ * "Helpdesk Runner" -- ein Nachbau des Chrome-Offline-Dinos (T-Rex Runner).
+ *
+ * Die Spielphysik verwendet bewusst die Original-Konstanten aus Chromium
+ * (components/neterror/resources/offline.js), damit sich das Spiel so anfuehlt
+ * wie das Vorbild:
+ *
+ *   - Die Geschwindigkeit steigt kontinuierlich um ACCELERATION pro Frame,
+ *     von SPEED (6) bis MAX_SPEED (13). Kein Deckel nach kurzer Zeit.
+ *   - Der Abstand zwischen Hindernissen wird aus der aktuellen Geschwindigkeit
+ *     berechnet, nicht aus einer festen Framezahl. Nur so bleibt das Spiel bei
+ *     hohem Tempo fair -- sonst ruecken die Kakteen immer enger zusammen.
+ *   - Der Punktestand haengt an der zurueckgelegten Strecke (COEFFICIENT),
+ *     nicht an der Spielzeit. Schneller laufen = schneller punkten.
+ *
+ * Alle Groessen sind in Original-Pixeln definiert und werden ueber SCALE auf
+ * die Canvas-Hoehe gebracht. Das Original rechnet mit einer 150 px hohen
+ * Spielflaeche, dieses Canvas ist 260 px hoch.
+ */
 function initializeGame() {
   const canvas = $("#game-canvas");
   const context = canvas.getContext("2d");
-  const groundY = 221;
-  const dino = {
-    x: 62,
-    y: groundY - 42,
-    width: 42,
-    height: 42,
+
+  // Original-Konstanten aus Chromium (Runner.config).
+  const ACCELERATION = 0.001;
+  const START_SPEED = 6;
+  const MAX_SPEED = 13;
+  const GRAVITY = 0.6;
+  // Trex.config.INITIAL_JUMP_VELOCITY im Original. Ergibt zusammen mit GRAVITY
+  // einen Sprungbogen von rund 88 px Hoehe und gut 0,55 s Dauer.
+  const INITIAL_JUMP_VELOCITY = -10;
+  const DROP_VELOCITY = -5; // Sprung abbrechen (Taste loslassen / Pfeil runter)
+  const SPEED_DROP_COEFFICIENT = 3; // schnelleres Fallen beim Ducken
+  const GAP_COEFFICIENT = 0.6;
+  const MAX_OBSTACLE_DUPLICATION = 2;
+  const SCORE_COEFFICIENT = 0.025;
+  const CLOUD_FREQUENCY = 0.5;
+  const MAX_CLOUDS = 6;
+  const BG_CLOUD_SPEED = 0.2;
+
+  // Das Original ist auf 150 px Spielhoehe ausgelegt; hier auf das Canvas skaliert.
+  const SCALE = 1.5;
+  const px = (value) => value * SCALE;
+
+  // Standlinie, auf der T-Rex und Kakteen aufsetzen.
+  //
+  // Im Original liegt die Bodengrafik bei y=127 und ist selbst rund 12 px hoch;
+  // die Sprites reichen deshalb bis y=140. Hier wird der Boden nur als duenne
+  // Linie gezeichnet, also wird direkt auf dieser Linie aufgesetzt. Die
+  // Original-`yPos`-Werte der Hindernisse sind entsprechend auf diese Linie
+  // umgerechnet (siehe ORIGINAL_GROUND_BOTTOM).
+  const groundY = px(127);
+  const ORIGINAL_GROUND_BOTTOM = 140;
+
+  const TREX = {
+    WIDTH: 44,
+    HEIGHT: 47,
+    WIDTH_DUCK: 59,
+    HEIGHT_DUCK: 25,
+    START_X_POS: 50,
+  };
+
+  // Hindernis-Typen mit den Originalmassen. `yPos` ist der Abstand der
+  // Oberkante vom Boden, `minSpeed` die Geschwindigkeit, ab der ein Typ
+  // ueberhaupt auftaucht (Pterodactyl erst ab 8.5).
+  const OBSTACLE_TYPES = [
+    {
+      type: "CACTUS_SMALL",
+      width: 17,
+      height: 35,
+      yPos: 105,
+      multipleSpeed: 4,
+      minGap: 120,
+      minSpeed: 0,
+      collisionBoxes: [
+        { x: 0, y: 7, width: 5, height: 27 },
+        { x: 4, y: 0, width: 6, height: 34 },
+        { x: 10, y: 4, width: 7, height: 14 },
+      ],
+    },
+    {
+      type: "CACTUS_LARGE",
+      width: 25,
+      height: 50,
+      yPos: 90,
+      multipleSpeed: 7,
+      minGap: 120,
+      minSpeed: 0,
+      collisionBoxes: [
+        { x: 0, y: 12, width: 7, height: 38 },
+        { x: 8, y: 0, width: 7, height: 49 },
+        { x: 13, y: 10, width: 10, height: 38 },
+      ],
+    },
+    {
+      type: "PTERODACTYL",
+      width: 46,
+      height: 40,
+      yPos: [100, 75, 50], // drei Flughoehen -- ducken oder springen
+      multipleSpeed: 999, // tritt nie in Gruppen auf
+      minGap: 150,
+      minSpeed: 8.5,
+      speedOffset: 0.8,
+      numFrames: 2,
+      frameRate: 1000 / 6,
+      collisionBoxes: [
+        { x: 15, y: 15, width: 16, height: 5 },
+        { x: 18, y: 21, width: 24, height: 6 },
+        { x: 2, y: 14, width: 4, height: 3 },
+        { x: 6, y: 10, width: 4, height: 7 },
+        { x: 10, y: 8, width: 6, height: 9 },
+      ],
+    },
+  ];
+
+  // Kollisionsboxen des T-Rex, ebenfalls Originalwerte.
+  const TREX_COLLISION_RUNNING = [
+    { x: 22, y: 0, width: 17, height: 16 },
+    { x: 1, y: 18, width: 30, height: 9 },
+    { x: 10, y: 35, width: 14, height: 8 },
+    { x: 1, y: 24, width: 29, height: 5 },
+    { x: 5, y: 30, width: 21, height: 4 },
+    { x: 9, y: 34, width: 15, height: 4 },
+  ];
+  const TREX_COLLISION_DUCKING = [
+    { x: 1, y: 18, width: 55, height: 25 },
+  ];
+
+  const trex = {
+    x: TREX.START_X_POS,
+    y: 0,
     velocityY: 0,
+    jumping: false,
     ducking: false,
+    speedDrop: false,
   };
 
   let running = false;
   let gameOver = false;
-  let frame = 0;
+  let speed = START_SPEED;
+  let distance = 0;
   let score = 0;
   let highScore = 0;
   let startTime = 0;
+  let lastTime = 0;
   let animationId = null;
-  let nextObstacleFrame = 90;
   let obstacles = [];
-  let clouds = [
-    { x: 180, y: 50, speed: .25 },
-    { x: 520, y: 82, speed: .18 },
-  ];
+  let clouds = [];
+  let jumpKeyHeld = false;
+
+  /** Bodenhoehe des T-Rex in der aktuellen Haltung. */
+  function trexGroundY() {
+    return groundY - px(trex.ducking ? TREX.HEIGHT_DUCK : TREX.HEIGHT);
+  }
 
   function resetGame() {
     running = true;
     gameOver = false;
-    frame = 0;
+    speed = START_SPEED;
+    distance = 0;
     score = 0;
-    startTime = Date.now();
-    dino.y = groundY - dino.height;
-    dino.velocityY = 0;
-    dino.ducking = false;
     obstacles = [];
-    nextObstacleFrame = 80;
+    clouds = [];
+    trex.ducking = false;
+    trex.jumping = false;
+    trex.speedDrop = false;
+    trex.velocityY = 0;
+    trex.y = trexGroundY();
+    startTime = Date.now();
+    lastTime = 0;
     $("#game-score").textContent = "00000";
   }
 
-  function jump() {
-    if (!running) return;
-    const onGround = dino.y >= groundY - dino.height - .5;
-    if (onGround) {
-      dino.velocityY = -12.8;
-      dino.ducking = false;
+  function startJump() {
+    if (!running || trex.jumping) return;
+    trex.jumping = true;
+    trex.ducking = false;
+    trex.speedDrop = false;
+    // Hoehere Geschwindigkeit -> etwas kraeftigerer Absprung, wie im Original.
+    trex.velocityY = INITIAL_JUMP_VELOCITY - (speed / 10);
+  }
+
+  /**
+   * Sprung vorzeitig beenden. Kurzes Antippen ergibt so einen niedrigen
+   * Sprung, langes Halten den vollen -- das ist im Original der Unterschied
+   * zwischen MIN_JUMP_HEIGHT und MAX_JUMP_HEIGHT.
+   */
+  function endJump() {
+    if (trex.jumping && trex.velocityY < DROP_VELOCITY) {
+      trex.velocityY = DROP_VELOCITY;
     }
   }
 
   function setDucking(value) {
-    dino.ducking = value && running;
+    if (!running) return;
+
+    if (value && trex.jumping) {
+      // Im Sprung wirkt Ducken als Schnellabstieg.
+      trex.speedDrop = true;
+      trex.ducking = false;
+      return;
+    }
+
+    if (!trex.jumping) {
+      trex.ducking = value;
+      trex.y = trexGroundY();
+    }
+
+    if (!value) trex.speedDrop = false;
+  }
+
+  function updateTrex(deltaFrames) {
+    if (trex.jumping) {
+      const gravity = trex.speedDrop
+        ? GRAVITY * SPEED_DROP_COEFFICIENT
+        : GRAVITY;
+
+      // Schwerkraft und Geschwindigkeit werden im selben Einheitenraum
+      // gerechnet (Original-Pixel). Wuerde nur die Geschwindigkeit skaliert,
+      // fiele der Sprung um den SCALE-Faktor zu hoch aus.
+      trex.velocityY += gravity * deltaFrames;
+      trex.y += trex.velocityY * deltaFrames;
+
+      const ground = trexGroundY();
+      if (trex.y >= ground) {
+        trex.y = ground;
+        trex.velocityY = 0;
+        trex.jumping = false;
+        trex.speedDrop = false;
+      }
+    } else {
+      trex.y = trexGroundY();
+    }
+  }
+
+  /**
+   * Mindestabstand zum naechsten Hindernis.
+   *
+   * Faehrt das Spiel schneller, braucht es proportional mehr Platz -- deshalb
+   * geht die Geschwindigkeit hier direkt ein. Genau diese Kopplung fehlte
+   * vorher, weshalb ein fester Frameabstand bei hohem Tempo unspielbar waere.
+   */
+  function computeGap(obstacle, currentSpeed) {
+    const minGap = Math.round(
+      obstacle.width * currentSpeed + obstacle.minGap * GAP_COEFFICIENT,
+    );
+    const maxGap = Math.round(minGap * 1.5);
+    return minGap + Math.floor(Math.random() * (maxGap - minGap));
+  }
+
+  function lastObstacle() {
+    return obstacles[obstacles.length - 1] ?? null;
   }
 
   function spawnObstacle() {
-    const allowBird = score > 180;
-    const bird = allowBird && Math.random() < .24;
+    const available = OBSTACLE_TYPES.filter((type) => speed >= type.minSpeed);
+    const definition = available[Math.floor(Math.random() * available.length)];
 
-    if (bird) {
-      obstacles.push({
-        type: "bird",
-        x: canvas.width + 20,
-        y: Math.random() < .5 ? 157 : 182,
-        width: 40,
-        height: 24,
-      });
-    } else {
-      const large = Math.random() < .35;
-      obstacles.push({
-        type: "cactus",
-        x: canvas.width + 20,
-        y: groundY - (large ? 50 : 38),
-        width: large ? 28 : 20,
-        height: large ? 50 : 38,
-      });
+    // Nicht mehr als MAX_OBSTACLE_DUPLICATION gleiche Hindernisse hintereinander.
+    const recent = obstacles.slice(-MAX_OBSTACLE_DUPLICATION);
+    if (
+      recent.length === MAX_OBSTACLE_DUPLICATION &&
+      recent.every((entry) => entry.type === definition.type)
+    ) {
+      return;
     }
 
-    nextObstacleFrame = frame + 70 + Math.floor(Math.random() * 70);
+    // Kakteen koennen als Gruppe auftreten -- aber erst ab `multipleSpeed`.
+    const maxGroup = speed >= definition.multipleSpeed ? 3 : 1;
+    const size = Math.floor(Math.random() * maxGroup) + 1;
+
+    const yPos = Array.isArray(definition.yPos)
+      ? definition.yPos[Math.floor(Math.random() * definition.yPos.length)]
+      : definition.yPos;
+
+    // Original-Koordinate auf unsere Standlinie umrechnen: Im Original sitzt
+    // alles auf y=140 auf, hier direkt auf groundY.
+    const y = groundY - px(ORIGINAL_GROUND_BOTTOM - yPos);
+
+    obstacles.push({
+      type: definition.type,
+      definition,
+      x: canvas.width,
+      y,
+      width: px(definition.width * size),
+      height: px(definition.height),
+      size,
+      gap: computeGap({ ...definition, width: definition.width * size }, speed),
+      frame: 0,
+      frameTimer: 0,
+    });
   }
 
-  function drawCloud(cloud) {
-    context.fillStyle = "#555a68";
-    context.fillRect(Math.round(cloud.x), cloud.y + 6, 38, 2);
-    context.fillRect(Math.round(cloud.x + 8), cloud.y, 14, 2);
-    context.fillRect(Math.round(cloud.x + 4), cloud.y + 2, 26, 2);
-    context.fillRect(Math.round(cloud.x + 2), cloud.y + 4, 32, 2);
+  function updateObstacles(deltaFrames, deltaMs) {
+    for (const obstacle of obstacles) {
+      // Pterodactyls fliegen leicht schneller bzw. langsamer als der Boden.
+      const obstacleSpeed = obstacle.definition.speedOffset
+        ? speed + obstacle.definition.speedOffset
+        : speed;
+      obstacle.x -= px(obstacleSpeed) * deltaFrames;
+
+      if (obstacle.definition.numFrames) {
+        obstacle.frameTimer += deltaMs;
+        if (obstacle.frameTimer >= obstacle.definition.frameRate) {
+          obstacle.frameTimer = 0;
+          obstacle.frame = (obstacle.frame + 1) % obstacle.definition.numFrames;
+        }
+      }
+    }
+
+    obstacles = obstacles.filter((obstacle) => obstacle.x + obstacle.width > 0);
+
+    // Neues Hindernis, sobald das letzte weit genug hereingelaufen ist.
+    const last = lastObstacle();
+    if (!last) {
+      spawnObstacle();
+    } else if (last.x + last.width + px(last.gap) < canvas.width) {
+      spawnObstacle();
+    }
   }
 
-  function drawDino() {
-    const x = Math.round(dino.x);
-    const y = Math.round(dino.y);
-    const bodyHeight = dino.ducking ? 26 : 38;
-    const top = dino.ducking ? y + 14 : y;
-    const legFrame = Math.floor(frame / 5) % 2;
+  function updateClouds(deltaFrames) {
+    for (const cloud of clouds) {
+      cloud.x -= px(BG_CLOUD_SPEED + speed / 12) * deltaFrames;
+    }
+    clouds = clouds.filter((cloud) => cloud.x + px(46) > 0);
+
+    const lastCloud = clouds[clouds.length - 1];
+    const roomForCloud = !lastCloud
+      || canvas.width - (lastCloud.x + px(46)) > px(lastCloud.gap);
+
+    if (clouds.length < MAX_CLOUDS && roomForCloud && Math.random() > CLOUD_FREQUENCY) {
+      clouds.push({
+        x: canvas.width,
+        y: px(30 + Math.floor(Math.random() * 40)),
+        gap: 100 + Math.floor(Math.random() * 200),
+      });
+    }
+  }
+
+  // --- Zeichnen -------------------------------------------------------------
+  // Der T-Rex wird aus Rechtecken nachgebaut. Die Aufteilung folgt der Silhouette
+  // des Originals: hoher Kopf mit Schnauze, Auge als Aussparung, Rueckenlinie,
+  // abfallender Schwanz, kurzer Arm und zwei animierte Beine.
+
+  function drawTrex() {
+    const x = Math.round(trex.x);
+    const y = Math.round(trex.y);
+    const unit = SCALE; // ein Original-Pixel
+    const box = (left, top, width, height) => {
+      context.fillRect(
+        Math.round(x + left * unit),
+        Math.round(y + top * unit),
+        Math.ceil(width * unit),
+        Math.ceil(height * unit),
+      );
+    };
 
     context.fillStyle = "#d4d6dc";
-    context.fillRect(x + 9, top + 8, 24, bodyHeight - 12);
-    context.fillRect(x + 24, top, 18, 15);
-    context.fillRect(x + 37, top + 5, 7, 5);
-    context.fillRect(x + 2, top + 16, 12, 8);
-    context.fillRect(x, top + 12, 8, 5);
-    context.fillStyle = "#0f1117";
-    context.fillRect(x + 34, top + 4, 3, 3);
 
+    if (trex.ducking) {
+      // Geduckt: langgestreckter Koerper, Kopf nach vorn.
+      box(0, 18, 14, 8);    // Schwanzspitze
+      box(8, 14, 30, 14);   // Ruecken/Rumpf
+      box(36, 12, 20, 12);  // Kopf
+      box(52, 16, 6, 4);    // Schnauze
+      context.fillStyle = "#12141b";
+      box(48, 15, 3, 3);    // Auge
+      context.fillStyle = "#d4d6dc";
+      // Beine im Laufzyklus
+      const duckFrame = Math.floor(distance / 6) % 2;
+      box(14 + (duckFrame ? 0 : 4), 26, 7, 5);
+      box(28 + (duckFrame ? 4 : 0), 26, 7, 5);
+      return;
+    }
+
+    // Kopf mit Schnauze und Kiefer
+    box(26, 0, 18, 14);   // Kopfform
+    box(42, 6, 4, 4);     // Schnauzenspitze
+    box(26, 13, 14, 4);   // Unterkiefer
+    context.fillStyle = "#12141b";
+    box(38, 3, 3, 3);     // Auge
     context.fillStyle = "#d4d6dc";
-    if (dino.ducking) {
-      context.fillRect(x + 13, top + 20, 12, 5);
-      context.fillRect(x + 29, top + 20, 12, 5);
-    } else if (dino.y < groundY - dino.height - 1) {
-      context.fillRect(x + 12, top + 32, 7, 9);
-      context.fillRect(x + 27, top + 32, 7, 9);
+
+    // Hals und Rumpf
+    box(22, 10, 12, 12);
+    box(14, 18, 20, 16);
+
+    // Schwanz -- abfallend nach hinten, gibt die typische Silhouette
+    box(6, 20, 10, 8);
+    box(0, 24, 8, 6);
+
+    // Kurzer Arm vor der Brust
+    box(30, 22, 8, 4);
+    box(35, 25, 4, 3);
+
+    if (trex.jumping) {
+      // Im Sprung beide Beine angezogen
+      box(16, 33, 7, 12);
+      box(26, 33, 7, 12);
     } else {
-      context.fillRect(x + (legFrame ? 12 : 16), top + 32, 7, 10);
-      context.fillRect(x + (legFrame ? 29 : 25), top + 32, 7, 10);
+      // Laufanimation: Der Takt haengt an der Strecke, nicht an der Zeit --
+      // dadurch trippeln die Beine bei hohem Tempo sichtbar schneller.
+      //
+      // Ein Bein steht gestreckt am Boden (mit Fuss), das andere ist angewinkelt.
+      // Der Fuss macht den Unterschied zwischen den beiden Frames deutlich
+      // sichtbar; ohne ihn wirkt die Animation fast statisch.
+      const legFrame = Math.floor(distance / 8) % 2;
+      if (legFrame) {
+        box(15, 33, 7, 14);   // hinteres Bein gestreckt
+        box(15, 44, 11, 3);   // Fuss
+        box(27, 33, 7, 8);    // vorderes Bein angewinkelt
+      } else {
+        box(15, 33, 7, 8);    // hinteres Bein angewinkelt
+        box(27, 33, 7, 14);   // vorderes Bein gestreckt
+        box(27, 44, 11, 3);   // Fuss
+      }
     }
   }
 
   function drawCactus(obstacle) {
     const x = Math.round(obstacle.x);
-    const y = obstacle.y;
+    const y = Math.round(obstacle.y);
+    const unit = SCALE;
+    const single = obstacle.definition.width;
     context.fillStyle = "#74b785";
-    context.fillRect(x + 7, y, obstacle.width - 14, obstacle.height);
-    context.fillRect(x, y + 14, 9, 7);
-    context.fillRect(x + 2, y + 8, 5, 16);
-    context.fillRect(x + obstacle.width - 7, y + 20, 9, 7);
-    context.fillRect(x + obstacle.width - 2, y + 13, 5, 16);
+
+    // Jeder Kaktus der Gruppe wird einzeln gezeichnet.
+    for (let index = 0; index < obstacle.size; index += 1) {
+      const offset = x + index * single * unit;
+      const box = (left, top, width, height) => {
+        context.fillRect(
+          Math.round(offset + left * unit),
+          Math.round(y + top * unit),
+          Math.ceil(width * unit),
+          Math.ceil(height * unit),
+        );
+      };
+
+      if (obstacle.type === "CACTUS_LARGE") {
+        box(9, 0, 7, 50);   // Stamm
+        box(2, 14, 7, 5);   // linker Arm
+        box(2, 18, 5, 14);
+        box(16, 10, 7, 5);  // rechter Arm
+        box(18, 14, 5, 16);
+      } else {
+        box(6, 0, 6, 35);   // Stamm
+        box(1, 10, 5, 4);   // linker Arm
+        box(1, 13, 4, 10);
+        box(12, 7, 5, 4);   // rechter Arm
+        box(13, 10, 4, 11);
+      }
+    }
   }
 
-  function drawBird(obstacle) {
+  function drawPterodactyl(obstacle) {
     const x = Math.round(obstacle.x);
-    const y = obstacle.y;
-    const wingUp = Math.floor(frame / 7) % 2 === 0;
+    const y = Math.round(obstacle.y);
+    const unit = SCALE;
+    const box = (left, top, width, height) => {
+      context.fillRect(
+        Math.round(x + left * unit),
+        Math.round(y + top * unit),
+        Math.ceil(width * unit),
+        Math.ceil(height * unit),
+      );
+    };
+
     context.fillStyle = "#c9ccd4";
-    context.fillRect(x + 10, y + 8, 24, 10);
-    context.fillRect(x + 30, y + 5, 9, 8);
-    context.fillRect(x + 2, y + 11, 10, 5);
-    context.fillRect(x + 14, wingUp ? y : y + 16, 16, 5);
+    // Kopf sitzt vorn oben, Schnabel laeuft spitz zu.
+    box(32, 12, 12, 7);
+    box(42, 15, 6, 3);
+    // Schlanker Rumpf plus langer Schwanz nach hinten.
+    box(18, 15, 16, 6);
+    box(6, 17, 13, 4);
+    box(2, 18, 5, 3);
+
+    // Fluegel schlagen zwischen zwei Stellungen. Der Fluegel ist an der Wurzel
+    // schmal und wird nach aussen breiter -- dadurch bleibt zwischen Fluegel und
+    // Rumpf ein Spalt sichtbar und die Silhouette liest sich als Vogel statt
+    // als geschlossener Klotz.
+    if (obstacle.frame === 0) {
+      box(24, 10, 6, 5);   // Wurzel am Rumpf
+      box(20, 5, 13, 5);   // Fluegelflaeche
+      box(22, 1, 9, 4);    // Spitze nach oben
+    } else {
+      box(24, 21, 6, 5);   // Wurzel am Rumpf
+      box(20, 26, 13, 5);  // Fluegelflaeche
+      box(22, 31, 9, 4);   // Spitze nach unten
+    }
+  }
+
+  function drawCloud(cloud) {
+    const x = Math.round(cloud.x);
+    const y = Math.round(cloud.y);
+    const unit = SCALE;
+    context.fillStyle = "#555a68";
+    context.fillRect(x, Math.round(y + 6 * unit), Math.ceil(38 * unit), Math.ceil(2 * unit));
+    context.fillRect(Math.round(x + 8 * unit), y, Math.ceil(14 * unit), Math.ceil(2 * unit));
+    context.fillRect(Math.round(x + 4 * unit), Math.round(y + 2 * unit), Math.ceil(26 * unit), Math.ceil(2 * unit));
+    context.fillRect(Math.round(x + 2 * unit), Math.round(y + 4 * unit), Math.ceil(32 * unit), Math.ceil(2 * unit));
   }
 
   function drawScene() {
@@ -1262,22 +1626,23 @@ function initializeGame() {
 
     clouds.forEach(drawCloud);
 
+    // Boden: durchgehende Linie plus Kieselstruktur, die mitscrollt.
     context.fillStyle = "#626674";
-    context.fillRect(0, groundY, canvas.width, 2);
+    context.fillRect(0, groundY, canvas.width, Math.ceil(2 * SCALE));
 
-    const groundOffset = (frame * 6) % 32;
+    const groundOffset = (distance * SCALE) % px(32);
     context.fillStyle = "#3c404d";
-    for (let x = -groundOffset; x < canvas.width; x += 32) {
-      context.fillRect(x, groundY + 8, 11, 2);
-      context.fillRect(x + 18, groundY + 15, 6, 2);
+    for (let x = -groundOffset; x < canvas.width; x += px(32)) {
+      context.fillRect(Math.round(x), groundY + px(6), px(11), px(1));
+      context.fillRect(Math.round(x + px(18)), groundY + px(11), px(6), px(1));
     }
 
     obstacles.forEach((obstacle) => {
-      if (obstacle.type === "bird") drawBird(obstacle);
+      if (obstacle.type === "PTERODACTYL") drawPterodactyl(obstacle);
       else drawCactus(obstacle);
     });
 
-    drawDino();
+    drawTrex();
 
     context.fillStyle = "#8b8f9d";
     context.font = "14px monospace";
@@ -1304,26 +1669,66 @@ function initializeGame() {
     }
   }
 
+  /**
+   * Kollisionspruefung in zwei Stufen, wie im Original: Erst die groben
+   * Huellboxen, und nur bei Ueberschneidung die einzelnen Detailboxen. Das
+   * verhindert Treffer, bei denen sich optisch nichts beruehrt.
+   */
+  function intersects(left, right) {
+    return (
+      left.x < right.x + right.width &&
+      left.x + left.width > right.x &&
+      left.y < right.y + right.height &&
+      left.y + left.height > right.y
+    );
+  }
+
   function collides(obstacle) {
-    const dinoBox = {
-      x: dino.x + 7,
-      y: dino.ducking ? dino.y + 15 : dino.y + 5,
-      width: dino.ducking ? 37 : 31,
-      height: dino.ducking ? 21 : 35,
+    const trexWidth = trex.ducking ? TREX.WIDTH_DUCK : TREX.WIDTH;
+    const trexHeight = trex.ducking ? TREX.HEIGHT_DUCK : TREX.HEIGHT;
+
+    const trexHull = {
+      x: trex.x,
+      y: trex.y,
+      width: px(trexWidth),
+      height: px(trexHeight),
     };
-    const obstacleBox = {
-      x: obstacle.x + 3,
-      y: obstacle.y + 3,
-      width: obstacle.width - 6,
-      height: obstacle.height - 5,
+    const obstacleHull = {
+      x: obstacle.x,
+      y: obstacle.y,
+      width: obstacle.width,
+      height: obstacle.height,
     };
 
-    return (
-      dinoBox.x < obstacleBox.x + obstacleBox.width &&
-      dinoBox.x + dinoBox.width > obstacleBox.x &&
-      dinoBox.y < obstacleBox.y + obstacleBox.height &&
-      dinoBox.y + dinoBox.height > obstacleBox.y
-    );
+    if (!intersects(trexHull, obstacleHull)) return false;
+
+    const trexBoxes = trex.ducking ? TREX_COLLISION_DUCKING : TREX_COLLISION_RUNNING;
+    const obstacleBoxes = obstacle.definition.collisionBoxes;
+
+    for (const rawTrexBox of trexBoxes) {
+      const trexBox = {
+        x: trex.x + px(rawTrexBox.x),
+        y: trex.y + px(rawTrexBox.y),
+        width: px(rawTrexBox.width),
+        height: px(rawTrexBox.height),
+      };
+
+      // Bei Kaktusgruppen wiederholt sich die Box je Einzelkaktus.
+      for (let index = 0; index < obstacle.size; index += 1) {
+        const groupOffset = index * obstacle.definition.width;
+        for (const rawObstacleBox of obstacleBoxes) {
+          const obstacleBox = {
+            x: obstacle.x + px(groupOffset + rawObstacleBox.x),
+            y: obstacle.y + px(rawObstacleBox.y),
+            width: px(rawObstacleBox.width),
+            height: px(rawObstacleBox.height),
+          };
+          if (intersects(trexBox, obstacleBox)) return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   async function finish() {
@@ -1347,28 +1752,32 @@ function initializeGame() {
     }
   }
 
-  function tick() {
+  /**
+   * Spielschleife.
+   *
+   * Rechnet mit einem Zeitdelta statt mit festen Frames, damit das Tempo auf
+   * Bildschirmen mit 120 Hz nicht doppelt so hoch ist wie auf 60 Hz.
+   */
+  function tick(timestamp) {
     if (!running) return;
 
-    frame += 1;
-    score = Math.floor(frame / 5);
+    if (!lastTime) lastTime = timestamp;
+    const deltaMs = Math.min(timestamp - lastTime, 100); // Tab-Wechsel abfedern
+    lastTime = timestamp;
+    const deltaFrames = deltaMs / (1000 / 60);
+
+    // Kontinuierliche Beschleunigung -- der Kern des Originals.
+    if (speed < MAX_SPEED) {
+      speed = Math.min(MAX_SPEED, speed + ACCELERATION * deltaFrames);
+    }
+
+    distance += speed * deltaFrames;
+    score = Math.floor(distance * SCORE_COEFFICIENT);
     $("#game-score").textContent = String(score).padStart(5, "0");
 
-    dino.velocityY += .68;
-    dino.y = Math.min(groundY - dino.height, dino.y + dino.velocityY);
-    if (dino.y >= groundY - dino.height) dino.velocityY = 0;
-
-    const speed = 6 + Math.min(6, score / 250);
-    clouds.forEach((cloud) => {
-      cloud.x -= cloud.speed;
-      if (cloud.x < -50) cloud.x = canvas.width + Math.random() * 250;
-    });
-
-    if (frame >= nextObstacleFrame) spawnObstacle();
-    obstacles.forEach((obstacle) => {
-      obstacle.x -= speed;
-    });
-    obstacles = obstacles.filter((obstacle) => obstacle.x + obstacle.width > -10);
+    updateTrex(deltaFrames);
+    updateObstacles(deltaFrames, deltaMs);
+    updateClouds(deltaFrames);
 
     if (obstacles.some(collides)) {
       finish();
@@ -1388,8 +1797,11 @@ function initializeGame() {
   }
 
   $("#game-start").addEventListener("click", start);
-  canvas.addEventListener("click", () => {
-    if (running) jump();
+  canvas.addEventListener("pointerdown", () => {
+    if (running) startJump();
+  });
+  canvas.addEventListener("pointerup", () => {
+    if (running) endJump();
   });
 
   window.addEventListener("keydown", (event) => {
@@ -1398,7 +1810,10 @@ function initializeGame() {
     if (event.code === "Space" || event.code === "ArrowUp") {
       if (!running) return;
       event.preventDefault();
-      jump();
+      if (!jumpKeyHeld) {
+        jumpKeyHeld = true;
+        startJump();
+      }
     }
 
     if (event.code === "ArrowDown") {
@@ -1409,9 +1824,17 @@ function initializeGame() {
   });
 
   window.addEventListener("keyup", (event) => {
+    if (state.activeView !== "game") return;
+
+    if (event.code === "Space" || event.code === "ArrowUp") {
+      jumpKeyHeld = false;
+      endJump();
+    }
+
     if (event.code === "ArrowDown") setDucking(false);
   });
 
+  trex.y = trexGroundY();
   drawScene();
 }
 
