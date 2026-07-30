@@ -857,6 +857,13 @@ dialog::backdrop {
   border: 1px solid var(--border);
   border-radius: 18px;
 }
+/* Aktionsspalte einer Papierkorb-/Historienzeile (Wiederherstellen, Löschen). */
+.history-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .history-row h4 {
   margin: 0 0 4px;
   color: var(--text-strong);
@@ -949,6 +956,7 @@ dialog::backdrop {
   .filter-select { width: 100%; }
   .user-row,
   .history-row { grid-template-columns: 1fr; }
+  .history-actions { justify-content: flex-start; }
   .feedback-admin-actions { grid-template-columns: 1fr; }
   .content { padding: 18px; border-radius: 24px; }
   .app-header,

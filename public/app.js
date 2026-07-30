@@ -420,9 +420,14 @@ function historyRow(item, type) {
         <h4>${escapeHtml(item.title)}</h4>
         <p>${subtitle}</p>
       </div>
-      ${canRestore
+      <div class="history-actions">
+        ${canRestore
         ? `<button type="button" data-restore-${type}="${item.id}">Wiederherstellen</button>`
         : ""}
+        ${type === "template" && isAdmin()
+        ? `<button class="danger-button" type="button" data-purge-template="${item.id}">Endgültig löschen</button>`
+        : ""}
+      </div>
     </article>
   `;
 }
@@ -446,6 +451,27 @@ async function restoreHistoryItem(type, id) {
   });
   showToast("Vorlage wurde wiederhergestellt.");
   await loadBootstrap();
+  await loadHistory();
+}
+
+/**
+ * Entfernt eine archivierte Vorlage endgueltig.
+ *
+ * Der Titel steht in der Rueckfrage, damit klar ist, welche Vorlage betroffen
+ * ist -- der Vorgang laesst sich nicht rueckgaengig machen.
+ */
+async function purgeTemplate(id) {
+  const title = $(`[data-purge-template="${id}"]`)
+    ?.closest(".history-row")
+    ?.querySelector("h4")
+    ?.textContent ?? "Diese Vorlage";
+
+  if (!confirm(`„${title}“ endgültig löschen?\n\nDie Vorlage und ihre Versionshistorie werden unwiderruflich entfernt.`)) {
+    return;
+  }
+
+  await api(`/api/history/template/${id}`, { method: "DELETE" });
+  showToast("Vorlage wurde endgültig gelöscht.");
   await loadHistory();
 }
 
@@ -2297,9 +2323,18 @@ $("#template-version-list").addEventListener("click", (event) => {
     .catch((error) => alert(error.message));
 });
 $("#template-trash-list").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-restore-template]");
-  if (button) restoreHistoryItem("template", Number(button.dataset.restoreTemplate))
-    .catch((error) => alert(error.message));
+  const restoreButton = event.target.closest("[data-restore-template]");
+  if (restoreButton) {
+    restoreHistoryItem("template", Number(restoreButton.dataset.restoreTemplate))
+      .catch((error) => alert(error.message));
+    return;
+  }
+
+  const purgeButton = event.target.closest("[data-purge-template]");
+  if (purgeButton) {
+    purgeTemplate(Number(purgeButton.dataset.purgeTemplate))
+      .catch((error) => alert(error.message));
+  }
 });
 
 $("#new-command-button").addEventListener("click", () => $("#command-dialog").showModal());

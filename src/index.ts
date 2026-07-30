@@ -1226,6 +1226,40 @@ async function handleHistory(
     return json({ ok: true });
   }
 
+  // Endgueltiges Loeschen aus dem Papierkorb.
+  //
+  // Bewusst nur fuer Admins, waehrend Wiederherstellen auch Redakteuren offen
+  // steht: Der Vorgang ist nicht umkehrbar. Die Bedingung `active = 0` stellt
+  // sicher, dass nur bereits archivierte Vorlagen entfernt werden koennen --
+  // eine aktive Vorlage muss also erst in den Papierkorb wandern.
+  //
+  // Die Versionshistorie haengt per ON DELETE CASCADE an der Vorlage und wird
+  // automatisch mitgeloescht. Vorschlaege verweisen mit ON DELETE SET NULL und
+  // bleiben erhalten.
+  const purgeMatch = path.match(/^\/api\/history\/template\/(\d+)$/);
+  if (purgeMatch && request.method === "DELETE") {
+    requireRole(user, ["admin"]);
+    const templateId = positiveInteger(purgeMatch[1], "Vorlagen-ID");
+
+    // Titel vorher lesen, damit das Protokoll nachvollziehbar bleibt.
+    const template = await env.DB.prepare(
+      "SELECT title FROM templates WHERE id = ?1 AND active = 0",
+    ).bind(templateId).first<{ title: string }>();
+
+    if (!template) {
+      throw new HttpError(404, "Archivierte Vorlage wurde nicht gefunden.");
+    }
+
+    await env.DB.prepare(
+      "DELETE FROM templates WHERE id = ?1 AND active = 0",
+    ).bind(templateId).run();
+
+    await audit(env, user.id, "purge", "template", templateId, {
+      title: template.title,
+    });
+    return json({ ok: true });
+  }
+
   return null;
 }
 
