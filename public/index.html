@@ -153,6 +153,11 @@
                   <option value="solution">Lösung / Abschluss</option>
                   <option value="progress">Zwischenstand</option>
                   <option value="escalation">Eskalation an 3rd Level</option>
+                  <option value="handover">Übergabe an Kollegen</option>
+                  <option value="callback">Rückfrage an Benutzer</option>
+                  <option value="external">Weitergabe an Hersteller</option>
+                  <option value="onsite">Vor-Ort-Einsatz</option>
+                  <option value="documentation">Reine Dokumentation</option>
                 </select>
               </label>
               <label>Priorität
@@ -164,23 +169,45 @@
                 </select>
               </label>
               <label>Benutzer<input id="gen-user" placeholder="Name / Kennung"></label>
+              <label>Standort / Abteilung<input id="gen-location" placeholder="Niederlassung, Etage, Team"></label>
               <label>Gerät<input id="gen-device" placeholder="PC / Server / Drucker"></label>
+              <label>Inventar- / Seriennummer<input id="gen-asset"></label>
               <label>Ticketnummer<input id="gen-ticket"></label>
               <label>Betroffene Benutzer/Systeme<input id="gen-affected"></label>
+              <label>Seit wann besteht das Problem<input id="gen-since" placeholder="z. B. seit heute 09:30 Uhr"></label>
+              <label>Kontaktzeit / Erreichbarkeit<input id="gen-contact" placeholder="z. B. werktags 8-16 Uhr"></label>
               <label class="wide">Fehlerbild und Auswirkungen<textarea id="gen-issue" rows="4"></textarea></label>
               <label class="wide">Durchgeführte Schritte<textarea id="gen-steps" rows="5"></textarea></label>
               <label class="wide">Ergebnis / Lösung / offene Frage<textarea id="gen-result" rows="4"></textarea></label>
-              <label>Zielteam<input id="gen-team" placeholder="3rd-Level-Team"></label>
+              <label>Zielteam / Empfänger<input id="gen-team" placeholder="3rd-Level-Team, Kollege, Hersteller"></label>
               <label>Reproduzierbar
                 <select id="gen-repro">
                   <option>Unbekannt</option>
-                  <option>Ja</option>
+                  <option>Ja, immer</option>
+                  <option>Ja, gelegentlich</option>
                   <option>Nein</option>
                 </select>
               </label>
+              <label>Auswirkung
+                <select id="gen-impact">
+                  <option>Einzelner Benutzer</option>
+                  <option>Mehrere Benutzer</option>
+                  <option>Ganze Abteilung</option>
+                  <option>Standortübergreifend</option>
+                </select>
+              </label>
+              <label>Arbeit weiterhin möglich
+                <select id="gen-workaround-state">
+                  <option>Ja, ohne Einschränkung</option>
+                  <option>Ja, mit Behelfslösung</option>
+                  <option>Nein, blockiert</option>
+                </select>
+              </label>
+              <label class="wide">Behelfslösung für den Benutzer<textarea id="gen-workaround" rows="3"></textarea></label>
               <label class="wide">Logs, Fehlercodes, Zeitstempel<textarea id="gen-logs" rows="4"></textarea></label>
               <label class="wide">Reproduktionsschritte<textarea id="gen-reprosteps" rows="4"></textarea></label>
-              <label class="wide">Konkrete Frage an den 3rd Level<textarea id="gen-request" rows="4"></textarea></label>
+              <label class="wide">Konkrete Frage / Auftrag an den Empfänger<textarea id="gen-request" rows="4"></textarea></label>
+              <label class="wide">Nächste Schritte und Zuständigkeit<textarea id="gen-next" rows="3"></textarea></label>
             </div>
             <div class="card-actions">
               <button class="btn-primary" id="gen-create-button" type="button">Text erzeugen</button>
