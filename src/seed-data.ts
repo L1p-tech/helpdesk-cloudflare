@@ -320,7 +320,7 @@ Ticketnummer: [HP-TICKETNUMMER]
 
 Ein Techniker von HP wird sich demnächst mit Ihnen in Verbindung setzen.
 
-Bitte hinterlegen Sie im Ticket neue Informationen, Screenshots und den E-Mail-Verkehr mit HP.
+Bitte dokumentieren Sie den weiteren Verlauf im Ticket: neue Erkenntnisse, Screenshots sowie den E-Mail-Verkehr mit HP.
 
 Vielen Dank für Ihre Mithilfe.
 
@@ -340,7 +340,7 @@ Bitte melden Sie sich zeitnah bei HP unter der Telefonnummer [HP-NUMMER] und geb
 
 Bitte beachten Sie, dass die Rückmeldung bis spätestens [FRISTDATUM] erfolgen muss, da HP das Ticket sonst schließt.
 
-Bitte hinterlegen Sie im Ticket neue Informationen, Screenshots und den E-Mail-Verkehr mit HP.
+Bitte dokumentieren Sie den weiteren Verlauf im Ticket: neue Erkenntnisse, Screenshots sowie den E-Mail-Verkehr mit HP.
 
 Vielen Dank für Ihre Mithilfe.
 
@@ -358,7 +358,7 @@ bitte führen Sie einmal einen Hard Reset am Notebook durch:
 2. Entfernen Sie alle angeschlossenen Kabel, einschließlich des Netzkabels.
 3. Halten Sie die Einschalttaste und die Taste F6 gleichzeitig etwa 30 Sekunden lang gedrückt.
 4. Lassen Sie beide Tasten los. Das Notebook sollte anschließend wieder starten.
-5. Danach können Sie alle Kabel wieder anschließen.
+5. Schließen Sie danach zuerst das Netzkabel und anschließend die übrigen Kabel wieder an.
 
 Bitte geben Sie im Ticket Bescheid, ob die Meldung danach erneut auftritt.
 
@@ -388,8 +388,7 @@ wenn Sie Ihre Telefonnummer im Authenticator oder in den Sicherheitsinformatione
 
 1. Öffnen Sie den folgenden Link:
 https://mysignins.microsoft.com/security-info
-2. Klicken Sie auf "Anmeldemethode hinzufügen".
-3. Wenn bereits eine Telefonnummer hinterlegt ist, wählen Sie stattdessen "Ändern".
+2. Klicken Sie auf "Anmeldemethode hinzufügen". Ist bereits eine Telefonnummer hinterlegt, wählen Sie stattdessen "Ändern".
 
 Es ist empfehlenswert, mehr als eine Anmeldemethode zu hinterlegen, zum Beispiel Authenticator und Telefonnummer.
 
@@ -437,7 +436,9 @@ wenn der PC noch nicht in Betrieb war, ist er in der Regel auch noch nicht volls
 
 Bitte lassen Sie den PC zunächst mindestens zwei Stunden per LAN verbunden und führen Sie danach einen Neustart durch.
 
-Anschließend sollte bei der Windows-Anmeldung die Option "Anderer Benutzer" angezeigt werden. Melden Sie sich dort bitte mit Ihrer Windows-Kennung beziehungsweise Ihrer E-Mail-Adresse und Ihrem Windows-Passwort an.
+Anschließend sollte bei der Windows-Anmeldung die Option "Anderer Benutzer" angezeigt werden.
+
+Melden Sie sich dort bitte mit Ihrer Windows-Kennung beziehungsweise Ihrer E-Mail-Adresse und Ihrem Windows-Passwort an.
 
 Bitte führen Sie danach noch die folgenden drei Schritte aus:
 
@@ -483,9 +484,9 @@ Mit freundlichen Grüßen
 
 bitte ändern Sie einmal Ihr Windows-Passwort:
 
-1. Strg + Alt + Entf drücken und "Kennwort ändern" auswählen. Anschließend ein neues Kennwort vergeben.
-2. Nachdem das Passwort geändert ist, Windows-Taste + L drücken und sich mit dem neuen Passwort anmelden.
-3. Wenn Sie wieder auf der Desktop-Oberfläche sind, bitte 5 Minuten warten und den PC neu starten.
+1. Drücken Sie Strg + Alt + Entf und wählen Sie "Kennwort ändern". Vergeben Sie anschließend ein neues Kennwort.
+2. Sperren Sie den Rechner danach mit Windows-Taste + L und melden Sie sich mit dem neuen Passwort wieder an.
+3. Warten Sie anschließend etwa fünf Minuten und starten Sie den PC neu.
 
 Nach dem Neustart sollte die Anmeldung überall wieder funktionieren.
 
@@ -509,9 +510,9 @@ Mit freundlichen Grüßen
   {
     categorySlug: "mfa",
     title: "Global MFA Reset anfordern (intern)",
-    body: `Dear Global AD-Team,
+    body: `Dear Global AD Team,
 
-could you reset the MFA of the following user please:
+could you please reset the MFA for the following user:
 
 [E-MAIL-ADRESSE]
 
@@ -523,9 +524,9 @@ Thanks in advance and best regards
     title: "Postfachzugriff entfernt",
     body: `Hallo [USERNAME],
 
-wir haben den Zugriff auf das entsprechende Postfach entfernt. Die Änderung wurde bereits umgesetzt und ist ab sofort wirksam.
+wir haben den Zugriff auf das entsprechende Postfach entfernt. Die Änderung ist ab sofort wirksam.
 
-Falls Sie noch Fragen haben oder es dabei zu Problemen kommt, geben Sie gerne Bescheid – wir unterstützen Sie jederzeit.
+Falls dabei Probleme auftreten oder Sie noch Fragen haben, geben Sie uns gerne Bescheid.
 
 Mit freundlichen Grüßen
 [ICH]`,
@@ -551,7 +552,9 @@ Mit freundlichen Grüßen
     title: "E-Mail aus Quarantäne freigegeben",
     body: `Hallo [USERNAME],
 
-ich habe die Information vom Global Service Portal erhalten, dass die E-Mail aus der Quarantäne gelöst wurde.
+ich habe die Information vom Global Service Portal erhalten, dass die E-Mail aus der Quarantäne freigegeben wurde.
+
+Sie sollte in Kürze in Ihrem Postfach eintreffen.
 
 Mit freundlichen Grüßen
 [ICH]`,
@@ -623,9 +626,9 @@ Mit freundlichen Grüßen
     title: "Laptop-Kauf – Preis und Formular",
     body: `Hallo [USERNAME],
 
-der Preis würde hier bei [PREIS] liegen.
+der Preis für das Gerät liegt bei [PREIS].
 
-Falls Sie das Gerät kaufen möchten, füllen Sie bitte das beigefügte Formular aus und fügen es wieder in das Ticket ein.
+Falls Sie es kaufen möchten, füllen Sie bitte das beigefügte Formular aus und fügen es wieder in das Ticket ein.
 
 Mit freundlichen Grüßen
 [ICH]`,
@@ -649,7 +652,11 @@ Mit freundlichen Grüßen
 
 versuchen Sie bitte einmal, Ihren Browser-Cache zu löschen:
 
-Drei-Punkte-Menü oben rechts → Einstellungen → Datenschutz, Suche und Dienste → Abschnitt "Browserdaten löschen" → "Zu löschende Elemente auswählen" → bei "Zeitbereich" die Option "Gesamte Zeit" wählen → Haken bei "Zwischengespeicherte Bilder und Dateien" setzen → "Jetzt löschen".
+1. Öffnen Sie das Drei-Punkte-Menü oben rechts und wählen Sie "Einstellungen".
+2. Wechseln Sie zu "Datenschutz, Suche und Dienste".
+3. Klicken Sie im Abschnitt "Browserdaten löschen" auf "Zu löschende Elemente auswählen".
+4. Wählen Sie bei "Zeitbereich" die Option "Gesamte Zeit".
+5. Setzen Sie den Haken bei "Zwischengespeicherte Bilder und Dateien" und klicken Sie auf "Jetzt löschen".
 
 Starten Sie den Browser anschließend einmal neu und probieren Sie es erneut.
 
@@ -661,9 +668,9 @@ Mit freundlichen Grüßen
     title: "Ticket wegen Inaktivität geschlossen",
     body: `Hallo [USERNAME],
 
-das Ticket wird aufgrund von Inaktivität geschlossen.
+da wir zu Ihrem Anliegen längere Zeit keine Rückmeldung erhalten haben, schließen wir das Ticket vorerst.
 
-Falls das Problem weiterhin besteht, öffnen Sie das Ticket bitte einfach erneut.
+Falls das Problem weiterhin besteht, öffnen Sie das Ticket bitte einfach erneut. Wir kümmern uns dann gerne darum.
 
 Mit freundlichen Grüßen
 [ICH]`,
