@@ -1174,6 +1174,7 @@ async function detachUserReferences(env: Env, targetId: number): Promise<void> {
     "UPDATE commands SET created_by = NULL WHERE created_by = ?1",
     "UPDATE commands SET updated_by = NULL WHERE updated_by = ?1",
     "UPDATE template_versions SET changed_by = NULL WHERE changed_by = ?1",
+    "UPDATE categories SET created_by = NULL WHERE created_by = ?1",
   ];
 
   const optional = [

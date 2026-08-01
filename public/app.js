@@ -1393,6 +1393,10 @@ async function loadUsers() {
         <button class="btn-ghost" type="button" data-user-action="reset-password" data-user-id="${user.id}" data-user-name="${escapeHtml(user.display_name)}">
           Passwort
         </button>
+        ${user.id === state.user?.id ? "" : `
+        <button class="btn-ghost danger-button" type="button" data-user-action="delete" data-user-id="${user.id}" data-user-name="${escapeHtml(user.display_name)}">
+          Löschen
+        </button>`}
       </div>
     </div>`).join("");
 }
@@ -1552,6 +1556,23 @@ async function handleUsersListClick(event) {
 
     await updateUserAdmin(userId, { password: password.trim() });
     showToast("Passwort aktualisiert.");
+    return;
+  }
+
+  if (action === "delete") {
+    // Das Loeschen laesst sich nicht rueckgaengig machen, deshalb wird der
+    // Name ausgeschrieben und der Verbleib der Inhalte benannt -- die Vorlagen
+    // und Befehle des Kontos bleiben erhalten und werden nur entkoppelt.
+    const confirmed = confirm(
+      `Benutzer „${userName}" wirklich endgültig löschen?\n\n` +
+      "Das Konto und alle zugehörigen Sitzungen werden entfernt. " +
+      "Erstellte Vorlagen und Befehle bleiben erhalten.",
+    );
+    if (!confirmed) return;
+
+    await api(`/api/users/${userId}`, { method: "DELETE" });
+    await loadUsers();
+    showToast(`Benutzer „${userName}" wurde gelöscht.`);
   }
 }
 
