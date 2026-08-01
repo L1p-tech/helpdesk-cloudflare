@@ -1306,3 +1306,82 @@ dialog::backdrop {
   overflow-wrap: anywhere;
 }
 .chat-body a:hover { color: var(--text-strong); }
+
+/* ============================================================
+   IT-Meldungen
+   ============================================================ */
+.news-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.news-toolbar input[type="search"] {
+  flex: 1;
+  min-width: 180px;
+}
+
+.news-list { display: flex; flex-direction: column; gap: 12px; }
+
+.news-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+.news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: .75rem;
+  color: var(--muted-dark);
+  margin-bottom: 6px;
+}
+.news-source { font-weight: 600; color: var(--accent); }
+.news-category {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+}
+.news-title { margin: 0 0 6px; font-size: .98rem; line-height: 1.4; }
+.news-title a { color: var(--text-strong); text-decoration: none; }
+.news-title a:hover { color: var(--primary); text-decoration: underline; }
+.news-summary {
+  margin: 0;
+  font-size: .85rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* Quellenverwaltung im Admin-Bereich. */
+.news-feed-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.news-feed-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 110px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: .85rem;
+}
+.news-feed-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.news-feed-url {
+  font-size: .72rem;
+  color: var(--muted-dark);
+  overflow-wrap: anywhere;
+}
+.news-feed-error { color: var(--danger); }
+.news-feed-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+@media (max-width: 900px) {
+  .news-feed-form,
+  .news-feed-row { grid-template-columns: 1fr; }
+  .news-feed-actions { justify-content: flex-start; }
+}

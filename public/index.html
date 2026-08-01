@@ -45,6 +45,7 @@
         <button class="main-tab" data-view="commands" type="button">Befehle</button>
         <button class="main-tab" data-view="diagnose" type="button">Diagnose</button>
         <button class="main-tab" data-view="generator" type="button">Ticket-Generator</button>
+        <button class="main-tab" data-view="news" type="button">IT-Meldungen</button>
         <button class="main-tab" data-view="proposals" type="button">Meine Vorschläge</button>
         <button class="main-tab" data-view="approvals" data-role="reviewer" type="button">
           Freigaben <span id="approval-count"></span>
@@ -240,6 +241,21 @@
           </div>
         </section>
 
+        <section class="view hidden" id="view-news">
+          <div class="news-toolbar">
+            <select class="filter-select" id="news-category">
+              <option value="">Alle Kategorien</option>
+            </select>
+            <select class="filter-select" id="news-feed">
+              <option value="">Alle Quellen</option>
+            </select>
+            <input id="news-search" type="search" placeholder="In Meldungen suchen…">
+            <button class="btn-tool" id="news-refresh" type="button">Aktualisieren</button>
+          </div>
+          <p class="panel-hint" id="news-status"></p>
+          <div id="news-list" class="news-list"></div>
+        </section>
+
         <section class="view hidden" id="view-proposals">
           <div id="my-proposals-list" class="templates-list"></div>
         </section>
@@ -359,6 +375,21 @@
           <div class="panel">
             <h3>Benutzer</h3>
             <div id="users-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Nachrichtenquellen</h3>
+                <p class="panel-hint">RSS- und Atom-Feeds für den Reiter „IT-Meldungen“.</p>
+              </div>
+            </div>
+            <form class="news-feed-form" id="news-feed-form">
+              <input id="news-feed-name" placeholder="Name" required>
+              <input id="news-feed-url" type="url" placeholder="https://…/feed.xml" required>
+              <input id="news-feed-category" placeholder="Kategorie" value="Allgemein">
+              <button class="btn-primary" type="submit">Hinzufügen</button>
+            </form>
+            <div id="news-feeds-list"></div>
           </div>
           <div class="panel">
             <div class="panel-header">
