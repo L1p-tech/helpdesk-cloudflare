@@ -16,6 +16,11 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Holt die Nachrichtenquellen alle 30 Minuten, auch wenn niemand die Seite
+  // benutzt. Ohne diesen Ausloeser liefe der Abruf nur beim Seitenaufruf mit.
+  "triggers": {
+    "crons": ["*/30 * * * *"]
+  },
   "vars": {
     "SESSION_TTL_HOURS": "12"
   }

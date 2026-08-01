@@ -1821,4 +1821,27 @@ export default {
       return errorResponse(error);
     }
   },
+
+  /**
+   * Zeitgesteuerter Lauf (siehe `triggers.crons` in wrangler.jsonc).
+   *
+   * Holt die Nachrichtenquellen unabhaengig davon, ob jemand die Seite
+   * benutzt. Ohne diesen Lauf wuerde nach einem Wochenende ohne Zugriff erst
+   * der naechste Seitenaufruf die Meldungen nachladen.
+   *
+   * `force` bleibt aus: Der Lauf soll dieselbe Alterspruefung anwenden wie der
+   * Seitenaufruf, damit ein zwischenzeitlicher Abruf nicht sofort wiederholt
+   * wird. Da der Trigger im selben Takt wie NEWS_REFRESH_MINUTES laeuft, ist
+   * praktisch immer etwas faellig.
+   */
+  async scheduled(_event: ScheduledController, env: Env): Promise<void> {
+    try {
+      await refreshNewsIfStale(env, false);
+    } catch (error) {
+      // Ein Fehler hier darf den Lauf nicht als fehlgeschlagen enden lassen --
+      // die einzelnen Quellen behandeln ihre Fehler bereits selbst, und ein
+      // erneuter Versuch folgt ohnehin in 30 Minuten.
+      console.error("Zeitgesteuerter Feed-Abruf fehlgeschlagen:", error);
+    }
+  },
 } satisfies ExportedHandler<Env>;
