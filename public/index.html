@@ -400,6 +400,26 @@
           </form>
         </section>
       </section>
+
+      <!-- Team-Chat: liegt als eigenes Panel am rechten Rand, damit er den
+           auf 1120px zentrierten Inhalt nicht schmaler macht. -->
+      <aside class="chat-panel hidden" id="chat-panel" aria-label="Team-Chat">
+        <header class="chat-header">
+          <h2>Team-Chat</h2>
+          <button class="chat-close" id="chat-close" type="button" aria-label="Chat schließen">&times;</button>
+        </header>
+        <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
+        <form class="chat-form" id="chat-form">
+          <label class="sr-only" for="chat-input">Nachricht</label>
+          <textarea id="chat-input" rows="2" maxlength="2000"
+                    placeholder="Nachricht an das Team…"></textarea>
+          <button class="btn-primary" type="submit">Senden</button>
+        </form>
+      </aside>
+
+      <button class="chat-toggle hidden" id="chat-toggle" type="button" aria-expanded="false">
+        Chat <span class="chat-badge hidden" id="chat-badge"></span>
+      </button>
     </section>
   </main>
 

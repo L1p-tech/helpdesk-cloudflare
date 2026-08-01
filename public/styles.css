@@ -1107,3 +1107,180 @@ dialog::backdrop {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   Team-Chat
+   ============================================================
+   Der Chat liegt fixiert am rechten Rand statt in einer Layout-Spalte: Die App
+   ist auf 1120px zentriert, eine feste Spalte haette den Inhalt dauerhaft
+   schmaler gemacht. So bleibt der Arbeitsbereich unveraendert und der Chat
+   laesst sich bei Bedarf zuklappen.
+*/
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.chat-panel {
+  position: fixed;
+  top: 84px;
+  right: 20px;
+  bottom: 20px;
+  width: 330px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(22px);
+  z-index: 40;
+  overflow: hidden;
+}
+.chat-panel.hidden { display: none; }
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.chat-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-strong);
+}
+.chat-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 8px;
+}
+.chat-close:hover { color: var(--text-strong); }
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chat-empty {
+  color: var(--muted-dark);
+  font-size: .85rem;
+  text-align: center;
+  margin-top: 24px;
+}
+
+.chat-message { display: flex; flex-direction: column; gap: 3px; }
+.chat-message-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: .75rem;
+  color: var(--muted-dark);
+}
+.chat-author { font-weight: 600; color: var(--accent); }
+/* Eigene Beitraege heben sich ab, damit der Verlauf schnell lesbar bleibt. */
+.chat-message.own .chat-author { color: var(--primary); }
+.chat-body {
+  background: var(--surface-soft);
+  border-radius: 12px;
+  padding: 8px 11px;
+  font-size: .88rem;
+  line-height: 1.45;
+  /* Lange Woerter und eingefuegte Pfade duerfen das Panel nicht sprengen. */
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.chat-message.own .chat-body {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.chat-delete {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--muted-dark);
+  font-size: .72rem;
+  cursor: pointer;
+  padding: 2px 0;
+  text-decoration: underline;
+}
+.chat-delete:hover { color: var(--danger); }
+
+.chat-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+}
+.chat-form textarea {
+  resize: none;
+  width: 100%;
+  font: inherit;
+  font-size: .88rem;
+}
+
+/* Umschalter unten rechts, sichtbar solange das Panel zu ist. */
+.chat-toggle {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 41;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--panel-strong);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(22px);
+}
+.chat-toggle:hover { border-color: var(--primary); color: var(--text-strong); }
+.chat-toggle.hidden { display: none; }
+
+.chat-badge {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #06110c;
+  font-size: .72rem;
+  font-weight: 700;
+  text-align: center;
+}
+.chat-badge.hidden { display: none; }
+
+/*
+ * Auf schmalen Bildschirmen wuerde ein 330px-Panel den Inhalt verdecken,
+ * deshalb dort ueber die volle Breite -- der Umschalter bleibt gleich.
+ */
+@media (max-width: 900px) {
+  .chat-panel {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    height: min(70vh, 460px);
+  }
+}
