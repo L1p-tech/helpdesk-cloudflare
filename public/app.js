@@ -2586,12 +2586,58 @@ function renderChat() {
           <span class="chat-author">${escapeHtml(message.author_name)}</span>
           <span>${escapeHtml(formatChatTime(message.created_at))}</span>
         </div>
-        <div class="chat-body">${escapeHtml(message.body)}</div>
+        <div class="chat-body">${renderChatBody(message.body)}</div>
         ${canDelete ? `<button class="chat-delete" type="button" data-chat-delete="${message.id}">Löschen</button>` : ""}
       </div>`;
   }).join("");
 
   if (stickToBottom) box.scrollTop = box.scrollHeight;
+}
+
+/** Endungen, bei denen eine Adresse als Bild eingebettet wird. */
+const CHAT_IMAGE_PATTERN = /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i;
+
+/**
+ * Wandelt den Nachrichtentext in sicheres Markup: Adressen werden anklickbar,
+ * Bildadressen zusaetzlich als Vorschau eingebettet.
+ *
+ * Sicherheitskritische Reihenfolge: Der Text wird ZUERST vollstaendig escaped,
+ * die Ersetzung laeuft anschliessend nur noch ueber bereits entschaerften Text.
+ * Andersherum -- erst ersetzen, dann escapen -- wuerde das eingefuegte Markup
+ * mitescapen; und ohne Escaping vorweg koennte der Text eigenes HTML
+ * einschleusen. Nur `http://` und `https://` werden verlinkt, damit weder
+ * `javascript:` noch `data:` als Adresse durchkommen.
+ */
+function renderChatBody(body) {
+  const safe = escapeHtml(body);
+
+  // Adressen enden am ersten Anfuehrungszeichen: `escapeHtml` laesst `"` und
+  // `'` unveraendert (textContent escaped nur &, < und >), sodass ein
+  // eingeschmuggeltes Zeichen sonst im href-Attribut landen wuerde.
+  return safe.replace(/https?:\/\/[^\s<"']+/g, (match) => {
+    // Satzzeichen am Ende gehoeren zum Satz, nicht zur Adresse.
+    const trailing = match.match(/[.,;:!?)\]]+$/);
+    const url = trailing ? match.slice(0, -trailing[0].length) : match;
+    const suffix = trailing ? trailing[0] : "";
+
+    // Zusaetzlich hart kodieren, damit das Attribut auch dann nicht verlassen
+    // werden kann, wenn das Muster oben je gelockert wird.
+    const href = url.replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+    const link = `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+
+    if (!CHAT_IMAGE_PATTERN.test(stripQuery(url))) return link + suffix;
+
+    // Bilder werden lazy geladen und bleiben anklickbar, um sie in voller
+    // Groesse zu oeffnen -- im schmalen Panel ist die Vorschau begrenzt.
+    return `<a class="chat-image-link" href="${href}" target="_blank" rel="noopener noreferrer">
+      <img class="chat-image" src="${href}" alt="Bild aus dem Chat" loading="lazy">
+    </a>${suffix}`;
+  });
+}
+
+/** Entfernt Query und Fragment, damit die Endung erkannt wird. */
+function stripQuery(url) {
+  return url.split(/[?#]/)[0];
 }
 
 /**

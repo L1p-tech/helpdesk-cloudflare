@@ -1284,3 +1284,25 @@ dialog::backdrop {
     height: min(70vh, 460px);
   }
 }
+
+/* Bilder und Links im Chatverlauf. */
+.chat-image-link {
+  display: block;
+  margin-top: 6px;
+}
+.chat-image {
+  display: block;
+  max-width: 100%;
+  /* Begrenzt, damit ein hohes Bild nicht den halben Verlauf einnimmt. */
+  max-height: 220px;
+  width: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  object-fit: contain;
+}
+.chat-body a {
+  color: var(--primary);
+  overflow-wrap: anywhere;
+}
+.chat-body a:hover { color: var(--text-strong); }
