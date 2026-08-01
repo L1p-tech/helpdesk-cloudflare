@@ -24,10 +24,19 @@ export async function sha256(value: string): Promise<string> {
   return toBase64(new Uint8Array(digest));
 }
 
+/**
+ * Obergrenze der Cloudflare-Workers-Laufzeit fuer PBKDF2. Hoehere Werte
+ * quittiert die WebCrypto-Implementierung mit einem NotSupportedError
+ * ("iteration counts above 100000 are not supported"). Lokal in `wrangler dev`
+ * greift das Limit nicht, weshalb zu hohe Werte erst in der Produktion
+ * auffallen -- der Standard muss daher hier verankert bleiben.
+ */
+export const MAX_PBKDF2_ITERATIONS = 100_000;
+
 export async function hashPassword(
   password: string,
   saltBase64?: string,
-  iterations = 210_000,
+  iterations = MAX_PBKDF2_ITERATIONS,
 ): Promise<{ hash: string; salt: string; iterations: number }> {
   const salt = saltBase64
     ? fromBase64(saltBase64)
@@ -41,12 +50,17 @@ export async function hashPassword(
     ["deriveBits"],
   );
 
+  // Gespeicherte Iterationszahlen aus aelteren Datensaetzen koennen ueber dem
+  // Laufzeitlimit liegen. Ungeprueft wuerde deriveBits werfen und der Login
+  // waere fuer diese Konten dauerhaft blockiert, statt nur langsamer zu sein.
+  const safeIterations = Math.min(iterations, MAX_PBKDF2_ITERATIONS);
+
   const bits = await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
       hash: "SHA-256",
       salt: new Uint8Array(salt).buffer,
-      iterations,
+      iterations: safeIterations,
     },
     key,
     256,
@@ -55,7 +69,7 @@ export async function hashPassword(
   return {
     hash: toBase64(new Uint8Array(bits)),
     salt: toBase64(salt),
-    iterations,
+    iterations: safeIterations,
   };
 }
 
