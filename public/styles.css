@@ -243,21 +243,19 @@ h1, h2, h3, h4, p { margin-top: 0; }
   font-size: 14px;
 }
 
+/*
+ * Die Reiter brechen um, statt seitlich zu scrollen. Bei zwoelf Bereichen
+ * passte die Zeile nicht mehr in die Breite und wurde rechts abgeschnitten --
+ * ohne sichtbaren Hinweis, dass dort noch etwas kommt. Eine zweite Zeile
+ * zeigt ehrlich alles, was da ist.
+ */
 .main-tabs {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 0 0 16px;
-  padding: 10px;
+  padding: 8px;
   border-radius: 24px;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(59, 52, 45, 0.18) transparent;
-}
-.main-tabs::-webkit-scrollbar { height: 5px; }
-.main-tabs::-webkit-scrollbar-thumb {
-  background: rgba(59, 52, 45, 0.2);
-  border-radius: 999px;
 }
 .main-tab {
   padding: 11px 16px;
@@ -1384,4 +1382,77 @@ dialog::backdrop {
   .news-feed-form,
   .news-feed-row { grid-template-columns: 1fr; }
   .news-feed-actions { justify-content: flex-start; }
+}
+
+/*
+ * Formulare gestrafft. Die Panels brauchten fuer vier Felder mehr als eine
+ * Bildschirmhoehe: Beschriftung, Abstand und Feldhoehe summierten sich pro
+ * Zeile auf ueber 90px. Mit engerem Zeilenabstand und flacheren Feldern
+ * passen dieselben Angaben in etwa zwei Drittel des Platzes -- ohne dass die
+ * Klickflaeche unter die uebliche Mindestgroesse faellt.
+ */
+.form-panel { gap: 10px; }
+.form-panel label { gap: 4px; }
+.form-panel input,
+.form-panel select,
+.panel-box input,
+.panel-box select {
+  padding: 9px 13px;
+  border-radius: 12px;
+}
+.form-panel h3,
+.panel-box h3 { margin-bottom: 4px; }
+
+/* Der Farbwaehler brauchte als einziges Feld 48px Hoehe. */
+input[type="color"] { height: 40px; }
+
+.form-grid { gap: 12px; }
+.form-grid label { gap: 4px; }
+.form-grid input,
+.form-grid select,
+.form-grid textarea {
+  padding: 9px 13px;
+  border-radius: 12px;
+}
+
+/*
+ * Nebeneinanderliegende Formulare werden im Raster gleich hoch. Das kuerzere
+ * verteilte seine Felder dann ueber die volle Hoehe, wodurch die Abstaende
+ * links und rechts sichtbar auseinanderliefen. `start` haelt beide oben
+ * buendig, die Panelhoehe bleibt durch das Raster trotzdem gleich.
+ */
+.form-panel { align-content: start; }
+
+/* Der Farbwaehler nahm die volle Spaltenbreite ein, obwohl er nur eine Farbe
+   zeigt -- ein kompaktes Feld reicht und wirkt weniger wie ein Fehler. */
+.form-panel input[type="color"] {
+  width: 96px;
+  padding: 4px;
+}
+
+/*
+ * Bei geoeffnetem Chat rueckt der Inhalt nach links, statt sich verdecken zu
+ * lassen. Zuvor lag das fixierte Panel ueber der rechten Spalte -- Formulare
+ * und Zeilenaktionen waren dort nicht mehr erreichbar. Die Verschiebung wirkt
+ * nur, solange daneben genug Platz bleibt (siehe Media Query unten).
+ */
+@media (min-width: 1200px) {
+  body.chat-open .app-shell {
+    /*
+     * Nur so weit verschieben, wie das Panel tatsaechlich hineinragt. Ein
+     * fester Rand von der vollen Panelbreite drueckte die Seite an den linken
+     * Rand; hier bleibt sie zentriert und weicht erst aus, wenn es eng wird.
+     */
+    /*
+     * Der Chat liegt rechts fixiert (330px breit, 20px Abstand). Die Seite
+     * ist zentriert, ragte also in diesen Bereich hinein. Sie behaelt ihre
+     * Breite und wird stattdessen aus der Mitte des verbleibenden Platzes
+     * heraus zentriert -- so bleibt sie so gross wie moeglich und wird nur
+     * schmaler, wenn der Platz links davon nicht mehr reicht.
+     */
+    width: min(1120px, calc(100vw - 394px));
+    margin-left: auto;
+    margin-right: 366px;
+    transition: width .2s ease, margin-right .2s ease;
+  }
 }

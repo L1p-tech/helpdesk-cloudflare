@@ -181,10 +181,22 @@ function extractLink(block: string): string {
   return "";
 }
 
-/** Entfernt Markup und normalisiert Leerraum -- Feeds liefern oft HTML. */
+/**
+ * Entfernt Markup und normalisiert Leerraum -- Feeds liefern oft HTML.
+ *
+ * Reihenfolge beachten: Manche Quellen liefern das HTML escaped (Golem sendet
+ * `&lt;img src=...&gt;`). Wuerde erst entfernt und dann dekodiert, kaeme das
+ * Markup nach dem Dekodieren als sichtbarer Text wieder zum Vorschein. Also
+ * zuerst dekodieren, dann entfernen -- und danach ein zweites Mal dekodieren,
+ * weil Attribute wie `&amp;amp;` doppelt kodiert sein koennen.
+ */
 function cleanText(value: string | null): string {
   if (!value) return "";
-  return decodeEntities(value.replace(/<[^>]*>/g, " "))
+
+  const decoded = decodeEntities(value);
+  const withoutMarkup = decoded.replace(/<[^>]*>/g, " ");
+
+  return decodeEntities(withoutMarkup)
     .replace(/\s+/g, " ")
     .trim();
 }

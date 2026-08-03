@@ -85,6 +85,7 @@ function handleExpiredSession() {
   $("#login-view").classList.remove("hidden");
   $("#chat-panel").classList.add("hidden");
   $("#chat-toggle").classList.add("hidden");
+  document.body.classList.remove("chat-open");
   $("#login-message").textContent =
     "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.";
   $("#login-password").value = "";
@@ -453,6 +454,20 @@ function renderQuickbar() {
         : '<span class="quick-empty">Noch keine zuletzt verwendeten Inhalte.</span>'}
     </div>
   `;
+
+  // Solange weder Favoriten noch Verlauf existieren, ist die Leiste nur ein
+  // leerer Kasten ueber dem Inhalt -- dann bleibt sie ausgeblendet.
+  updateQuickbarVisibility();
+}
+
+/** Zeigt die Schnellleiste nur dort, wo sie Bezug hat und Inhalt zeigt. */
+function updateQuickbarVisibility() {
+  const relevantView = ["templates", "commands"].includes(state.activeView);
+  const hasContent = state.recentItems.length > 0
+    || state.templates.some((item) => isFavorite("template", item.id))
+    || state.commands.some((item) => isFavorite("command", item.id));
+
+  $("#quickbar").classList.toggle("hidden", !relevantView || !hasContent);
 }
 
 function renderDiagnosticChecklist() {
@@ -763,7 +778,12 @@ async function loadBootstrap() {
   };
 
   applyTheme(state.settings.preferences.theme);
-  $("#current-user").innerHTML = `<strong>${escapeHtml(state.user.displayName)}</strong><br>${roleLabel(state.user.role)}`;
+  // Rolle nur zeigen, wenn sie sich vom Anzeigenamen unterscheidet -- sonst
+  // stuende bei einem Konto namens "Administrator" zweimal dasselbe.
+  const role = roleLabel(state.user.role);
+  const showRole = role.toLowerCase() !== state.user.displayName.trim().toLowerCase();
+  $("#current-user").innerHTML = `<strong>${escapeHtml(state.user.displayName)}</strong>`
+    + (showRole ? `<br>${escapeHtml(role)}` : "");
   $("#signature-name").value = state.settings.signatureName;
   $("#theme-select").value = state.settings.preferences.theme;
   populateCategories();
@@ -1364,6 +1384,11 @@ async function switchView(view) {
   $("#view-title").textContent = config[1];
   $("#view-description").textContent = config[2];
   $("#new-proposal-button").classList.toggle("hidden", view !== "templates");
+
+  // Die Schnellleiste zeigt zuletzt kopierte Vorlagen und Befehle -- auf den
+  // uebrigen Reitern (Verwaltung, Meldungen, Spiel ...) hat sie keinen Bezug
+  // und schob dort nur den eigentlichen Inhalt nach unten.
+  updateQuickbarVisibility();
 
   if (view === "proposals" || view === "approvals") await loadProposals(view);
   if (view === "feedback") await loadFeedback();
@@ -2871,6 +2896,9 @@ function setChatOpen(open) {
   $("#chat-panel").classList.toggle("hidden", !open);
   $("#chat-toggle").classList.toggle("hidden", open);
   $("#chat-toggle").setAttribute("aria-expanded", String(open));
+  // Das Panel liegt fixiert ueber der Seite -- ohne diese Markierung wuerde es
+  // auf breiten Bildschirmen die rechte Spalte samt Bedienelementen verdecken.
+  document.body.classList.toggle("chat-open", open);
 
   if (open) {
     chatState.unread = 0;
@@ -3062,19 +3090,6 @@ $("#main-nav").addEventListener("click", (event) => {
   const button = event.target.closest("[data-view]");
   if (button) switchView(button.dataset.view);
 });
-
-$("#main-nav").addEventListener("wheel", (event) => {
-  const nav = event.currentTarget;
-  if (nav.scrollWidth <= nav.clientWidth) return;
-
-  const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
-    ? event.deltaY
-    : event.deltaX;
-
-  if (delta === 0) return;
-  event.preventDefault();
-  nav.scrollLeft += delta;
-}, { passive: false });
 
 $$("dialog").forEach((dialog) => {
   dialog.addEventListener("click", (event) => {
