@@ -255,8 +255,16 @@ h1, h2, h3, h4, p { margin-top: 0; }
   gap: 16px;
   min-width: 0;
 }
-/* Ohne sichtbaren Inhalt keine leere Spalte. */
+/*
+ * Ohne sichtbaren Inhalt keine leere Spalte -- und ohne die Spalte auch keine
+ * reservierte Breite. `display: none` allein genuegte nicht: die Rasterspalte
+ * blieb bestehen, wodurch rechts 300px leer standen und der Inhalt schmaler
+ * war als noetig.
+ */
 .side-rail:not(:has(> :not(.hidden))) { display: none; }
+.work-area:not(:has(.side-rail > :not(.hidden))) {
+  grid-template-columns: minmax(0, 1fr);
+}
 
 /* Auf schmaleren Schirmen rutscht die Spalte unter den Inhalt. */
 @media (max-width: 1180px) {
@@ -680,25 +688,6 @@ details.card[open] summary::after { transform: rotate(225deg); }
   border-color: color-mix(in srgb, var(--category-color) 42%, transparent);
 }
 
-/* Farbiger Streifen am Kartenrand -- macht die Bereiche in langen Listen sichtbar. */
-.category-card {
-  border-left: 4px solid color-mix(in srgb, var(--category-color) 65%, transparent);
-}
-.category-card:hover {
-  border-left-color: var(--category-color);
-  /* Leuchten greift die Bereichsfarbe auf statt der Grundfarbe. */
-  box-shadow:
-    0 18px 38px rgba(0, 0, 0, 0.24),
-    0 0 22px -6px color-mix(in srgb, var(--category-color) 34%, transparent);
-}
-.category-card::after {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--category-color) 38%, transparent),
-    transparent
-  );
-}
 details.card.category-card[open] {
   border-color: color-mix(in srgb, var(--category-color) 45%, transparent);
   border-left-color: var(--category-color);
@@ -1717,10 +1706,25 @@ details.card[open] {
     0 18px 38px rgba(0, 0, 0, 0.48),
     0 0 30px -6px color-mix(in srgb, var(--primary) 50%, transparent);
 }
-/* Bereichsstreifen kraeftig, damit die Kategorien sofort ins Auge fallen. */
-.category-card {
-  border-left-width: 5px;
-  border-left-color: var(--category-color);
+/*
+ * Bereichsstreifen kraeftig, damit die Kategorien sofort ins Auge fallen.
+ *
+ * `details.card` weiter oben setzt `border` als Kurzschreibweise und damit
+ * auch border-left neu. Dieselbe Spezifitaet (details.card.category-card) und
+ * die spaetere Position sind noetig, sonst bleibt der Streifen 1px breit und
+ * traegt die Rahmenfarbe statt der Bereichsfarbe.
+ */
+details.card.category-card,
+.card.category-card {
+  border-left: 5px solid var(--category-color);
+}
+.category-card::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--category-color) 45%, transparent),
+    transparent
+  );
 }
 .category-card:hover {
   box-shadow:
