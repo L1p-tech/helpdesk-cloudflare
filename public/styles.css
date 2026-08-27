@@ -181,17 +181,82 @@ h1, h2, h3, h4, p { margin-top: 0; }
 }
 
 .app-shell {
-  width: min(1120px, calc(100% - 28px));
+  width: min(1440px, calc(100% - 28px));
   margin: 0 auto;
   padding: 28px 0 96px;
+}
+
+/*
+ * Hauptbereich und Seitenspalte nebeneinander. Die Spalte bekommt eine feste
+ * Breite, der Inhalt den Rest -- so bleiben die Karten auf breiten Schirmen
+ * lesbar, statt in die Breite zu laufen.
+ */
+.work-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.side-rail {
+  position: sticky;
+  top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+/* Ohne sichtbaren Inhalt keine leere Spalte. */
+.side-rail:not(:has(> :not(.hidden))) { display: none; }
+
+/* Auf schmaleren Schirmen rutscht die Spalte unter den Inhalt. */
+@media (max-width: 1180px) {
+  .work-area { grid-template-columns: minmax(0, 1fr); }
+  .side-rail { position: static; }
+}
+/*
+ * Bei geoeffnetem Chat schrumpft die Seite um rund 370px. Die Schwelle oben
+ * misst aber den Viewport, nicht die Seite -- ohne diese zweite Regel bliebe
+ * die Spalte daneben stehen und quetschte den Inhalt auf schmale Reste
+ * zusammen. Die Grenze liegt entsprechend um den Platzbedarf des Chats hoeher.
+ */
+@media (max-width: 1560px) {
+  body.chat-open .work-area { grid-template-columns: minmax(0, 1fr); }
+  body.chat-open .side-rail { position: static; }
 }
 .app-header,
 .main-tabs,
 .content {
-  background: var(--panel);
+  position: relative;
+  /* Leichter Verlauf ueber dem Grundton gibt den Flaechen Tiefe. */
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--primary) 6%, transparent) 0%,
+      transparent 38%
+    ),
+    var(--panel);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   backdrop-filter: blur(22px);
+}
+/* Schmaler Lichtsaum an der Oberkante der grossen Flaechen. */
+.app-header::before,
+.main-tabs::before,
+.content::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--primary) 30%, transparent),
+    transparent
+  );
+  pointer-events: none;
 }
 .app-header {
   display: flex;
@@ -274,8 +339,16 @@ h1, h2, h3, h4, p { margin-top: 0; }
 }
 .main-tab.active {
   color: #fff;
-  background: linear-gradient(135deg, var(--primary), #3c8677);
-  box-shadow: 0 12px 24px rgba(47, 108, 99, 0.24);
+  /* Verlauf aus den Theme-Farben -- passt sich mit dem Theme an, statt wie
+     zuvor fest auf einen Gruenton verdrahtet zu sein. */
+  background: linear-gradient(
+    135deg,
+    var(--primary),
+    color-mix(in srgb, var(--accent) 55%, var(--primary))
+  );
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.22),
+    0 0 18px -6px color-mix(in srgb, var(--primary) 45%, transparent);
 }
 
 .content {
@@ -434,16 +507,45 @@ button:hover {
 
 .templates-list { display: flex; flex-direction: column; gap: 12px; }
 .card, details.card {
-  background: var(--surface);
+  position: relative;
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--primary) 5%, transparent) 0%,
+      transparent 42%
+    ),
+    var(--surface);
   border: 1px solid var(--border);
   border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
   transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
+/*
+ * Feiner Lichtsaum an der Oberkante -- gibt der Karte Tiefe, ohne den
+ * Kontrast des Inhalts anzufassen.
+ */
+.card::after, details.card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--primary) 34%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
 .card:hover, details.card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.24);
+  /* Zweiter, farbiger Schatten als weiches Leuchten statt harter Neon-Kante. */
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.24),
+    0 0 22px -6px color-mix(in srgb, var(--primary) 30%, transparent);
   border-color: var(--border-strong);
 }
 details.card[open] { border-color: color-mix(in srgb, var(--primary) 50%, transparent); }
@@ -535,6 +637,18 @@ details.card[open] summary::after { transform: rotate(225deg); }
 }
 .category-card:hover {
   border-left-color: var(--category-color);
+  /* Leuchten greift die Bereichsfarbe auf statt der Grundfarbe. */
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.24),
+    0 0 22px -6px color-mix(in srgb, var(--category-color) 34%, transparent);
+}
+.category-card::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--category-color) 38%, transparent),
+    transparent
+  );
 }
 details.card.category-card[open] {
   border-color: color-mix(in srgb, var(--category-color) 45%, transparent);
@@ -829,7 +943,6 @@ dialog::backdrop {
 }
 
 .quickbar {
-  margin-bottom: 20px;
   padding: 16px 18px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -854,6 +967,18 @@ dialog::backdrop {
   font-size: 11px;
 }
 .quickbar-items { display: flex; gap: 8px; flex-wrap: wrap; }
+/* In der Seitenspalte ist kaum Breite -- Eintraege deshalb untereinander. */
+.side-rail .quickbar-items { display: block; }
+.side-rail .quick-item {
+  display: block;
+  width: 100%;
+  margin-bottom: 6px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-rail .quickbar-head { margin-bottom: 12px; }
 .quick-item {
   padding: 8px 11px;
   background: var(--surface-soft);
@@ -1493,7 +1618,7 @@ input[type="color"] { height: 40px; }
      * heraus zentriert -- so bleibt sie so gross wie moeglich und wird nur
      * schmaler, wenn der Platz links davon nicht mehr reicht.
      */
-    width: min(1120px, calc(100vw - 394px));
+    width: min(1440px, calc(100vw - 394px));
     margin-left: auto;
     margin-right: 366px;
     transition: width .2s ease, margin-right .2s ease;

@@ -57,6 +57,7 @@
         <button class="main-tab" data-view="settings" type="button">Einstellungen</button>
       </nav>
 
+      <div class="work-area">
       <section class="content">
         <div class="section-heading">
           <div>
@@ -70,17 +71,6 @@
         </div>
 
         <div id="toast" class="toast hidden"></div>
-
-        <section class="quickbar" id="quickbar">
-          <div class="quickbar-head">
-            <div>
-              <h3>Persönliche Schnellleiste</h3>
-              <p>Zuletzt kopierte Vorlagen und Befehle</p>
-            </div>
-            <button class="btn-link" id="clear-recent-button" type="button">Verlauf leeren</button>
-          </div>
-          <div class="quickbar-items" id="quickbar-items"></div>
-        </section>
 
         <section class="view" id="view-templates">
           <div class="controls">
@@ -431,6 +421,23 @@
           </form>
         </section>
       </section>
+
+      <!-- Seitenspalte: nutzt den Platz rechts neben dem Inhalt. Laeuft beim
+           Scrollen mit und rutscht auf schmalen Bildschirmen unter den
+           Hauptbereich. -->
+      <aside class="side-rail" id="side-rail" aria-label="Schnellzugriff">
+        <section class="quickbar" id="quickbar">
+          <div class="quickbar-head">
+            <div>
+              <h3>Persönliche Schnellleiste</h3>
+              <p>Favoriten und zuletzt Kopiertes</p>
+            </div>
+            <button class="btn-link" id="clear-recent-button" type="button">Leeren</button>
+          </div>
+          <div class="quickbar-items" id="quickbar-items"></div>
+        </section>
+      </aside>
+      </div>
 
       <!-- Team-Chat: liegt als eigenes Panel am rechten Rand, damit er den
            auf 1120px zentrierten Inhalt nicht schmaler macht. -->
