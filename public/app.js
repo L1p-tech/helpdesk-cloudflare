@@ -9,17 +9,17 @@ const state = {
   settings: {
     signatureName: "",
     favorites: { templates: [], commands: [] },
-    preferences: { theme: "forest" },
+    preferences: { theme: "cyan" },
   },
   activeView: "templates",
   recentItems: [],
 };
 
 const THEMES = {
-  forest: { label: "Forest", next: "midnight" },
-  midnight: { label: "Midnight", next: "dune" },
-  dune: { label: "Dune", next: "neon" },
-  neon: { label: "Neon", next: "forest" },
+  cyan: { label: "Cyan", next: "magenta" },
+  magenta: { label: "Magenta", next: "lime" },
+  lime: { label: "Lime", next: "amber" },
+  amber: { label: "Amber", next: "cyan" },
 };
 
 const TYPING_PROMPTS = [
@@ -191,24 +191,37 @@ async function persistSettings() {
   });
 }
 
+/*
+ * Die frueheren Themes wurden durch die Neon-Varianten ersetzt. Gespeicherte
+ * Einstellungen wuerden sonst allesamt auf Cyan zurueckfallen -- diese
+ * Zuordnung bringt jeden auf die farblich naechstliegende Variante.
+ */
+const LEGACY_THEMES = {
+  forest: "lime",
+  midnight: "cyan",
+  dune: "amber",
+  neon: "cyan",
+};
+
 function normalizePreferences(value) {
   const preferences = value && typeof value === "object" ? value : {};
-  const theme = typeof preferences.theme === "string" && THEMES[preferences.theme]
-    ? preferences.theme
-    : "forest";
+  const stored = typeof preferences.theme === "string" ? preferences.theme : "";
+  const theme = THEMES[stored]
+    ? stored
+    : LEGACY_THEMES[stored] || "cyan";
   return { theme };
 }
 
 function applyTheme(theme) {
-  const resolvedTheme = THEMES[theme] ? theme : "forest";
+  const resolvedTheme = THEMES[theme] ? theme : LEGACY_THEMES[theme] || "cyan";
   document.documentElement.dataset.theme = resolvedTheme;
   $("#theme-select").value = resolvedTheme;
   $("#theme-button").textContent = `Theme: ${THEMES[resolvedTheme].label}`;
 }
 
 async function cycleTheme() {
-  const currentTheme = state.settings.preferences.theme || "forest";
-  const nextTheme = THEMES[currentTheme]?.next || "forest";
+  const currentTheme = state.settings.preferences.theme || "cyan";
+  const nextTheme = THEMES[currentTheme]?.next || "cyan";
   state.settings.preferences.theme = nextTheme;
   applyTheme(nextTheme);
   await persistSettings();
@@ -3183,7 +3196,7 @@ $("#theme-button").addEventListener("click", () => {
 });
 $("#theme-select").addEventListener("change", (event) => {
   const theme = event.target.value;
-  state.settings.preferences.theme = THEMES[theme] ? theme : "forest";
+  state.settings.preferences.theme = THEMES[theme] ? theme : "cyan";
   applyTheme(state.settings.preferences.theme);
 });
 document.querySelectorAll("input[name='proposal-category-mode']").forEach((input) => {

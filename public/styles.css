@@ -1,90 +1,18 @@
+/*
+ * Vier Neon-Varianten auf dunklem Grund. Die Struktur ist ueberall gleich --
+ * getauscht werden nur die Farbtoken. Wer eine weitere Variante ergaenzen
+ * will, kopiert einen Block und aendert die Werte; die Leuchteffekte weiter
+ * unten greifen automatisch, weil sie ueber --primary und --accent laufen.
+ *
+ * Grundregel fuer alle Varianten: Das Leuchten liegt auf Raendern, Akzenten
+ * und Zustaenden. Flaechen bleiben dunkel und der Fliesstext ruhig hell --
+ * sonst wird die Seite nach einer halben Stunde anstrengend.
+ */
+
+/* Cyan auf Nachtblau -- Standard. */
 :root {
   color-scheme: dark;
   font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
-  --page-gradient: linear-gradient(180deg, #1b2b29 0%, #0f1718 100%);
-  --glow-left: rgba(136, 194, 154, 0.16);
-  --glow-right: rgba(227, 182, 123, 0.14);
-  --panel: rgba(12, 20, 22, 0.9);
-  --panel-strong: rgba(14, 24, 26, 0.96);
-  --surface: rgba(20, 33, 35, 0.88);
-  --surface-strong: rgba(24, 39, 42, 0.96);
-  --surface-soft: rgba(255, 255, 255, 0.06);
-  --surface-soft-hover: rgba(255, 255, 255, 0.1);
-  --border: rgba(166, 216, 191, 0.16);
-  --border-strong: rgba(166, 216, 191, 0.3);
-  --text: #e6f2ea;
-  --text-strong: #ffffff;
-  --muted: #bdd0c5;
-  --muted-dark: #93a89b;
-  --primary: #67b389;
-  --primary-hover: #559b75;
-  --accent: #d0a36f;
-  --danger: #db8b83;
-  --danger-hover: #c36f69;
-  --success: #72c28b;
-  --shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
-  --code-bg: rgba(10, 17, 19, 0.94);
-  --code-text: #a9ccff;
-}
-
-:root[data-theme="midnight"] {
-  --page-gradient: linear-gradient(180deg, #111827 0%, #090d16 100%);
-  --glow-left: rgba(106, 145, 255, 0.18);
-  --glow-right: rgba(101, 227, 194, 0.12);
-  --panel: rgba(12, 18, 30, 0.9);
-  --panel-strong: rgba(14, 22, 36, 0.96);
-  --surface: rgba(22, 31, 49, 0.9);
-  --surface-strong: rgba(26, 36, 58, 0.96);
-  --surface-soft: rgba(255, 255, 255, 0.05);
-  --surface-soft-hover: rgba(255, 255, 255, 0.1);
-  --border: rgba(126, 153, 207, 0.18);
-  --border-strong: rgba(126, 153, 207, 0.34);
-  --text: #e7efff;
-  --text-strong: #ffffff;
-  --muted: #b5c3e5;
-  --muted-dark: #8a9abe;
-  --primary: #6b8cff;
-  --primary-hover: #5a78de;
-  --accent: #60d2c0;
-  --danger: #ef8d96;
-  --danger-hover: #d86f79;
-  --success: #69c8a3;
-  --code-bg: rgba(8, 13, 24, 0.94);
-  --code-text: #9dc6ff;
-}
-
-:root[data-theme="dune"] {
-  --page-gradient: linear-gradient(180deg, #3f2f2a 0%, #201715 100%);
-  --glow-left: rgba(235, 173, 95, 0.16);
-  --glow-right: rgba(197, 118, 92, 0.14);
-  --panel: rgba(38, 27, 22, 0.9);
-  --panel-strong: rgba(44, 31, 26, 0.96);
-  --surface: rgba(58, 40, 32, 0.9);
-  --surface-strong: rgba(67, 47, 38, 0.96);
-  --surface-soft: rgba(255, 255, 255, 0.05);
-  --surface-soft-hover: rgba(255, 255, 255, 0.1);
-  --border: rgba(240, 204, 159, 0.18);
-  --border-strong: rgba(240, 204, 159, 0.32);
-  --text: #f6e9d8;
-  --text-strong: #fffaf3;
-  --muted: #e0c3aa;
-  --muted-dark: #b89a7d;
-  --primary: #d08d5d;
-  --primary-hover: #b77649;
-  --accent: #f0c78c;
-  --danger: #ef9b84;
-  --danger-hover: #d77d68;
-  --success: #9dc27a;
-  --code-bg: rgba(27, 19, 16, 0.94);
-  --code-text: #ffd5ad;
-}
-
-/*
- * Neon: kuehles Cyan auf tiefem Nachtblau. Die Leuchtwirkung liegt bewusst nur
- * auf Raendern, Akzenten und Zustaenden -- Flaechen und Fließtext bleiben
- * ruhig, damit die Seite auch nach Stunden noch lesbar ist.
- */
-:root[data-theme="neon"] {
   --page-gradient: linear-gradient(180deg, #0b1524 0%, #05080f 100%);
   --glow-left: rgba(34, 224, 255, 0.20);
   --glow-right: rgba(255, 77, 157, 0.14);
@@ -109,89 +37,95 @@
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   --code-bg: rgba(6, 12, 22, 0.96);
   --code-text: #7fe9ff;
+  /* Dunkler Ton fuer Schrift auf leuchtender Flaeche (aktiver Reiter). */
+  --on-primary: #04121c;
 }
 
-/*
- * Verstaerkungen, die nur im Neon-Theme greifen. Die uebrigen Themes behalten
- * ihre ruhigere Gestaltung.
- */
-:root[data-theme="neon"] .card,
-:root[data-theme="neon"] details.card {
-  box-shadow:
-    0 14px 34px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(34, 224, 255, 0.10);
+/* Magenta auf Violett -- waermer, mit Cyan als Gegenspieler. */
+:root[data-theme="magenta"] {
+  --page-gradient: linear-gradient(180deg, #170a24 0%, #0a0410 100%);
+  --glow-left: rgba(255, 61, 160, 0.20);
+  --glow-right: rgba(120, 220, 255, 0.13);
+  --panel: rgba(22, 10, 34, 0.92);
+  --panel-strong: rgba(28, 13, 42, 0.97);
+  --surface: rgba(32, 15, 48, 0.90);
+  --surface-strong: rgba(40, 20, 60, 0.96);
+  --surface-soft: rgba(255, 61, 160, 0.08);
+  --surface-soft-hover: rgba(255, 61, 160, 0.14);
+  --border: rgba(255, 61, 160, 0.24);
+  --border-strong: rgba(255, 61, 160, 0.48);
+  --text: #f3e2f0;
+  --text-strong: #ffffff;
+  --muted: #c9a8c8;
+  --muted-dark: #9d7f9d;
+  --primary: #ff3da0;
+  --primary-hover: #ff5fb0;
+  --accent: #78dcff;
+  --danger: #ff7a6b;
+  --danger-hover: #ff5c4a;
+  --success: #5cf0c0;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --code-bg: rgba(14, 6, 22, 0.96);
+  --code-text: #ffa8d6;
+  --on-primary: #1a0410;
 }
-:root[data-theme="neon"] .card:hover,
-:root[data-theme="neon"] details.card:hover {
-  box-shadow:
-    0 18px 38px rgba(0, 0, 0, 0.48),
-    0 0 28px -4px color-mix(in srgb, var(--primary) 55%, transparent);
+
+/* Limette auf Tiefgruen -- kuehl und technisch, Terminal-Anmutung. */
+:root[data-theme="lime"] {
+  --page-gradient: linear-gradient(180deg, #071a14 0%, #030c09 100%);
+  --glow-left: rgba(61, 255, 158, 0.18);
+  --glow-right: rgba(255, 217, 61, 0.12);
+  --panel: rgba(8, 24, 19, 0.92);
+  --panel-strong: rgba(10, 30, 23, 0.97);
+  --surface: rgba(12, 34, 26, 0.90);
+  --surface-strong: rgba(16, 44, 34, 0.96);
+  --surface-soft: rgba(61, 255, 158, 0.07);
+  --surface-soft-hover: rgba(61, 255, 158, 0.13);
+  --border: rgba(61, 255, 158, 0.22);
+  --border-strong: rgba(61, 255, 158, 0.45);
+  --text: #d6f5e6;
+  --text-strong: #ffffff;
+  --muted: #93ccb0;
+  --muted-dark: #6b9c85;
+  --primary: #3dff9e;
+  --primary-hover: #6bffb5;
+  --accent: #ffd93d;
+  --danger: #ff7d7d;
+  --danger-hover: #ff5c5c;
+  --success: #3dff9e;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --code-bg: rgba(4, 16, 12, 0.96);
+  --code-text: #8effc4;
+  --on-primary: #02160e;
 }
-/* Aufgeklappte Karte bekommt einen deutlich leuchtenden Rand. */
-:root[data-theme="neon"] details.card[open] {
-  border-color: color-mix(in srgb, var(--primary) 60%, transparent);
-  box-shadow:
-    0 18px 38px rgba(0, 0, 0, 0.48),
-    0 0 30px -6px color-mix(in srgb, var(--primary) 50%, transparent);
-}
-/* Bereichsstreifen kraeftiger als in den ruhigen Themes. */
-:root[data-theme="neon"] .category-card {
-  border-left-width: 5px;
-  border-left-color: var(--category-color);
-}
-:root[data-theme="neon"] .category-card:hover {
-  box-shadow:
-    0 18px 38px rgba(0, 0, 0, 0.48),
-    0 0 28px -4px color-mix(in srgb, var(--category-color) 55%, transparent);
-}
-:root[data-theme="neon"] .category-badge {
-  color: color-mix(in srgb, var(--category-color) 82%, white 18%);
-  background: color-mix(in srgb, var(--category-color) 24%, transparent);
-  border-color: color-mix(in srgb, var(--category-color) 62%, transparent);
-}
-/* Aktiver Reiter leuchtet deutlich, statt nur farbig zu sein. */
-:root[data-theme="neon"] .main-tab.active {
-  color: #04121c;
-  background: linear-gradient(135deg, var(--primary), #8ef0ff);
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.4),
-    0 0 26px -4px color-mix(in srgb, var(--primary) 70%, transparent);
-}
-:root[data-theme="neon"] .main-tab:hover {
-  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
-}
-/* Primaerknopf mit Leuchtsaum. */
-:root[data-theme="neon"] .btn-primary,
-:root[data-theme="neon"] button.primary {
-  box-shadow: 0 0 20px -6px color-mix(in srgb, var(--primary) 70%, transparent);
-}
-:root[data-theme="neon"] .btn-primary:hover,
-:root[data-theme="neon"] button.primary:hover {
-  box-shadow: 0 0 26px -4px color-mix(in srgb, var(--primary) 85%, transparent);
-}
-/* Lichtsaum an den grossen Flaechen kraeftiger ziehen. */
-:root[data-theme="neon"] .app-header::before,
-:root[data-theme="neon"] .main-tabs::before,
-:root[data-theme="neon"] .content::before {
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--primary) 70%, transparent) 30%,
-    color-mix(in srgb, var(--accent) 55%, transparent) 70%,
-    transparent
-  );
-}
-/* Code-Bloecke bekommen eine leuchtende Kante links. */
-:root[data-theme="neon"] .command-code {
-  border-left: 3px solid color-mix(in srgb, var(--primary) 55%, transparent);
-}
-/* Suchfeld und Filter heben sich staerker ab. */
-:root[data-theme="neon"] .search-box:focus-within {
-  border-color: var(--primary);
-  box-shadow: 0 0 20px -6px color-mix(in srgb, var(--primary) 70%, transparent);
+
+/* Bernstein auf Anthrazit -- warm und ruhig, fuer lange Sitzungen. */
+:root[data-theme="amber"] {
+  --page-gradient: linear-gradient(180deg, #1c1408 0%, #0c0904 100%);
+  --glow-left: rgba(255, 168, 38, 0.18);
+  --glow-right: rgba(120, 200, 255, 0.12);
+  --panel: rgba(26, 19, 10, 0.92);
+  --panel-strong: rgba(32, 24, 13, 0.97);
+  --surface: rgba(38, 28, 15, 0.90);
+  --surface-strong: rgba(48, 36, 20, 0.96);
+  --surface-soft: rgba(255, 168, 38, 0.08);
+  --surface-soft-hover: rgba(255, 168, 38, 0.14);
+  --border: rgba(255, 168, 38, 0.24);
+  --border-strong: rgba(255, 168, 38, 0.48);
+  --text: #f7e9d4;
+  --text-strong: #ffffff;
+  --muted: #ccb392;
+  --muted-dark: #9c8869;
+  --primary: #ffa826;
+  --primary-hover: #ffbb52;
+  --accent: #78c8ff;
+  --danger: #ff7a6b;
+  --danger-hover: #ff5c4a;
+  --success: #8fe06a;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --code-bg: rgba(16, 11, 5, 0.96);
+  --code-text: #ffcf8a;
+  --on-primary: #180f02;
 }
 
 * { box-sizing: border-box; }
@@ -1738,4 +1672,89 @@ input[type="color"] { height: 40px; }
     margin-right: 366px;
     transition: width .2s ease, margin-right .2s ease;
   }
+}
+
+/*
+ * Leuchteffekte fuer alle Varianten. Sie greifen ausschliesslich auf
+ * --primary, --accent und --category-color zu und passen sich damit dem
+ * gewaehlten Theme an, ohne je Variante wiederholt zu werden.
+ */
+.card,
+details.card {
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.card:hover,
+details.card:hover {
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.48),
+    0 0 28px -4px color-mix(in srgb, var(--primary) 55%, transparent);
+}
+/* Aufgeklappte Karte bekommt einen deutlich leuchtenden Rand. */
+details.card[open] {
+  border-color: color-mix(in srgb, var(--primary) 60%, transparent);
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.48),
+    0 0 30px -6px color-mix(in srgb, var(--primary) 50%, transparent);
+}
+/* Bereichsstreifen kraeftig, damit die Kategorien sofort ins Auge fallen. */
+.category-card {
+  border-left-width: 5px;
+  border-left-color: var(--category-color);
+}
+.category-card:hover {
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.48),
+    0 0 28px -4px color-mix(in srgb, var(--category-color) 55%, transparent);
+}
+.category-badge {
+  color: color-mix(in srgb, var(--category-color) 82%, white 18%);
+  background: color-mix(in srgb, var(--category-color) 24%, transparent);
+  border-color: color-mix(in srgb, var(--category-color) 62%, transparent);
+}
+/* Aktiver Reiter leuchtet, Schrift dunkel auf heller Flaeche. */
+.main-tab.active {
+  color: var(--on-primary);
+  background: linear-gradient(
+    135deg,
+    var(--primary),
+    color-mix(in srgb, var(--primary) 55%, white 45%)
+  );
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.4),
+    0 0 26px -4px color-mix(in srgb, var(--primary) 70%, transparent);
+}
+.main-tab:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+}
+.btn-primary,
+button.primary {
+  box-shadow: 0 0 20px -6px color-mix(in srgb, var(--primary) 70%, transparent);
+}
+.btn-primary:hover,
+button.primary:hover {
+  box-shadow: 0 0 26px -4px color-mix(in srgb, var(--primary) 85%, transparent);
+}
+/* Lichtsaum an den grossen Flaechen, vom Akzent durchzogen. */
+.app-header::before,
+.main-tabs::before,
+.content::before {
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--primary) 70%, transparent) 30%,
+    color-mix(in srgb, var(--accent) 55%, transparent) 70%,
+    transparent
+  );
+}
+.command-code {
+  border-left: 3px solid color-mix(in srgb, var(--primary) 55%, transparent);
+}
+.search-box:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 20px -6px color-mix(in srgb, var(--primary) 70%, transparent);
 }
