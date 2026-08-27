@@ -51,6 +51,8 @@ const DUPLICATE_REJECT_THRESHOLD = 0.98;
 const SHELLS = ["cmd", "powershell", "windows"] as const;
 const RISK_LEVELS = ["low", "medium", "high"] as const;
 const ROLES: Role[] = ["employee", "editor", "admin"];
+const SEVERITIES = ["low", "medium", "high"] as const;
+const CONTENT_TYPES = ["command", "solution"] as const;
 const FEEDBACK_TYPES = ["bug", "improvement"] as const;
 const FEEDBACK_STATUSES = ["open", "planned", "closed"] as const;
 
@@ -66,6 +68,19 @@ interface TemplateSnapshot {
   category_id: number;
   title: string;
   body: string;
+}
+
+/** Zeile aus content_proposals -- Vorschlaege fuer Befehle und Loesungen. */
+interface ContentProposalRow {
+  id: number;
+  content_type: "command" | "solution";
+  target_id: number | null;
+  proposal_type: "create" | "update";
+  title: string;
+  payload_json: string;
+  status: string;
+  submitted_by: number | null;
+  submitted_by_name: string;
 }
 
 interface ProposalRow {
@@ -422,7 +437,7 @@ async function handleBootstrap(
   await ensureDefaultLibrary(env, { id: user.id, displayName: user.displayName });
   await ensureTemplateUsageTable(env);
 
-  const [categories, templates, commands, settings, notifications] = await Promise.all([
+  const [categories, templates, commands, solutions, settings, notifications] = await Promise.all([
     env.DB.prepare(
       "SELECT id, slug, name, color FROM categories WHERE active = 1 ORDER BY name COLLATE NOCASE",
     ).all(),
@@ -450,6 +465,11 @@ async function handleBootstrap(
        FROM commands WHERE active = 1 ORDER BY category, name COLLATE NOCASE`,
     ).all(),
     env.DB.prepare(
+      `SELECT id, category, title, symptom, cause, solution, severity, updated_at,
+              COALESCE(created_by_name, ?1) AS created_by_name
+       FROM solutions WHERE active = 1 ORDER BY category, title COLLATE NOCASE`,
+    ).bind(DELETED_USER_LABEL).all(),
+    env.DB.prepare(
       `SELECT signature_name, favorites_json, preferences_json
        FROM user_settings WHERE user_id = ?1`,
     ).bind(user.id).first(),
@@ -465,6 +485,7 @@ async function handleBootstrap(
     categories: categories.results,
     templates: templates.results,
     commands: commands.results,
+    solutions: solutions.results,
     settings: settings ?? {
       signature_name: "",
       favorites_json: '{"templates":[],"commands":[]}',
@@ -937,6 +958,399 @@ async function handleCommands(
 }
 
 /** Fehlermeldungen und Verbesserungsvorschlaege der Mitarbeitenden. */
+/**
+ * Vorschlaege fuer Befehle und Loesungen.
+ *
+ * Ablauf wie bei den Vorlagen: Mitarbeiter reichen ein, Redakteure und Admins
+ * entscheiden. Anders als dort teilen sich beide Inhaltsarten eine Tabelle --
+ * die inhaltlichen Felder liegen als JSON im Payload, geprueft wird beim
+ * Einreichen und erneut beim Genehmigen.
+ */
+async function handleContentProposals(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  path: string,
+): Promise<Response | null> {
+  if (path === "/api/content-proposals" && request.method === "GET") {
+    // Pruefer sehen alle offenen, Mitarbeiter ihre eigenen -- wie bei Vorlagen.
+    const isReviewer = user.role === "admin" || user.role === "editor";
+    const query = env.DB.prepare(
+      `SELECT id, content_type, target_id, proposal_type, title, payload_json,
+              reason, status, submitted_by, submitted_by_name, review_note,
+              submitted_at, reviewed_at
+       FROM content_proposals
+       WHERE ${isReviewer ? "status = 'pending'" : "submitted_by = ?1"}
+       ORDER BY updated_at DESC`,
+    );
+
+    const rows = isReviewer ? await query.all() : await query.bind(user.id).all();
+    return json({ proposals: rows.results });
+  }
+
+  if (path === "/api/content-proposals" && request.method === "POST") {
+    const body = await readJson<Record<string, unknown>>(request);
+    const contentType = oneOf(body.contentType, CONTENT_TYPES, "Ungültige Inhaltsart.");
+    const reason = optionalString(body.reason, 1000);
+    const targetId = body.targetId ? positiveInteger(body.targetId, "Ziel-ID") : null;
+
+    // Die Felder werden hier vollstaendig geprueft, damit ein Vorschlag nicht
+    // erst beim Genehmigen -- moeglicherweise Wochen spaeter -- auffaellt.
+    const payload = contentType === "command"
+      ? parseCommandPayload(body)
+      : parseSolutionPayload(body);
+    const title = contentType === "command"
+      ? (payload as ReturnType<typeof parseCommandPayload>).name
+      : (payload as ReturnType<typeof parseSolutionPayload>).title;
+
+    // Bezieht sich der Vorschlag auf einen bestehenden Eintrag, muss es den
+    // auch geben -- sonst liefe er beim Genehmigen ins Leere.
+    if (targetId !== null) {
+      const table = contentType === "command" ? "commands" : "solutions";
+      const existing = await env.DB.prepare(
+        `SELECT id FROM ${table} WHERE id = ?1 AND active = 1`,
+      ).bind(targetId).first();
+      if (!existing) throw new HttpError(404, "Der zu ändernde Eintrag wurde nicht gefunden.");
+    }
+
+    const result = await env.DB.prepare(
+      `INSERT INTO content_proposals
+        (content_type, target_id, proposal_type, title, payload_json, reason,
+         status, submitted_by, submitted_by_name, submitted_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?7, ?8, CURRENT_TIMESTAMP)`,
+    ).bind(
+      contentType,
+      targetId,
+      targetId === null ? "create" : "update",
+      title,
+      JSON.stringify(payload),
+      reason,
+      user.id,
+      user.displayName,
+    ).run();
+
+    const proposalId = Number(result.meta.last_row_id);
+    await audit(env, user.id, "submit", "content_proposal", proposalId, { contentType });
+    return json({ id: proposalId }, { status: 201 });
+  }
+
+  const reviewMatch = path.match(/^\/api\/content-proposals\/(\d+)\/(approve|reject|changes)$/);
+  if (reviewMatch && request.method === "POST") {
+    requireRole(user, ["editor", "admin"]);
+
+    const proposalId = positiveInteger(reviewMatch[1], "Vorschlags-ID");
+    const action = reviewMatch[2] as "approve" | "reject" | "changes";
+
+    const body = await readJson<Record<string, unknown>>(request);
+    const note = optionalString(body.note, 2000);
+
+    const proposal = await env.DB.prepare(
+      `SELECT id, content_type, target_id, proposal_type, title, payload_json,
+              status, submitted_by, submitted_by_name
+       FROM content_proposals WHERE id = ?1`,
+    ).bind(proposalId).first<ContentProposalRow>();
+
+    if (!proposal) throw new HttpError(404, "Vorschlag wurde nicht gefunden.");
+    if (proposal.status !== "pending") {
+      throw new HttpError(409, "Dieser Vorschlag wurde bereits bearbeitet.");
+    }
+
+    if (action === "approve") {
+      const targetId = await applyContentProposal(env, user, proposal);
+
+      await env.DB.prepare(
+        `UPDATE content_proposals
+         SET status = 'approved', reviewed_by = ?1, review_note = ?2,
+             reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP,
+             target_id = ?3
+         WHERE id = ?4`,
+      ).bind(user.id, note, targetId, proposalId).run();
+
+      if (proposal.submitted_by !== null) {
+        await notify(
+          env,
+          proposal.submitted_by,
+          "proposal_approved",
+          proposal.content_type === "command" ? "Befehl genehmigt" : "Lösung genehmigt",
+          `Dein Vorschlag „${proposal.title}“ wurde genehmigt.`,
+        );
+      }
+      await audit(env, user.id, "approve", "content_proposal", proposalId, { targetId });
+      return json({ ok: true, targetId });
+    }
+
+    if (!note) {
+      throw new HttpError(400, "Bitte einen Grund oder Änderungswunsch eintragen.");
+    }
+
+    const status = action === "reject" ? "rejected" : "changes_requested";
+    await env.DB.prepare(
+      `UPDATE content_proposals
+       SET status = ?1, reviewed_by = ?2, review_note = ?3,
+           reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?4`,
+    ).bind(status, user.id, note, proposalId).run();
+
+    if (proposal.submitted_by !== null) {
+      await notify(
+        env,
+        proposal.submitted_by,
+        status === "rejected" ? "proposal_rejected" : "changes_requested",
+        status === "rejected" ? "Vorschlag abgelehnt" : "Überarbeitung angefordert",
+        `„${proposal.title}“: ${note}`,
+      );
+    }
+    await audit(env, user.id, action, "content_proposal", proposalId, { note });
+    return json({ ok: true });
+  }
+
+  // Zurueckziehen des eigenen Vorschlags, solange er offen ist.
+  const withdrawMatch = path.match(/^\/api\/content-proposals\/(\d+)$/);
+  if (withdrawMatch && request.method === "DELETE") {
+    const proposalId = positiveInteger(withdrawMatch[1], "Vorschlags-ID");
+
+    const result = await env.DB.prepare(
+      `UPDATE content_proposals
+       SET status = 'withdrawn', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?1 AND submitted_by = ?2 AND status = 'pending'`,
+    ).bind(proposalId, user.id).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Offener eigener Vorschlag wurde nicht gefunden.");
+    }
+
+    await audit(env, user.id, "withdraw", "content_proposal", proposalId);
+    return json({ ok: true });
+  }
+
+  return null;
+}
+
+/**
+ * Uebertraegt einen genehmigten Vorschlag in den Bestand.
+ *
+ * Der Payload wird erneut geprueft: Zwischen Einreichen und Genehmigen koennen
+ * Wochen liegen, und ein unvollstaendiger Datensatz wuerde sonst ungeprueft in
+ * den Bestand wandern.
+ */
+async function applyContentProposal(
+  env: Env,
+  user: AuthUser,
+  proposal: ContentProposalRow,
+): Promise<number> {
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(proposal.payload_json) as Record<string, unknown>;
+  } catch {
+    throw new HttpError(409, "Der Vorschlag enthält keine lesbaren Daten.");
+  }
+
+  if (proposal.content_type === "solution") {
+    const payload = parseSolutionPayload(raw);
+
+    if (proposal.proposal_type === "create") {
+      // Urheberschaft bleibt beim Einreicher, die letzte Aenderung beim Pruefer.
+      return insertSolution(
+        env, payload, proposal.submitted_by, proposal.submitted_by_name, user,
+      );
+    }
+
+    if (!proposal.target_id) throw new HttpError(409, "Ziel-Lösung fehlt.");
+    const result = await env.DB.prepare(
+      `UPDATE solutions
+       SET category = ?1, title = ?2, symptom = ?3, cause = ?4, solution = ?5,
+           severity = ?6, updated_by = ?7, updated_by_name = ?8,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?9 AND active = 1`,
+    ).bind(
+      payload.category, payload.title, payload.symptom, payload.cause,
+      payload.solution, payload.severity, user.id, user.displayName, proposal.target_id,
+    ).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Die zu ändernde Lösung existiert nicht mehr.");
+    }
+    return proposal.target_id;
+  }
+
+  const payload = parseCommandPayload(raw);
+
+  if (proposal.proposal_type === "create") {
+    const duplicate = await env.DB.prepare(
+      `SELECT id FROM commands
+       WHERE active = 1 AND (lower(name) = lower(?1) OR command = ?2)
+       LIMIT 1`,
+    ).bind(payload.name, payload.command).first();
+
+    if (duplicate) {
+      throw new HttpError(409, "Inzwischen existiert bereits ein gleichnamiger Befehl.");
+    }
+
+    const result = await env.DB.prepare(
+      `INSERT INTO commands
+        (category, name, command, description, shell, requires_admin, risk_level,
+         remote_capable, restart_required, created_by, created_by_name,
+         updated_by, updated_by_name)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
+    ).bind(
+      payload.category, payload.name, payload.command, payload.description,
+      payload.shell, payload.requiresAdmin, payload.riskLevel,
+      payload.remoteCapable, payload.restartRequired,
+      proposal.submitted_by, proposal.submitted_by_name,
+      user.id, user.displayName,
+    ).run();
+
+    return Number(result.meta.last_row_id);
+  }
+
+  if (!proposal.target_id) throw new HttpError(409, "Ziel-Befehl fehlt.");
+  const result = await env.DB.prepare(
+    `UPDATE commands
+     SET category = ?1, name = ?2, command = ?3, description = ?4, shell = ?5,
+         requires_admin = ?6, risk_level = ?7, remote_capable = ?8,
+         restart_required = ?9, updated_by = ?10, updated_by_name = ?11,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?12 AND active = 1`,
+  ).bind(
+    payload.category, payload.name, payload.command, payload.description,
+    payload.shell, payload.requiresAdmin, payload.riskLevel,
+    payload.remoteCapable, payload.restartRequired,
+    user.id, user.displayName, proposal.target_id,
+  ).run();
+
+  if ((result.meta.changes ?? 0) === 0) {
+    throw new HttpError(404, "Der zu ändernde Befehl existiert nicht mehr.");
+  }
+  return proposal.target_id;
+}
+
+/**
+ * Inhaltliche Felder eines Befehls-Vorschlags.
+ *
+ * Wird beim Einreichen und erneut beim Genehmigen geprueft: zwischen beiden
+ * Zeitpunkten koennen Wochen liegen, und die Datenbank kann den JSON-Inhalt
+ * nicht selbst validieren.
+ */
+function parseCommandPayload(body: Record<string, unknown>) {
+  return {
+    category: requiredString(body.category, "Kategorie", 60),
+    name: requiredString(body.name, "Name", 120),
+    command: requiredString(body.command, "Befehl", 5000),
+    description: requiredString(body.description, "Beschreibung", 2000),
+    shell: oneOf(body.shell, SHELLS, "Ungültige Shell."),
+    riskLevel: oneOf(body.riskLevel ?? "low", RISK_LEVELS, "Ungültige Risikostufe."),
+    requiresAdmin: body.requiresAdmin ? 1 : 0,
+    remoteCapable: body.remoteCapable ? 1 : 0,
+    restartRequired: body.restartRequired ? 1 : 0,
+  };
+}
+
+/** Inhaltliche Felder eines Loesungs-Vorschlags. */
+function parseSolutionPayload(body: Record<string, unknown>) {
+  return {
+    category: requiredString(body.category, "Kategorie", 60),
+    title: requiredString(body.title, "Titel", 160),
+    symptom: requiredString(body.symptom, "Symptom", 2000),
+    cause: optionalString(body.cause, 2000),
+    solution: requiredString(body.solution, "Lösung", 20_000),
+    severity: oneOf(body.severity ?? "medium", SEVERITIES, "Ungültige Dringlichkeit."),
+  };
+}
+
+/** Loesungen fuer bekannte Probleme -- Aufbau analog zu den Befehlen. */
+async function handleSolutions(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  path: string,
+): Promise<Response | null> {
+  if (path === "/api/solutions" && request.method === "POST") {
+    requireRole(user, ["editor", "admin"]);
+
+    const body = await readJson<Record<string, unknown>>(request);
+    const payload = parseSolutionPayload(body);
+
+    const duplicate = await env.DB.prepare(
+      "SELECT id FROM solutions WHERE active = 1 AND lower(title) = lower(?1) LIMIT 1",
+    ).bind(payload.title).first();
+
+    if (duplicate) throw new HttpError(409, "Eine Lösung mit diesem Titel existiert bereits.");
+
+    const solutionId = await insertSolution(env, payload, user.id, user.displayName, user);
+    await audit(env, user.id, "create", "solution", solutionId);
+    return json({ id: solutionId }, { status: 201 });
+  }
+
+  const solutionMatch = path.match(/^\/api\/solutions\/(\d+)$/);
+  if (solutionMatch && request.method === "PUT") {
+    requireRole(user, ["editor", "admin"]);
+    const solutionId = positiveInteger(solutionMatch[1], "Lösungs-ID");
+
+    const body = await readJson<Record<string, unknown>>(request);
+    const payload = parseSolutionPayload(body);
+
+    const result = await env.DB.prepare(
+      `UPDATE solutions
+       SET category = ?1, title = ?2, symptom = ?3, cause = ?4, solution = ?5,
+           severity = ?6, updated_by = ?7, updated_by_name = ?8,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?9 AND active = 1`,
+    ).bind(
+      payload.category, payload.title, payload.symptom, payload.cause,
+      payload.solution, payload.severity, user.id, user.displayName, solutionId,
+    ).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Lösung wurde nicht gefunden.");
+    }
+
+    await audit(env, user.id, "update", "solution", solutionId);
+    return json({ ok: true });
+  }
+
+  if (solutionMatch && request.method === "DELETE") {
+    requireRole(user, ["admin"]);
+    const solutionId = positiveInteger(solutionMatch[1], "Lösungs-ID");
+
+    const result = await env.DB.prepare(
+      `UPDATE solutions
+       SET active = 0, updated_by = ?1, updated_by_name = ?2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?3 AND active = 1`,
+    ).bind(user.id, user.displayName, solutionId).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Lösung wurde nicht gefunden.");
+    }
+
+    await audit(env, user.id, "delete", "solution", solutionId);
+    return json({ ok: true });
+  }
+
+  return null;
+}
+
+/** Legt eine Loesung an; Urheberschaft kann vom Pruefer abweichen. */
+async function insertSolution(
+  env: Env,
+  payload: ReturnType<typeof parseSolutionPayload>,
+  authorId: number | null,
+  authorName: string,
+  editor: AuthUser,
+): Promise<number> {
+  const result = await env.DB.prepare(
+    `INSERT INTO solutions
+      (category, title, symptom, cause, solution, severity,
+       created_by, created_by_name, updated_by, updated_by_name)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`,
+  ).bind(
+    payload.category, payload.title, payload.symptom, payload.cause,
+    payload.solution, payload.severity,
+    authorId, authorName, editor.id, editor.displayName,
+  ).run();
+
+  return Number(result.meta.last_row_id);
+}
+
 async function handleFeedback(
   request: Request,
   env: Env,
@@ -1813,6 +2227,8 @@ const AUTHENTICATED_HANDLERS = [
   handleCategories,
   handleTemplates,
   handleCommands,
+  handleSolutions,
+  handleContentProposals,
   handleFeedback,
   handleUsers,
   handleHistory,

@@ -3,7 +3,9 @@ const state = {
   categories: [],
   templates: [],
   commands: [],
+  solutions: [],
   proposals: [],
+  contentProposals: [],
   feedbackItems: [],
   auditEntries: [],
   settings: {
@@ -791,6 +793,7 @@ async function loadBootstrap() {
   state.categories = data.categories;
   state.templates = data.templates;
   state.commands = data.commands;
+  state.solutions = data.solutions || [];
   let parsedFavorites = {};
   let parsedPreferences = {};
   try {
@@ -826,6 +829,8 @@ async function loadBootstrap() {
   applyRoleVisibility();
   renderTemplates();
   renderCommands();
+  renderSolutions();
+  populateSolutionCategories();
   loadRecentItems();
 }
 
@@ -1164,6 +1169,204 @@ function renderCommands() {
   $("#commands-list").innerHTML = commands.length
     ? commands.map(commandCard).join("")
     : `<div class="panel muted">Keine Befehle gefunden.</div>`;
+
+  // Mitarbeiter schlagen vor, Redakteure und Admins legen direkt an.
+  const button = $("#new-command-button");
+  if (button) {
+    button.textContent = canReview() ? "+ Befehl hinzufügen" : "+ Befehl vorschlagen";
+  }
+}
+
+/* ============================================================
+   Loesungen fuer bekannte Probleme
+   ============================================================
+   Aufbau wie bei den Befehlen: farbcodierte Bereiche, Suche, Filter. Wer
+   einreichen darf statt direkt anzulegen, entscheidet die Rolle -- siehe
+   openSolutionDialog.
+*/
+
+const SEVERITY_LABELS = { low: "Niedrig", medium: "Mittel", high: "Hoch" };
+const SEVERITY_ORDER = { low: 0, medium: 1, high: 2 };
+
+function solutionCard(solution) {
+  const color = commandCategoryColor(solution.category);
+  const severity = SEVERITY_LABELS[solution.severity] || solution.severity;
+
+  return `
+    <details class="card category-card" style="--category-color:${color}">
+      <summary>
+        <div class="summary-main">
+          <span class="badge category-badge">${escapeHtml(solution.category)}</span>
+          <span class="summary-title">${escapeHtml(solution.title)}</span>
+        </div>
+        <span class="summary-meta">
+          <span class="badge risk-badge risk-${escapeHtml(solution.severity)}">${severity}</span>
+        </span>
+      </summary>
+      <div class="card-content">
+        <div class="solution-block">
+          <span class="solution-label">Symptom</span>
+          <div class="template-body">${escapeHtml(solution.symptom)}</div>
+        </div>
+        ${solution.cause ? `
+          <div class="solution-block">
+            <span class="solution-label">Ursache</span>
+            <div class="template-body">${escapeHtml(solution.cause)}</div>
+          </div>` : ""}
+        <div class="solution-block">
+          <span class="solution-label">Lösungsweg</span>
+          <div class="template-body">${escapeHtml(solution.solution)}</div>
+        </div>
+        <div class="card-actions">
+          <button class="primary" data-copy-solution="${solution.id}">Lösungsweg kopieren</button>
+          <button data-edit-solution="${solution.id}">${
+            canReview() ? "Bearbeiten" : "Änderung vorschlagen"
+          }</button>
+          ${isAdmin() ? `<button class="danger-button" data-delete-solution="${solution.id}">Löschen</button>` : ""}
+        </div>
+      </div>
+    </details>`;
+}
+
+function sortSolutions(solutions) {
+  const sortBy = $("#solution-sort")?.value || "category-asc";
+  const sorted = [...solutions];
+
+  sorted.sort((left, right) => {
+    if (sortBy === "title-asc") return compareText(left.title, right.title);
+    if (sortBy === "title-desc") return compareText(right.title, left.title);
+
+    if (sortBy === "severity-asc" || sortBy === "severity-desc") {
+      const difference = (SEVERITY_ORDER[left.severity] ?? 0)
+        - (SEVERITY_ORDER[right.severity] ?? 0);
+      if (difference !== 0) return sortBy === "severity-asc" ? difference : -difference;
+      return compareText(left.title, right.title);
+    }
+
+    return compareText(left.category, right.category)
+      || compareText(left.title, right.title);
+  });
+
+  return sorted;
+}
+
+/** Fuellt den Bereichsfilter aus den vorhandenen Loesungen. */
+function populateSolutionCategories() {
+  const select = $("#solution-category-filter");
+  if (!select) return;
+
+  const previous = select.value;
+  const categories = [...new Set(state.solutions.map((item) => item.category))]
+    .sort((left, right) => compareText(left, right));
+
+  select.innerHTML = `<option value="">Alle Bereiche</option>${
+    categories.map((category) =>
+      `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join("")
+  }`;
+  if (categories.includes(previous)) select.value = previous;
+}
+
+function renderSolutions() {
+  const list = $("#solutions-list");
+  if (!list) return;
+
+  const search = $("#solution-search").value.trim().toLowerCase();
+  const category = $("#solution-category-filter")?.value || "";
+  const severity = $("#solution-severity-filter")?.value || "";
+
+  const solutions = sortSolutions(state.solutions.filter((item) =>
+    (!category || item.category === category) &&
+    (!severity || item.severity === severity) &&
+    (!search ||
+      item.title.toLowerCase().includes(search) ||
+      item.symptom.toLowerCase().includes(search) ||
+      item.solution.toLowerCase().includes(search) ||
+      (item.cause || "").toLowerCase().includes(search))
+  ));
+
+  list.innerHTML = solutions.length
+    ? solutions.map(solutionCard).join("")
+    : `<div class="panel muted">Keine Lösungen gefunden.</div>`;
+
+  // Beschriftung des Knopfs richtet sich nach der Rolle.
+  const button = $("#new-solution-button");
+  if (button) {
+    button.textContent = canReview() ? "+ Lösung hinzufügen" : "+ Lösung vorschlagen";
+  }
+}
+
+/**
+ * Oeffnet den Loesungsdialog.
+ *
+ * Redakteure und Admins speichern direkt, Mitarbeiter reichen einen Vorschlag
+ * ein. Der Dialog ist derselbe -- nur das Begruendungsfeld und die Beschriftung
+ * unterscheiden sich.
+ */
+function openSolutionDialog(solution = null) {
+  const direct = canReview();
+  const dialog = $("#solution-dialog");
+
+  dialog.dataset.mode = direct ? "direct" : "proposal";
+  dialog.dataset.solutionId = solution?.id || "";
+
+  $("#solution-title").value = solution?.title || "";
+  $("#solution-category").value = solution?.category || "";
+  $("#solution-severity").value = solution?.severity || "medium";
+  $("#solution-symptom").value = solution?.symptom || "";
+  $("#solution-cause").value = solution?.cause || "";
+  $("#solution-steps").value = solution?.solution || "";
+  $("#solution-reason").value = "";
+
+  $("#solution-reason-field").classList.toggle("hidden", direct);
+  $("#solution-dialog-title").textContent = solution
+    ? (direct ? "Lösung bearbeiten" : "Änderung vorschlagen")
+    : (direct ? "Lösung hinzufügen" : "Lösung vorschlagen");
+  $("#solution-submit").textContent = direct ? "Speichern" : "Zur Freigabe einreichen";
+
+  dialog.showModal();
+}
+
+async function submitSolution(event) {
+  event.preventDefault();
+  const dialog = $("#solution-dialog");
+  const direct = dialog.dataset.mode === "direct";
+  const solutionId = dialog.dataset.solutionId || "";
+
+  const payload = {
+    category: $("#solution-category").value,
+    title: $("#solution-title").value,
+    symptom: $("#solution-symptom").value,
+    cause: $("#solution-cause").value || null,
+    solution: $("#solution-steps").value,
+    severity: $("#solution-severity").value,
+  };
+
+  try {
+    if (direct) {
+      await api(solutionId ? `/api/solutions/${solutionId}` : "/api/solutions", {
+        method: solutionId ? "PUT" : "POST",
+        body: JSON.stringify(payload),
+      });
+      showToast(solutionId ? "Lösung gespeichert." : "Lösung angelegt.");
+    } else {
+      await api("/api/content-proposals", {
+        method: "POST",
+        body: JSON.stringify({
+          ...payload,
+          contentType: "solution",
+          targetId: solutionId || null,
+          reason: $("#solution-reason").value || null,
+        }),
+      });
+      showToast("Vorschlag wurde zur Freigabe eingereicht.");
+    }
+
+    dialog.close();
+    await loadBootstrap();
+    renderSolutions();
+  } catch (error) {
+    alert(error.message);
+  }
 }
 
 function feedbackTypeLabel(type) {
@@ -1219,12 +1422,74 @@ async function loadFeedback() {
     : '<div class="panel muted">Noch keine Vorschläge oder Bugs eingereicht.</div>';
 }
 
+const CONTENT_TYPE_LABELS = { command: "Befehl", solution: "Lösung" };
+
+const PROPOSAL_STATUS_LABELS = {
+  pending: "Offen",
+  approved: "Genehmigt",
+  rejected: "Abgelehnt",
+  changes_requested: "Überarbeitung nötig",
+  withdrawn: "Zurückgezogen",
+  draft: "Entwurf",
+};
+
+/** Karte fuer einen Befehls- oder Loesungs-Vorschlag. */
+function contentProposalCard(proposal, view) {
+  const payload = safeParse(proposal.payload_json);
+  const label = CONTENT_TYPE_LABELS[proposal.content_type] || proposal.content_type;
+  const status = PROPOSAL_STATUS_LABELS[proposal.status] || proposal.status;
+
+  // Je nach Art unterscheiden sich die inhaltlichen Felder.
+  const preview = proposal.content_type === "command"
+    ? payload.command || ""
+    : [payload.symptom, payload.solution].filter(Boolean).join("\n\n");
+
+  return `
+    <article class="card">
+      <div class="card-header">
+        <div>
+          <h3>${escapeHtml(proposal.title)}</h3>
+          <div class="badges">
+            <span class="badge">${escapeHtml(label)}</span>
+            <span class="badge">${escapeHtml(payload.category || "")}</span>
+            <span class="badge">${escapeHtml(status)}</span>
+            ${proposal.proposal_type === "update"
+              ? '<span class="badge">Änderung</span>' : ""}
+          </div>
+        </div>
+        ${view === "approvals"
+          ? `<button class="primary" data-review-content="${proposal.id}">Prüfen</button>`
+          : ""}
+      </div>
+      <p class="muted">Von ${escapeHtml(proposal.submitted_by_name || state.user.displayName)}</p>
+      <div class="template-body">${escapeHtml(preview)}</div>
+      ${proposal.reason ? `<p class="muted">Begründung: ${escapeHtml(proposal.reason)}</p>` : ""}
+      ${proposal.review_note ? `<div class="notice">${escapeHtml(proposal.review_note)}</div>` : ""}
+    </article>`;
+}
+
+/** JSON aus der Datenbank -- defekte Daten duerfen die Liste nicht sprengen. */
+function safeParse(value) {
+  try {
+    return JSON.parse(value) || {};
+  } catch {
+    return {};
+  }
+}
+
 async function loadProposals(view) {
-  const data = await api("/api/proposals");
+  const [data, contentData] = await Promise.all([
+    api("/api/proposals"),
+    api("/api/content-proposals"),
+  ]);
   state.proposals = data.proposals;
+  state.contentProposals = contentData.proposals;
   const container = view === "approvals" ? $("#approvals-list") : $("#my-proposals-list");
 
-  container.innerHTML = state.proposals.length
+  const contentCards = state.contentProposals
+    .map((proposal) => contentProposalCard(proposal, view)).join("");
+
+  container.innerHTML = (state.proposals.length + state.contentProposals.length)
     ? state.proposals.map((proposal) => `
       <article class="card">
         <div class="card-header">
@@ -1243,11 +1508,12 @@ async function loadProposals(view) {
         <p class="muted">Von ${escapeHtml(proposal.submitted_by_name || state.user.displayName)}</p>
         <div class="template-body">${escapeHtml(proposal.body)}</div>
         ${proposal.review_note ? `<div class="notice">${escapeHtml(proposal.review_note)}</div>` : ""}
-      </article>`).join("")
+      </article>`).join("") + contentCards
     : `<div class="panel muted">Keine Einträge vorhanden.</div>`;
 
   if (view === "approvals") {
-    $("#approval-count").textContent = state.proposals.length ? `(${state.proposals.length})` : "";
+    const open = state.proposals.length + state.contentProposals.length;
+    $("#approval-count").textContent = open ? `(${open})` : "";
   }
 }
 
@@ -1342,6 +1608,9 @@ function openReview(proposalId) {
   if (!proposal) return;
 
   $("#review-dialog").dataset.proposalId = String(proposalId);
+  // Zuruecksetzen: sonst wuerde nach einem Inhalts-Vorschlag weiterhin dessen
+  // Schnittstelle angesprochen.
+  $("#review-dialog").dataset.kind = "template";
   $("#review-note").value = "";
   $("#review-content").innerHTML = `
     <h3>${escapeHtml(proposal.title)}</h3>
@@ -1354,8 +1623,79 @@ function openReview(proposalId) {
   $("#review-dialog").showModal();
 }
 
+/**
+ * Pruefdialog fuer Befehls- und Loesungsvorschlaege.
+ *
+ * Nutzt denselben Dialog wie die Vorlagen. Welche Schnittstelle beim Bestaetigen
+ * angesprochen wird, steht in `dataset.kind` -- ohne diese Unterscheidung liefe
+ * die Entscheidung auf den falschen Endpunkt.
+ */
+function openContentReview(proposalId) {
+  const proposal = state.contentProposals.find((item) => item.id === proposalId);
+  if (!proposal) return;
+
+  const payload = safeParse(proposal.payload_json);
+  const dialog = $("#review-dialog");
+  dialog.dataset.proposalId = String(proposalId);
+  dialog.dataset.kind = "content";
+  $("#review-note").value = "";
+
+  const rows = proposal.content_type === "command"
+    ? [
+      ["Bereich", payload.category],
+      ["Umgebung", payload.shell],
+      ["Risiko", payload.riskLevel],
+      ["Befehl", payload.command],
+      ["Beschreibung", payload.description],
+    ]
+    : [
+      ["Bereich", payload.category],
+      ["Dringlichkeit", payload.severity],
+      ["Symptom", payload.symptom],
+      ["Ursache", payload.cause],
+      ["Lösungsweg", payload.solution],
+    ];
+
+  $("#review-content").innerHTML = `
+    <h3>${escapeHtml(proposal.title)}</h3>
+    <p class="muted">
+      ${escapeHtml(CONTENT_TYPE_LABELS[proposal.content_type] || "")}
+      · Eingereicht von ${escapeHtml(proposal.submitted_by_name)}
+      ${proposal.proposal_type === "update" ? "· Änderung an bestehendem Eintrag" : ""}
+    </p>
+    ${proposal.reason
+      ? `<p class="muted">Begründung: ${escapeHtml(proposal.reason)}</p>` : ""}
+    ${rows.filter(([, value]) => value).map(([label, value]) => `
+      <div class="solution-block">
+        <span class="solution-label">${escapeHtml(label)}</span>
+        <div class="template-body">${escapeHtml(String(value))}</div>
+      </div>`).join("")}`;
+
+  dialog.showModal();
+}
+
 async function reviewProposal(action) {
-  const proposalId = $("#review-dialog").dataset.proposalId;
+  const dialog = $("#review-dialog");
+  const proposalId = dialog.dataset.proposalId;
+
+  // Befehle und Loesungen laufen ueber eine eigene Schnittstelle.
+  if (dialog.dataset.kind === "content") {
+    try {
+      await api(`/api/content-proposals/${proposalId}/${action}`, {
+        method: "POST",
+        body: JSON.stringify({ note: $("#review-note").value }),
+      });
+      dialog.close();
+      showToast("Vorschlag wurde bearbeitet.");
+      await loadBootstrap();
+      renderSolutions();
+      await loadProposals("approvals");
+    } catch (error) {
+      alert(error.message);
+    }
+    return;
+  }
+
   try {
     await api(`/api/proposals/${proposalId}/${action}`, {
       method: "POST",
@@ -1423,6 +1763,11 @@ async function switchView(view) {
       "Verbesserungen & Bugs",
       "Hier können Mitarbeiter Probleme melden oder Ideen einreichen, die Admins gesammelt bearbeiten.",
     ],
+    solutions: [
+      "Wissen",
+      "Lösungen",
+      "Hier stehen bekannte Probleme mit Symptom, Ursache und erprobtem Lösungsweg.",
+    ],
     diagnose: [
       "Werkzeuge",
       "Diagnose",
@@ -1470,6 +1815,7 @@ async function switchView(view) {
   // und schob dort nur den eigentlichen Inhalt nach unten.
   updateQuickbarVisibility();
 
+  if (view === "solutions") renderSolutions();
   if (view === "proposals" || view === "approvals") await loadProposals(view);
   if (view === "feedback") await loadFeedback();
   if (view === "news") await loadNews();
@@ -3305,7 +3651,13 @@ $("#commands-list").addEventListener("click", (event) => {
 
 $("#approvals-list").addEventListener("click", (event) => {
   const button = event.target.closest("[data-review-id]");
-  if (button) openReview(Number(button.dataset.reviewId));
+  if (button) {
+    openReview(Number(button.dataset.reviewId));
+    return;
+  }
+
+  const contentButton = event.target.closest("[data-review-content]");
+  if (contentButton) openContentReview(Number(contentButton.dataset.reviewContent));
 });
 
 $("#review-form").addEventListener("click", (event) => {
@@ -3437,30 +3789,102 @@ $("#template-trash-list").addEventListener("click", (event) => {
   }
 });
 
-$("#new-command-button").addEventListener("click", () => $("#command-dialog").showModal());
+/**
+ * Oeffnet den Befehlsdialog. Wie bei den Loesungen entscheidet die Rolle, ob
+ * direkt gespeichert oder ein Vorschlag eingereicht wird.
+ */
+function openCommandDialog() {
+  const direct = canReview();
+  const dialog = $("#command-dialog");
+
+  dialog.dataset.mode = direct ? "direct" : "proposal";
+  $("#command-reason-field").classList.toggle("hidden", direct);
+  $("#command-dialog-title").textContent = direct
+    ? "Befehl hinzufügen"
+    : "Befehl vorschlagen";
+  $("#command-form .btn-save").textContent = direct
+    ? "Speichern"
+    : "Zur Freigabe einreichen";
+  dialog.showModal();
+}
+
+$("#new-command-button").addEventListener("click", openCommandDialog);
 $("#command-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  const direct = $("#command-dialog").dataset.mode !== "proposal";
+
+  const payload = {
+    name: $("#command-name").value,
+    category: $("#command-category").value,
+    command: $("#command-code").value,
+    description: $("#command-description").value,
+    shell: $("#command-shell").value,
+    riskLevel: $("#command-risk").value,
+    requiresAdmin: $("#command-admin").checked,
+    remoteCapable: $("#command-remote").checked,
+    restartRequired: $("#command-restart").checked,
+  };
+
   try {
-    await api("/api/commands", {
-      method: "POST",
-      body: JSON.stringify({
-        name: $("#command-name").value,
-        category: $("#command-category").value,
-        command: $("#command-code").value,
-        description: $("#command-description").value,
-        shell: $("#command-shell").value,
-        riskLevel: $("#command-risk").value,
-        requiresAdmin: $("#command-admin").checked,
-        remoteCapable: $("#command-remote").checked,
-        restartRequired: $("#command-restart").checked,
-      }),
-    });
+    if (direct) {
+      await api("/api/commands", { method: "POST", body: JSON.stringify(payload) });
+      showToast("Befehl gespeichert.");
+    } else {
+      await api("/api/content-proposals", {
+        method: "POST",
+        body: JSON.stringify({
+          ...payload,
+          contentType: "command",
+          reason: $("#command-reason").value || null,
+        }),
+      });
+      showToast("Vorschlag wurde zur Freigabe eingereicht.");
+    }
+
     $("#command-dialog").close();
     event.target.reset();
-    showToast("Befehl gespeichert.");
     await loadBootstrap();
   } catch (error) {
     alert(error.message);
+  }
+});
+
+$("#new-solution-button").addEventListener("click", () => openSolutionDialog());
+$("#solution-form").addEventListener("submit", submitSolution);
+$("#solution-search").addEventListener("input", renderSolutions);
+$("#solution-category-filter").addEventListener("change", renderSolutions);
+$("#solution-severity-filter").addEventListener("change", renderSolutions);
+$("#solution-sort").addEventListener("change", renderSolutions);
+
+$("#solutions-list").addEventListener("click", (event) => {
+  const copyButton = event.target.closest("[data-copy-solution]");
+  if (copyButton) {
+    const solution = state.solutions.find(
+      (item) => item.id === Number(copyButton.dataset.copySolution));
+    if (solution) copyText(solution.solution);
+    return;
+  }
+
+  const editButton = event.target.closest("[data-edit-solution]");
+  if (editButton) {
+    const solution = state.solutions.find(
+      (item) => item.id === Number(editButton.dataset.editSolution));
+    if (solution) openSolutionDialog(solution);
+    return;
+  }
+
+  const deleteButton = event.target.closest("[data-delete-solution]");
+  if (deleteButton) {
+    const id = Number(deleteButton.dataset.deleteSolution);
+    const solution = state.solutions.find((item) => item.id === id);
+    if (!confirm(`„${solution?.title ?? "Diese Lösung"}“ löschen?`)) return;
+    api(`/api/solutions/${id}`, { method: "DELETE" })
+      .then(async () => {
+        showToast("Lösung gelöscht.");
+        await loadBootstrap();
+        renderSolutions();
+      })
+      .catch((error) => alert(error.message));
   }
 });
 

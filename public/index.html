@@ -43,6 +43,7 @@
       <nav class="main-tabs" id="main-nav" aria-label="Hauptbereiche">
         <button class="main-tab active" data-view="templates" type="button">Ticket-Vorlagen</button>
         <button class="main-tab" data-view="commands" type="button">Befehle</button>
+        <button class="main-tab" data-view="solutions" type="button">Lösungen</button>
         <button class="main-tab" data-view="diagnose" type="button">Diagnose</button>
         <button class="main-tab" data-view="generator" type="button">Ticket-Generator</button>
         <button class="main-tab" data-view="news" type="button">IT-Meldungen</button>
@@ -118,13 +119,44 @@
               <option value="risk-desc">Risiko absteigend</option>
               <option value="no-admin">Ohne Adminrechte zuerst</option>
             </select>
-            <button class="btn-tool" id="new-command-button" data-role="reviewer" type="button">+ Befehl hinzufügen</button>
+            <button class="btn-tool" id="new-command-button" type="button">+ Befehl hinzufügen</button>
           </div>
           <p class="commands-intro">
             Befehle können kopiert und anschließend in Eingabeaufforderung oder PowerShell eingefügt werden.
             Platzhalter in eckigen Klammern vorher ersetzen.
           </p>
           <div id="commands-list" class="templates-list"></div>
+        </section>
+
+        <section class="view hidden" id="view-solutions">
+          <div class="controls">
+            <div class="search-box">
+              <span class="search-icon">⌕</span>
+              <input id="solution-search" placeholder="Problem oder Symptom suchen…">
+            </div>
+            <select id="solution-category-filter" class="filter-select" aria-label="Nach Bereich filtern">
+              <option value="">Alle Bereiche</option>
+            </select>
+            <select id="solution-severity-filter" class="filter-select" aria-label="Nach Dringlichkeit filtern">
+              <option value="">Alle Dringlichkeiten</option>
+              <option value="high">Hoch</option>
+              <option value="medium">Mittel</option>
+              <option value="low">Niedrig</option>
+            </select>
+            <select id="solution-sort" class="filter-select" aria-label="Lösungen sortieren">
+              <option value="category-asc">Bereich A-Z</option>
+              <option value="title-asc">Titel A-Z</option>
+              <option value="title-desc">Titel Z-A</option>
+              <option value="severity-desc">Dringlichkeit absteigend</option>
+              <option value="severity-asc">Dringlichkeit aufsteigend</option>
+            </select>
+            <button class="btn-tool" id="new-solution-button" type="button">+ Lösung</button>
+          </div>
+          <p class="commands-intro">
+            Bekannte Probleme mit Symptom, Ursache und Lösungsweg. Mitarbeiter können
+            neue Lösungen vorschlagen, Redakteure und Admins legen sie direkt an.
+          </p>
+          <div id="solutions-list" class="templates-list"></div>
         </section>
 
         <section class="view hidden" id="view-diagnose">
@@ -512,7 +544,7 @@
   <dialog id="command-dialog">
     <form method="dialog" id="command-form" class="modal">
       <div class="modal-header">
-        <h2>Befehl hinzufügen</h2>
+        <h2 id="command-dialog-title">Befehl hinzufügen</h2>
         <button class="modal-close" type="button" data-close-dialog aria-label="Dialog schließen">✕</button>
       </div>
       <div class="modal-body">
@@ -535,9 +567,50 @@
         <label class="check"><input id="command-admin" type="checkbox"> Administrator erforderlich</label>
         <label class="check"><input id="command-remote" type="checkbox"> Remote ausführbar</label>
         <label class="check"><input id="command-restart" type="checkbox"> Neustart erforderlich</label>
+        <label class="proposal-only hidden" id="command-reason-field">Begründung
+          <textarea id="command-reason" rows="3"
+                    placeholder="Warum ist dieser Befehl hilfreich?"></textarea>
+        </label>
       </div>
       <div class="modal-footer">
         <button class="btn-save" type="submit">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="solution-dialog">
+    <form method="dialog" id="solution-form" class="modal">
+      <div class="modal-header">
+        <h2 id="solution-dialog-title">Lösung hinzufügen</h2>
+        <button class="modal-close" type="button" data-close-dialog aria-label="Dialog schließen">✕</button>
+      </div>
+      <div class="modal-body">
+        <label>Titel<input id="solution-title" required
+                           placeholder="z. B. Drucker druckt nur leere Seiten"></label>
+        <div class="grid-two compact-grid">
+          <label>Bereich<input id="solution-category" required
+                               placeholder="z. B. Drucker"></label>
+          <label>Dringlichkeit<select id="solution-severity">
+            <option value="low">Niedrig</option>
+            <option value="medium" selected>Mittel</option>
+            <option value="high">Hoch</option>
+          </select></label>
+        </div>
+        <label>Symptom<textarea id="solution-symptom" rows="3" required
+                                placeholder="Was beobachtet der Benutzer?"></textarea></label>
+        <label>Ursache <span class="label-hint">(optional)</span>
+          <textarea id="solution-cause" rows="3"
+                    placeholder="Woran liegt es üblicherweise?"></textarea>
+        </label>
+        <label>Lösungsweg<textarea id="solution-steps" rows="7" required
+                                   placeholder="1. Erster Schritt&#10;2. Zweiter Schritt"></textarea></label>
+        <label class="proposal-only hidden" id="solution-reason-field">Begründung
+          <textarea id="solution-reason" rows="3"
+                    placeholder="Warum ist diese Lösung hilfreich?"></textarea>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-save" type="submit" id="solution-submit">Speichern</button>
       </div>
     </form>
   </dialog>

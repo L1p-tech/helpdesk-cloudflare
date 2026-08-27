@@ -1674,6 +1674,25 @@ input[type="color"] { height: 40px; }
   }
 }
 
+/* Loesungen: Symptom, Ursache und Weg klar voneinander abgesetzt. */
+.solution-block + .solution-block { margin-top: 12px; }
+.solution-label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+/* Hinweis an einem Feldnamen, z. B. "(optional)". */
+.label-hint {
+  color: var(--muted-dark);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 /*
  * Leuchteffekte fuer alle Varianten. Sie greifen ausschliesslich auf
  * --primary, --accent und --category-color zu und passen sich damit dem
