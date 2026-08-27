@@ -3076,7 +3076,23 @@ function initializeGame() {
       type: "PTERODACTYL",
       width: 46,
       height: 40,
-      yPos: [100, 75, 50], // drei Flughoehen -- ducken oder springen
+      /*
+       * Drei Flughoehen, gegenueber dem Original angepasst.
+       *
+       * Unsere Standlinie liegt bei 127 statt 140, wodurch alles um 13px
+       * verrutscht: Mit den Originalwerten [100, 75, 50] passte der geduckte
+       * T-Rex unter allen drei Hoehen hindurch, und der hoechste Vogel traf
+       * ueberhaupt nichts mehr.
+       *
+       * Wirksame Bereiche bei dieser Standlinie:
+       *   unter 70   trifft weder stehend noch geduckt
+       *   70 .. 105  stehend getroffen, Ducken hilft
+       *   ab 110     auch geduckt getroffen -- nur Springen hilft
+       *
+       * 115 liegt sicher im oberen Bereich (nur springen), 90 und 72 bleiben
+       * unterduckbar und unterscheiden sich sichtbar in der Hoehe.
+       */
+      yPos: [115, 90, 72],
       multipleSpeed: 999, // tritt nie in Gruppen auf
       minGap: 150,
       minSpeed: 8.5,
