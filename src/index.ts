@@ -45,6 +45,17 @@ import {
   validUsername,
 } from "./validation";
 
+/**
+ * Bedingung fuer die Sicht "Meine Vorschlaege".
+ *
+ * Erledigte Vorgaenge verschwinden aus der Liste: Genehmigtes steht bereits im
+ * Bestand, Zurueckgezogenes hat der Einreicher selbst beendet. Abgelehnte und
+ * zur Ueberarbeitung zurueckgegebene Vorschlaege bleiben dagegen sichtbar --
+ * dort steht die Begruendung des Pruefers, die der Einreicher noch braucht.
+ */
+const MY_PROPOSALS_CONDITION = (prefix: string) =>
+  `${prefix}submitted_by = ?1 AND ${prefix}status NOT IN ('approved', 'withdrawn')`;
+
 /** Ab diesem Dice-Wert gilt eine Vorlage als praktisch identisch und wird abgelehnt. */
 const DUPLICATE_REJECT_THRESHOLD = 0.98;
 
@@ -549,7 +560,7 @@ async function handleProposals(
        FROM template_proposals p
        LEFT JOIN categories c ON c.id = p.category_id
        LEFT JOIN templates d ON d.id = p.duplicate_template_id
-       WHERE ${isReviewer ? "p.status = 'pending'" : "p.submitted_by = ?1"}
+       WHERE ${isReviewer ? "p.status = 'pending'" : MY_PROPOSALS_CONDITION("p.")}
        ORDER BY p.updated_at DESC`,
     );
 
@@ -988,7 +999,7 @@ async function handleContentProposals(
               reason, status, submitted_by, submitted_by_name, review_note,
               submitted_at, reviewed_at
        FROM content_proposals
-       WHERE ${isReviewer ? "status = 'pending'" : "submitted_by = ?1"}
+       WHERE ${isReviewer ? "status = 'pending'" : MY_PROPOSALS_CONDITION("")}
        ORDER BY updated_at DESC`,
     );
 
