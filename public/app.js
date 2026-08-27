@@ -18,7 +18,8 @@ const state = {
 const THEMES = {
   forest: { label: "Forest", next: "midnight" },
   midnight: { label: "Midnight", next: "dune" },
-  dune: { label: "Dune", next: "forest" },
+  dune: { label: "Dune", next: "neon" },
+  neon: { label: "Neon", next: "forest" },
 };
 
 const TYPING_PROMPTS = [
