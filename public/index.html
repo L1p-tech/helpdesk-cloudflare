@@ -40,22 +40,71 @@
         </div>
       </header>
 
+      <!--
+        Gruppierte Navigation: Bei 20 Reitern nebeneinander findet man nichts
+        mehr. Jede Gruppe oeffnet ein Menue; der aktive Reiter faerbt seine
+        Gruppe ein, damit sichtbar bleibt, wo man steht.
+      -->
       <nav class="main-tabs" id="main-nav" aria-label="Hauptbereiche">
-        <button class="main-tab active" data-view="templates" type="button">Ticket-Vorlagen</button>
-        <button class="main-tab" data-view="commands" type="button">Befehle</button>
-        <button class="main-tab" data-view="solutions" type="button">Lösungen</button>
-        <button class="main-tab" data-view="diagnose" type="button">Diagnose</button>
-        <button class="main-tab" data-view="generator" type="button">Ticket-Generator</button>
-        <button class="main-tab" data-view="news" type="button">IT-Meldungen</button>
-        <button class="main-tab" data-view="proposals" type="button">Meine Vorschläge</button>
-        <button class="main-tab" data-view="approvals" data-role="reviewer" type="button">
-          Freigaben <span id="approval-count"></span>
+        <div class="nav-group" data-group="wissen">
+          <button class="nav-group-button" type="button" aria-expanded="false">Wissen</button>
+          <div class="nav-menu">
+            <button class="main-tab active" data-view="templates" type="button">Ticket-Vorlagen</button>
+            <button class="main-tab" data-view="commands" type="button">Befehle</button>
+            <button class="main-tab" data-view="solutions" type="button">Lösungen</button>
+          </div>
+        </div>
+
+        <div class="nav-group" data-group="arbeiten">
+          <button class="nav-group-button" type="button" aria-expanded="false">Arbeiten</button>
+          <div class="nav-menu">
+            <button class="main-tab" data-view="assistant" type="button">Symptom-Assistent</button>
+            <button class="main-tab" data-view="cases" type="button">Meine Fälle</button>
+            <button class="main-tab" data-view="escalation" type="button">Eskalation</button>
+            <button class="main-tab" data-view="diagnose" type="button">Diagnose</button>
+            <button class="main-tab" data-view="generator" type="button">Ticket-Generator</button>
+          </div>
+        </div>
+
+        <div class="nav-group" data-group="team">
+          <button class="nav-group-button" type="button" aria-expanded="false">Team</button>
+          <div class="nav-menu">
+            <button class="main-tab" data-view="handover" type="button">Dienstübergabe</button>
+            <button class="main-tab" data-view="stats" type="button">Statistik</button>
+            <button class="main-tab" data-view="news" type="button">IT-Meldungen</button>
+          </div>
+        </div>
+
+        <div class="nav-group" data-group="beitraege">
+          <button class="nav-group-button" type="button" aria-expanded="false">
+            Beiträge <span id="approval-count"></span>
+          </button>
+          <div class="nav-menu">
+            <button class="main-tab" data-view="proposals" type="button">Meine Vorschläge</button>
+            <button class="main-tab" data-view="approvals" data-role="reviewer" type="button">Freigaben</button>
+            <button class="main-tab" data-view="feedback" type="button">Verbesserungen</button>
+            <button class="main-tab" data-view="history" type="button">Versionen &amp; Papierkorb</button>
+          </div>
+        </div>
+
+        <div class="nav-group" data-group="mehr">
+          <button class="nav-group-button" type="button" aria-expanded="false">Mehr</button>
+          <div class="nav-menu">
+            <button class="main-tab" data-view="game" type="button">Pause</button>
+            <button class="main-tab" data-view="admin" data-role="admin" type="button">Administration</button>
+            <button class="main-tab" data-view="settings" type="button">Einstellungen</button>
+          </div>
+        </div>
+
+        <div class="nav-spacer"></div>
+        <button class="nav-action" id="palette-button" type="button" title="Schnellsuche (Strg+K)">
+          <span class="nav-action-icon">⌕</span> Suche
+          <kbd class="nav-kbd">Strg K</kbd>
         </button>
-        <button class="main-tab" data-view="history" type="button">Versionen &amp; Papierkorb</button>
-        <button class="main-tab" data-view="feedback" type="button">Verbesserungen</button>
-        <button class="main-tab" data-view="game" type="button">Pause</button>
-        <button class="main-tab" data-view="admin" data-role="admin" type="button">Administration</button>
-        <button class="main-tab" data-view="settings" type="button">Einstellungen</button>
+        <button class="nav-action" id="reminder-button" type="button" title="Erinnerungen">
+          <span class="nav-action-icon">⏰</span> Erinnerungen
+          <span class="reminder-count hidden" id="reminder-count"></span>
+        </button>
       </nav>
 
       <div class="work-area">
@@ -157,6 +206,84 @@
             neue Lösungen vorschlagen, Redakteure und Admins legen sie direkt an.
           </p>
           <div id="solutions-list" class="templates-list"></div>
+        </section>
+
+        <section class="view hidden" id="view-assistant">
+          <div class="panel-box">
+            <div id="assistant-body"></div>
+          </div>
+        </section>
+
+        <section class="view hidden" id="view-cases">
+          <div class="panel-box">
+            <div class="panel-title-row">
+              <div>
+                <h3>Fall anlegen</h3>
+                <p class="panel-hint">
+                  Während der Bearbeitung sammelt der Fall mit, was du benutzt
+                  hast -- daraus entsteht die Ticket-Dokumentation.
+                </p>
+              </div>
+            </div>
+            <form class="form-grid" id="case-form">
+              <label>Ticketnummer<input id="case-ticket" required placeholder="z. B. INC-4711"></label>
+              <label>Kurzbeschreibung<input id="case-title" required placeholder="Worum geht es?"></label>
+              <button class="btn-primary" type="submit">Fall starten</button>
+            </form>
+          </div>
+          <div id="cases-list" class="templates-list"></div>
+        </section>
+
+        <section class="view hidden" id="view-escalation">
+          <div class="panel-box">
+            <div class="panel-title-row">
+              <div>
+                <h3>Eskalationsstufen</h3>
+                <p class="panel-hint">
+                  Wann wird an wen weitergegeben. Admins pflegen die Stufen.
+                </p>
+              </div>
+              <button class="btn-tool hidden" id="new-escalation-button"
+                      data-role="admin" type="button">+ Stufe</button>
+            </div>
+            <div id="escalation-list" class="escalation-list"></div>
+          </div>
+        </section>
+
+        <section class="view hidden" id="view-handover">
+          <div class="panel-box">
+            <div class="panel-title-row">
+              <div>
+                <h3>Dienstübergabe schreiben</h3>
+                <p class="panel-hint">
+                  Was die nächste Schicht wissen muss. Mindestens ein Bereich
+                  muss ausgefüllt sein.
+                </p>
+              </div>
+            </div>
+            <form id="handover-form">
+              <label>Schicht<input id="handover-shift" required
+                                   placeholder="z. B. Frühschicht 27.08."></label>
+              <label>Offene Fälle mit Stand
+                <textarea id="handover-cases" rows="4"
+                          placeholder="INC-4711 Drucker: Treiber getauscht, morgen testen"></textarea>
+              </label>
+              <label>Auffälligkeiten / Störungen
+                <textarea id="handover-incidents" rows="3"
+                          placeholder="VPN seit 14 Uhr langsam"></textarea>
+              </label>
+              <label>Notizen
+                <textarea id="handover-notes" rows="3"
+                          placeholder="Sonstiges für die nächste Schicht"></textarea>
+              </label>
+              <button class="btn-primary" type="submit">Übergabe speichern</button>
+            </form>
+          </div>
+          <div id="handover-list" class="templates-list"></div>
+        </section>
+
+        <section class="view hidden" id="view-stats">
+          <div id="stats-body"></div>
         </section>
 
         <section class="view hidden" id="view-diagnose">
@@ -611,6 +738,65 @@
       </div>
       <div class="modal-footer">
         <button class="btn-save" type="submit" id="solution-submit">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Schnellsuche über alle Inhalte, per Strg+K erreichbar. -->
+  <dialog id="palette-dialog" class="palette">
+    <input id="palette-input" type="text" autocomplete="off"
+           placeholder="Vorlagen, Befehle und Lösungen durchsuchen…"
+           aria-label="Schnellsuche">
+    <div id="palette-results" class="palette-results"></div>
+    <p class="palette-hint">
+      <kbd>↑</kbd><kbd>↓</kbd> wählen · <kbd>Enter</kbd> kopieren ·
+      <kbd>Esc</kbd> schließen
+    </p>
+  </dialog>
+
+  <dialog id="reminder-dialog">
+    <form method="dialog" id="reminder-form" class="modal">
+      <div class="modal-header">
+        <h2>Erinnerungen</h2>
+        <button class="modal-close" type="button" data-close-dialog aria-label="Dialog schließen">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="reminder-list"></div>
+        <div class="grid-two compact-grid">
+          <label>Text<input id="reminder-message" placeholder="Woran erinnern?"></label>
+          <label>Ticket <span class="label-hint">(optional)</span>
+            <input id="reminder-ticket" placeholder="INC-4711"></label>
+        </div>
+        <label>Zeitpunkt<input id="reminder-due" type="datetime-local"></label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-save" type="submit">Erinnerung anlegen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="escalation-dialog">
+    <form method="dialog" id="escalation-form" class="modal">
+      <div class="modal-header">
+        <h2 id="escalation-dialog-title">Eskalationsstufe</h2>
+        <button class="modal-close" type="button" data-close-dialog aria-label="Dialog schließen">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="grid-two compact-grid">
+          <label>Reihenfolge<input id="escalation-position" type="number" min="0" value="0"></label>
+          <label>Bezeichnung<input id="escalation-name" required placeholder="z. B. 2nd Level"></label>
+        </div>
+        <label>Zuständigkeit<input id="escalation-responsible" required
+                                   placeholder="Wer übernimmt?"></label>
+        <div class="grid-two compact-grid">
+          <label>Kontakt<input id="escalation-contact" placeholder="Durchwahl, Mail, Gruppe"></label>
+          <label>Reaktionszeit<input id="escalation-response" placeholder="z. B. 2 Stunden"></label>
+        </div>
+        <label>Wann eskalieren<textarea id="escalation-criteria" rows="4"
+                                        placeholder="Woran erkennt man, dass diese Stufe dran ist?"></textarea></label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-save" type="submit">Speichern</button>
       </div>
     </form>
   </dialog>

@@ -6,6 +6,9 @@ const state = {
   solutions: [],
   proposals: [],
   contentProposals: [],
+  cases: [],
+  escalationLevels: [],
+  reminders: [],
   feedbackItems: [],
   auditEntries: [],
   settings: {
@@ -487,6 +490,625 @@ function updateQuickbarVisibility() {
   $("#quickbar").classList.toggle("hidden", !hasContent);
 }
 
+/* ============================================================
+   Fall-Arbeitsblatt
+   ============================================================ */
+async function loadCases() {
+  const data = await api("/api/cases");
+  state.cases = data.cases;
+
+  $("#cases-list").innerHTML = state.cases.length
+    ? state.cases.map(caseCard).join("")
+    : '<div class="panel muted">Noch kein Fall angelegt.</div>';
+}
+
+function caseCard(record) {
+  const closed = record.status === "closed";
+
+  return `
+    <details class="card" ${closed ? "" : "open"}>
+      <summary>
+        <div class="summary-main">
+          <span class="badge">${escapeHtml(record.ticket_ref)}</span>
+          <span class="summary-title">${escapeHtml(record.title)}</span>
+        </div>
+        <span class="summary-meta">
+          <span class="badge ${closed ? "" : "risk-badge risk-low"}">
+            ${closed ? "Abgeschlossen" : "Offen"}
+          </span>
+        </span>
+      </summary>
+      <div class="card-content" data-case-body="${record.id}">
+        <p class="muted">Wird geladen…</p>
+      </div>
+    </details>`;
+}
+
+/** Laedt die Schritte eines Falls erst beim Aufklappen nach. */
+async function loadCaseDetail(caseId) {
+  const container = document.querySelector(`[data-case-body="${caseId}"]`);
+  if (!container || container.dataset.loaded === "1") return;
+
+  const data = await api(`/api/cases/${caseId}`);
+  container.dataset.loaded = "1";
+
+  const entries = data.entries.length
+    ? `<ol class="case-entries">${data.entries.map((entry) => `
+        <li>
+          <span class="case-kind">${escapeHtml(CASE_KIND_LABELS[entry.kind] || entry.kind)}</span>
+          <span>${escapeHtml(entry.label)}</span>
+          ${entry.detail ? `<div class="muted">${escapeHtml(entry.detail)}</div>` : ""}
+          <button class="btn-link" type="button"
+                  data-case-entry-delete="${entry.id}" data-case="${caseId}">Entfernen</button>
+        </li>`).join("")}</ol>`
+    : '<p class="muted">Noch nichts festgehalten. Kopierte Vorlagen, Befehle und Lösungen landen automatisch hier.</p>';
+
+  container.innerHTML = `
+    ${entries}
+    <label class="field-block">Notizen
+      <textarea rows="4" data-case-notes="${caseId}">${escapeHtml(data.case.notes || "")}</textarea>
+    </label>
+    <div class="card-actions">
+      <button class="primary" data-case-document="${caseId}">Dokumentation erzeugen</button>
+      <button data-case-save="${caseId}">Notizen speichern</button>
+      ${data.case.status === "open"
+        ? `<button data-case-close="${caseId}">Fall abschließen</button>`
+        : ""}
+      <button class="danger-button" data-case-delete="${caseId}">Löschen</button>
+    </div>`;
+}
+
+const CASE_KIND_LABELS = {
+  template: "Vorlage",
+  command: "Befehl",
+  solution: "Lösung",
+  note: "Notiz",
+};
+
+/**
+ * Erzeugt die Ticket-Dokumentation aus den gesammelten Schritten.
+ *
+ * Bewusst als reiner Text: Er wird in ein Ticketsystem eingefuegt, das kein
+ * Markup uebernimmt.
+ */
+async function buildCaseDocumentation(caseId) {
+  const data = await api(`/api/cases/${caseId}`);
+  const record = data.case;
+
+  const zeilen = [
+    `Ticket: ${record.ticket_ref}`,
+    `Vorgang: ${record.title}`,
+    "",
+    "Durchgeführte Schritte:",
+  ];
+
+  data.entries.forEach((entry, index) => {
+    zeilen.push(`${index + 1}. [${CASE_KIND_LABELS[entry.kind] || entry.kind}] ${entry.label}`);
+    if (entry.detail) zeilen.push(`   ${entry.detail}`);
+  });
+
+  if (!data.entries.length) zeilen.push("(keine)");
+
+  if (record.notes) {
+    zeilen.push("", "Notizen:", record.notes);
+  }
+
+  zeilen.push("", `Bearbeitet von: ${state.user.displayName}`);
+  await copyText(zeilen.join("\n"));
+}
+
+/**
+ * Haengt einen benutzten Inhalt an den offenen Fall an.
+ *
+ * Ohne offenen Fall passiert nichts -- das Mitschreiben ist ein Angebot, kein
+ * Zwang, und soll den normalen Ablauf nicht stoeren.
+ */
+function trackInCase(kind, refId, label, detail = null) {
+  const offen = state.cases.find((item) => item.status === "open");
+  if (!offen) return;
+
+  api(`/api/cases/${offen.id}/entries`, {
+    method: "POST",
+    body: JSON.stringify({ kind, refId, label, detail }),
+  }).catch(() => {
+    // Mitschreiben ist Beiwerk und darf das Kopieren nicht stoeren.
+  });
+}
+
+/* ============================================================
+   Eskalation
+   ============================================================ */
+async function loadEscalation() {
+  const data = await api("/api/escalation");
+  state.escalationLevels = data.levels;
+
+  $("#escalation-list").innerHTML = data.levels.length
+    ? data.levels.map((level) => `
+      <article class="escalation-step">
+        <div class="escalation-step-head">
+          <span class="escalation-position">${level.position}</span>
+          <div>
+            <h4>${escapeHtml(level.name)}</h4>
+            <p class="muted">${escapeHtml(level.responsible)}</p>
+          </div>
+          ${isAdmin() ? `
+            <div class="escalation-actions">
+              <button class="btn-link" data-escalation-edit="${level.id}">Bearbeiten</button>
+              <button class="btn-link danger-link" data-escalation-delete="${level.id}">Entfernen</button>
+            </div>` : ""}
+        </div>
+        <div class="escalation-meta">
+          ${level.response_time
+            ? `<span class="badge">Reaktion: ${escapeHtml(level.response_time)}</span>` : ""}
+          ${level.contact ? `<span class="badge">${escapeHtml(level.contact)}</span>` : ""}
+        </div>
+        ${level.criteria ? `<p>${escapeHtml(level.criteria)}</p>` : ""}
+      </article>`).join("")
+    : '<div class="panel muted">Noch keine Stufen hinterlegt.</div>';
+}
+
+function openEscalationDialog(level = null) {
+  const dialog = $("#escalation-dialog");
+  dialog.dataset.levelId = level?.id || "";
+  $("#escalation-dialog-title").textContent = level
+    ? "Stufe bearbeiten" : "Stufe hinzufügen";
+  $("#escalation-position").value = level?.position ?? state.escalationLevels.length + 1;
+  $("#escalation-name").value = level?.name || "";
+  $("#escalation-responsible").value = level?.responsible || "";
+  $("#escalation-contact").value = level?.contact || "";
+  $("#escalation-response").value = level?.response_time || "";
+  $("#escalation-criteria").value = level?.criteria || "";
+  dialog.showModal();
+}
+
+/* ============================================================
+   Dienstuebergabe
+   ============================================================ */
+async function loadHandovers() {
+  const data = await api("/api/handovers");
+
+  $("#handover-list").innerHTML = data.handovers.length
+    ? data.handovers.map((item) => `
+      <details class="card" ${item.acknowledged_at ? "" : "open"}>
+        <summary>
+          <div class="summary-main">
+            <span class="badge">${escapeHtml(item.shift_label)}</span>
+            <span class="summary-title">${escapeHtml(item.created_by_name)}</span>
+          </div>
+          <span class="summary-meta">
+            ${item.acknowledged_at
+              ? `<span class="badge">Bestätigt von ${escapeHtml(item.acknowledged_by_name || "")}</span>`
+              : '<span class="badge risk-badge risk-medium">Offen</span>'}
+          </span>
+        </summary>
+        <div class="card-content">
+          <p class="muted">${formatDate(item.created_at)}</p>
+          ${handoverSection("Offene Fälle", item.open_cases)}
+          ${handoverSection("Auffälligkeiten", item.incidents)}
+          ${handoverSection("Notizen", item.notes)}
+          ${item.acknowledged_at ? "" : `
+            <div class="card-actions">
+              <button class="primary" data-handover-ack="${item.id}">Übernahme bestätigen</button>
+            </div>`}
+        </div>
+      </details>`).join("")
+    : '<div class="panel muted">Noch keine Übergabe vorhanden.</div>';
+}
+
+function handoverSection(titel, inhalt) {
+  if (!inhalt) return "";
+  return `
+    <div class="solution-block">
+      <span class="solution-label">${escapeHtml(titel)}</span>
+      <div class="template-body">${escapeHtml(inhalt)}</div>
+    </div>`;
+}
+
+/* ============================================================
+   Statistik
+   ============================================================ */
+async function loadStats() {
+  const data = await api("/api/usage/stats");
+  const counts = data.counts || {};
+
+  // Einzahl/Mehrzahl, damit "1 Offene Fälle" nicht stehen bleibt.
+  const kacheln = [
+    ["Vorlagen", counts.vorlagen, "Vorlage"],
+    ["Befehle", counts.befehle, "Befehl"],
+    ["Lösungen", counts.loesungen, "Lösung"],
+    ["Offene Fälle", counts.offene_faelle, "Offener Fall"],
+    ["Offene Vorschläge", counts.offene_vorschlaege, "Offener Vorschlag"],
+  ];
+
+  const liste = (eintraege, leer) => eintraege.length
+    ? `<ol class="stat-list">${eintraege.join("")}</ol>`
+    : `<p class="muted">${leer}</p>`;
+
+  $("#stats-body").innerHTML = `
+    <div class="stat-tiles">
+      ${kacheln.map(([mehrzahl, wert, einzahl]) => `
+        <div class="stat-tile">
+          <span class="stat-value">${Number(wert ?? 0)}</span>
+          <span class="stat-label">${Number(wert ?? 0) === 1 ? einzahl : mehrzahl}</span>
+        </div>`).join("")}
+    </div>
+
+    <div class="grid-two">
+      <div class="panel-box">
+        <h3>Meistgenutzte Lösungen</h3>
+        ${liste(data.topSolutions.map((item) => `
+          <li>
+            <span>${escapeHtml(item.title)}</span>
+            <span class="muted">${item.opened_count}× geöffnet · ${item.helpful_count}× hilfreich</span>
+          </li>`), "Noch keine Nutzung erfasst.")}
+      </div>
+
+      <div class="panel-box">
+        <h3>Meistgenutzte Befehle</h3>
+        ${liste(data.topCommands.map((item) => `
+          <li>
+            <span>${escapeHtml(item.title)}</span>
+            <span class="muted">${item.opened_count}× kopiert</span>
+          </li>`), "Noch keine Nutzung erfasst.")}
+      </div>
+
+      <div class="panel-box">
+        <h3>Gesucht, nichts gefunden</h3>
+        <p class="panel-hint">Hier fehlt Wissen -- diese Begriffe liefern keine Treffer.</p>
+        ${liste(data.misses.map((item) => `
+          <li>
+            <span>${escapeHtml(item.term)}</span>
+            <span class="muted">${item.treffer}× gesucht</span>
+          </li>`), "Keine erfolglosen Suchen -- gutes Zeichen.")}
+      </div>
+
+      <div class="panel-box">
+        <h3>Beiträge zur Wissensbasis</h3>
+        ${liste(data.contributors.map((item, index) => `
+          <li>
+            <span>${index < 3 ? ["🥇", "🥈", "🥉"][index] + " " : ""}${escapeHtml(item.name)}</span>
+            <span class="muted">${item.beitraege} Einträge</span>
+          </li>`), "Noch keine Beiträge.")}
+      </div>
+    </div>`;
+}
+
+/* ============================================================
+   Erinnerungen
+   ============================================================ */
+async function loadReminders() {
+  const data = await api("/api/reminders");
+  state.reminders = data.reminders;
+
+  const zaehler = $("#reminder-count");
+  zaehler.textContent = data.reminders.length || "";
+  zaehler.classList.toggle("hidden", !data.reminders.length);
+
+  const liste = $("#reminder-list");
+  if (!liste) return;
+
+  liste.innerHTML = data.reminders.length
+    ? data.reminders.map((item) => `
+      <div class="reminder-row ${Date.parse(item.due_at) <= Date.now() ? "due" : ""}">
+        <div>
+          <strong>${escapeHtml(item.message)}</strong>
+          <div class="muted">
+            ${item.ticket_ref ? `${escapeHtml(item.ticket_ref)} · ` : ""}${formatDateTime(item.due_at)}
+          </div>
+        </div>
+        <button class="btn-link" type="button" data-reminder-done="${item.id}">Erledigt</button>
+      </div>`).join("")
+    : '<p class="muted">Keine offenen Erinnerungen.</p>';
+}
+
+/* ============================================================
+   Symptom-Assistent
+   ============================================================
+   Ein Entscheidungsbaum fuehrt vom Symptom zur passenden Loesung. Die
+   Endpunkte verweisen ueber Suchbegriffe auf den Loesungsbestand, statt IDs
+   fest zu verdrahten -- so bleibt der Baum gueltig, wenn Loesungen dazukommen
+   oder umbenannt werden.
+*/
+const ASSISTANT_TREE = {
+  start: {
+    frage: "Womit hat der Benutzer ein Problem?",
+    optionen: [
+      { text: "Netzwerk / Internet", ziel: "netzwerk" },
+      { text: "Drucker", ziel: "drucker" },
+      { text: "Anmeldung / Konto", ziel: "konto" },
+      { text: "E-Mail / Outlook", ziel: "mail" },
+      { text: "Rechner langsam oder Fehler", ziel: "rechner" },
+      { text: "Remote-Zugriff / VPN", ziel: "vpn" },
+    ],
+  },
+  netzwerk: {
+    frage: "Wer ist betroffen?",
+    optionen: [
+      { text: "Nur ein Arbeitsplatz", ziel: "netzwerk-einzeln" },
+      { text: "Mehrere Benutzer", ziel: "netzwerk-mehrere" },
+      { text: "Netzlaufwerke fehlen", suche: "Netzlaufwerke" },
+    ],
+  },
+  "netzwerk-einzeln": {
+    frage: "Besteht eine Verbindung zum Netz?",
+    optionen: [
+      { text: "Verbunden, aber kein Internet", suche: "Kein Internet" },
+      { text: "Gar keine Verbindung", hinweis:
+        "Kabel und Anschlussdose prüfen, Adapterstatus mit ipconfig /all kontrollieren." },
+    ],
+  },
+  "netzwerk-mehrere": {
+    frage: "Sind auch Server betroffen?",
+    optionen: [
+      { text: "Ja, mehrere Dienste", eskalation: true, hinweis:
+        "Deutet auf eine Störung der Infrastruktur hin -- eskalieren statt einzeln prüfen." },
+      { text: "Nein, nur Internetzugriff", hinweis:
+        "Gateway und Proxy prüfen. Bei Verdacht auf Ausfall die nächste Stufe einbeziehen." },
+    ],
+  },
+  drucker: {
+    frage: "Was passiert beim Drucken?",
+    optionen: [
+      { text: "Auftrag bleibt hängen", suche: "Warteschlange" },
+      { text: "Seiten bleiben leer", suche: "leere Seiten" },
+      { text: "Drucker nicht gefunden", hinweis:
+        "Verbindung zum Druckserver prüfen, Drucker neu verbinden." },
+    ],
+  },
+  konto: {
+    frage: "Woran scheitert die Anmeldung?",
+    optionen: [
+      { text: "Konto ist gesperrt", suche: "gesperrt" },
+      { text: "Zweiter Faktor wird abgelehnt", suche: "zweitem Faktor" },
+      { text: "Passwort vergessen", hinweis:
+        "Passwort zurücksetzen und Änderung bei der nächsten Anmeldung erzwingen." },
+    ],
+  },
+  mail: {
+    frage: "Was ist das Symptom?",
+    optionen: [
+      { text: "Ständige Kennwortabfrage", suche: "Kennwort" },
+      { text: "Mails landen im Spam", suche: "Spam" },
+      { text: "Postfach voll", hinweis:
+        "Größe prüfen, Archivierung anstoßen oder Kontingent erhöhen." },
+    ],
+  },
+  rechner: {
+    frage: "Was genau tritt auf?",
+    optionen: [
+      { text: "Startet sehr langsam", suche: "langsam" },
+      { text: "Update schlägt fehl", suche: "Update" },
+      { text: "Kein Speicherplatz", suche: "Speicherplatz" },
+      { text: "Programm startet nicht", suche: "Anwendung startet nicht" },
+      { text: "Bildschirm bleibt schwarz", suche: "schwarz" },
+    ],
+  },
+  vpn: {
+    frage: "Wie weit kommt die Verbindung?",
+    optionen: [
+      { text: "Verbindet, nichts erreichbar", suche: "VPN" },
+      { text: "Verbindet gar nicht", hinweis:
+        "Zugangsdaten und zweiten Faktor prüfen, danach Client-Protokoll auswerten." },
+    ],
+  },
+};
+
+const assistantState = { knoten: "start", pfad: [] };
+
+function renderAssistant() {
+  const container = $("#assistant-body");
+  if (!container) return;
+
+  const knoten = ASSISTANT_TREE[assistantState.knoten];
+  const pfad = assistantState.pfad.length
+    ? `<p class="assistant-path">${assistantState.pfad.map(escapeHtml).join(" › ")}</p>`
+    : "";
+
+  // Endpunkt: entweder Treffer aus dem Loesungsbestand oder ein Hinweistext.
+  if (!knoten) {
+    container.innerHTML = pfad + renderAssistantResult();
+    return;
+  }
+
+  container.innerHTML = `
+    <h4 class="assistant-question">${escapeHtml(knoten.frage)}</h4>
+    ${pfad}
+    <div class="assistant-options">
+      ${knoten.optionen.map((option, index) => `
+        <button class="assistant-option" type="button" data-assistant-option="${index}">
+          ${escapeHtml(option.text)}
+        </button>`).join("")}
+    </div>
+    ${assistantState.pfad.length
+      ? '<button class="btn-link" type="button" data-assistant-reset>Von vorn beginnen</button>'
+      : ""}`;
+}
+
+function renderAssistantResult() {
+  const ergebnis = assistantState.ergebnis || {};
+  const treffer = ergebnis.suche
+    ? state.solutions.filter((item) =>
+      `${item.title} ${item.symptom}`.toLowerCase().includes(ergebnis.suche.toLowerCase()))
+    : [];
+
+  const trefferListe = treffer.length
+    ? `<div class="assistant-hits">${treffer.map((item) => `
+        <button class="assistant-hit" type="button" data-assistant-solution="${item.id}">
+          <span class="badge category-badge"
+                style="--category-color:${commandCategoryColor(item.category)}">
+            ${escapeHtml(item.category)}
+          </span>
+          <span>${escapeHtml(item.title)}</span>
+        </button>`).join("")}</div>`
+    : ergebnis.suche
+      ? `<div class="notice">Zu diesem Fall ist noch keine Lösung hinterlegt.
+           Wenn du ihn löst, trag die Lösung bitte ein.</div>`
+      : "";
+
+  return `
+    ${ergebnis.hinweis ? `<div class="notice">${escapeHtml(ergebnis.hinweis)}</div>` : ""}
+    ${trefferListe}
+    ${ergebnis.eskalation
+      ? '<button class="btn-tool" type="button" data-assistant-escalate>Eskalationsstufen ansehen</button>'
+      : ""}
+    <button class="btn-link" type="button" data-assistant-reset>Von vorn beginnen</button>`;
+}
+
+function chooseAssistantOption(index) {
+  const knoten = ASSISTANT_TREE[assistantState.knoten];
+  const option = knoten?.optionen[index];
+  if (!option) return;
+
+  assistantState.pfad.push(option.text);
+
+  if (option.ziel) {
+    assistantState.knoten = option.ziel;
+  } else {
+    // Endpunkt erreicht: Ergebnis merken und Baum verlassen.
+    assistantState.knoten = null;
+    assistantState.ergebnis = option;
+  }
+  renderAssistant();
+}
+
+function resetAssistant() {
+  assistantState.knoten = "start";
+  assistantState.pfad = [];
+  assistantState.ergebnis = null;
+  renderAssistant();
+}
+
+/* ============================================================
+   Schnellsuche (Strg+K)
+   ============================================================
+   Durchsucht Vorlagen, Befehle und Loesungen gleichzeitig. Alle Daten liegen
+   bereits im Bootstrap -- die Suche laeuft deshalb ohne Serveranfrage.
+*/
+const paletteState = { items: [], index: 0 };
+
+function paletteCandidates() {
+  return [
+    ...state.templates.map((item) => ({
+      kind: "template",
+      id: item.id,
+      title: item.title,
+      hint: item.category_name,
+      copy: item.body,
+      haystack: `${item.title} ${item.body}`.toLowerCase(),
+    })),
+    ...state.commands.map((item) => ({
+      kind: "command",
+      id: item.id,
+      title: item.name,
+      hint: `${item.category} · ${item.shell}`,
+      copy: item.command,
+      haystack: `${item.name} ${item.command} ${item.description}`.toLowerCase(),
+    })),
+    ...state.solutions.map((item) => ({
+      kind: "solution",
+      id: item.id,
+      title: item.title,
+      hint: item.category,
+      copy: item.solution,
+      haystack: `${item.title} ${item.symptom} ${item.solution}`.toLowerCase(),
+    })),
+  ];
+}
+
+const PALETTE_KIND_LABELS = {
+  template: "Vorlage",
+  command: "Befehl",
+  solution: "Lösung",
+};
+
+function renderPalette() {
+  const term = $("#palette-input").value.trim().toLowerCase();
+  const container = $("#palette-results");
+
+  paletteState.items = term
+    ? paletteCandidates().filter((item) => item.haystack.includes(term)).slice(0, 40)
+    : [];
+
+  if (!term) {
+    container.innerHTML = '<p class="palette-empty">Tippen, um zu suchen.</p>';
+    return;
+  }
+
+  if (!paletteState.items.length) {
+    container.innerHTML = '<p class="palette-empty">Nichts gefunden.</p>';
+    // Erfolglose Suchen festhalten -- daraus wird sichtbar, welches Wissen fehlt.
+    reportSearchMiss(term, "solutions");
+    return;
+  }
+
+  paletteState.index = Math.min(paletteState.index, paletteState.items.length - 1);
+  container.innerHTML = paletteState.items.map((item, index) => `
+    <button class="palette-item ${index === paletteState.index ? "active" : ""}"
+            type="button" data-palette-index="${index}">
+      <span class="palette-kind palette-kind-${item.kind}">${PALETTE_KIND_LABELS[item.kind]}</span>
+      <span class="palette-title">${escapeHtml(item.title)}</span>
+      <span class="palette-hint-text">${escapeHtml(item.hint || "")}</span>
+    </button>`).join("");
+
+  container.querySelector(".palette-item.active")
+    ?.scrollIntoView({ block: "nearest" });
+}
+
+/**
+ * Meldet eine Suche ohne Treffer.
+ *
+ * Gedrosselt: Ohne die Verzoegerung entstuende bei jedem Tastendruck ein
+ * Eintrag, und die Auswertung waere voll mit Wortfragmenten.
+ */
+let searchMissTimer = null;
+function reportSearchMiss(term, scope) {
+  if (term.length < 4) return;
+  clearTimeout(searchMissTimer);
+  searchMissTimer = setTimeout(() => {
+    api("/api/usage/miss", {
+      method: "POST",
+      body: JSON.stringify({ term, scope }),
+    }).catch(() => {
+      // Statistik ist Beiwerk -- ein Fehler darf die Suche nicht stoeren.
+    });
+  }, 1200);
+}
+
+function movePaletteSelection(offset) {
+  if (!paletteState.items.length) return;
+  const count = paletteState.items.length;
+  paletteState.index = (paletteState.index + offset + count) % count;
+  renderPalette();
+}
+
+async function usePaletteItem(index) {
+  const item = paletteState.items[index];
+  if (!item) return;
+
+  await copyText(item.copy);
+  addRecentItem(item.kind === "solution" ? "solution" : item.kind, item.id, item.title);
+  if (item.kind !== "template") countContentUsage(item.kind, item.id);
+  $("#palette-dialog").close();
+}
+
+function openPalette() {
+  paletteState.index = 0;
+  $("#palette-input").value = "";
+  renderPalette();
+  $("#palette-dialog").showModal();
+  $("#palette-input").focus();
+}
+
+/** Zaehlt Oeffnungen von Befehlen und Loesungen fuer die Statistik. */
+function countContentUsage(contentType, contentId, helpful = false) {
+  api("/api/usage", {
+    method: "POST",
+    body: JSON.stringify({ contentType, contentId, helpful }),
+  }).catch(() => {
+    // Auch hier: Statistik darf den Ablauf nicht blockieren.
+  });
+}
+
 function renderDiagnosticChecklist() {
   const selectedType = $("#diag-type").value;
   const items = DIAGNOSTICS[selectedType] || [];
@@ -833,6 +1455,10 @@ async function loadBootstrap() {
   renderSolutions();
   populateSolutionCategories();
   loadRecentItems();
+  loadCases().catch(() => {
+    // Faelle sind Beiwerk beim Start -- ein Fehler darf den Aufbau nicht stoppen.
+  });
+  loadReminders().catch(() => {});
 }
 
 function populateCategories() {
@@ -885,6 +1511,7 @@ async function copyText(text) {
 async function copyTemplate(template) {
   await copyText(replacePersonalPlaceholders(template.body));
   addRecentItem("template", template.id, template.title);
+  trackInCase("template", template.id, template.title);
 
   template.use_count = (template.use_count || 0) + 1;
   template.last_used_at = new Date().toISOString().replace("T", " ").slice(0, 19);
@@ -1216,10 +1843,11 @@ function solutionCard(solution) {
           </div>` : ""}
         <div class="solution-block">
           <span class="solution-label">Lösungsweg</span>
-          <div class="template-body">${escapeHtml(solution.solution)}</div>
+          ${renderSolutionSteps(solution)}
         </div>
         <div class="card-actions">
           <button class="primary" data-copy-solution="${solution.id}">Lösungsweg kopieren</button>
+          <button data-helpful-solution="${solution.id}">Hat geholfen</button>
           <button data-edit-solution="${solution.id}">${
             canReview() ? "Bearbeiten" : "Änderung vorschlagen"
           }</button>
@@ -1227,6 +1855,68 @@ function solutionCard(solution) {
         </div>
       </div>
     </details>`;
+}
+
+/**
+ * Stellt den Loesungsweg als abhakbare Schritte dar.
+ *
+ * Nummerierte Zeilen ("1. ...") werden zu einzelnen Schritten; enthaelt ein
+ * Schritt einen erkennbaren Befehl, bekommt er einen Kopierknopf. Texte ohne
+ * Nummerierung bleiben unveraendert -- eine erzwungene Aufteilung riss
+ * Fliesstext an den falschen Stellen auseinander.
+ */
+function renderSolutionSteps(solution) {
+  const zeilen = String(solution.solution).split("\n").map((zeile) => zeile.trim());
+  const schritte = zeilen.filter((zeile) => /^\d+\.\s/.test(zeile));
+
+  if (schritte.length < 2) {
+    return `<div class="template-body">${escapeHtml(solution.solution)}</div>`;
+  }
+
+  // Zeilen vor dem ersten Schritt und Hinweise am Ende bleiben als Text stehen.
+  const ersterIndex = zeilen.findIndex((zeile) => /^\d+\.\s/.test(zeile));
+  const nachspann = zeilen.slice(ersterIndex + schritte.length)
+    .filter(Boolean).join("\n");
+
+  return `
+    <ol class="solution-steps" data-solution-steps="${solution.id}">
+      ${schritte.map((schritt, index) => {
+        const text = schritt.replace(/^\d+\.\s*/, "");
+        const befehl = extractCommand(text);
+        return `
+          <li class="solution-step">
+            <label class="step-check">
+              <input type="checkbox" data-step="${index}">
+              <span>${escapeHtml(text)}</span>
+            </label>
+            ${befehl
+              ? `<button class="btn-link" type="button"
+                         data-copy-step="${escapeHtml(befehl)}">Befehl kopieren</button>`
+              : ""}
+          </li>`;
+      }).join("")}
+    </ol>
+    ${nachspann ? `<p class="muted">${escapeHtml(nachspann)}</p>` : ""}`;
+}
+
+/**
+ * Zieht einen ausfuehrbaren Befehl aus einem Schritt.
+ *
+ * Erkennt die im Bestand ueblichen Schreibweisen ("Dienst beenden: net stop
+ * spooler") sowie bekannte Kommandos am Zeilenanfang. Bewusst konservativ --
+ * lieber kein Knopf als einer, der Fliesstext kopiert.
+ */
+const KNOWN_COMMANDS = /\b(ipconfig|net|netsh|gpupdate|sfc|dism|chkdsk|nslookup|route|whoami|klist|vssadmin|systeminfo|tasklist|shutdown)\b/;
+
+function extractCommand(text) {
+  const nachDoppelpunkt = text.split(": ").slice(1).join(": ").trim();
+  const kandidat = KNOWN_COMMANDS.test(nachDoppelpunkt) ? nachDoppelpunkt : text.trim();
+
+  if (!KNOWN_COMMANDS.test(kandidat)) return null;
+  // Saetze mit Satzzeichen am Ende sind Beschreibungen, keine Befehle.
+  if (/[.!?]$/.test(kandidat) || kandidat.split(/\s+/).length > 8) return null;
+
+  return kandidat;
 }
 
 function sortSolutions(solutions) {
@@ -1741,6 +2431,13 @@ async function switchView(view) {
   $(`#view-${view}`).classList.remove("hidden");
   $$("#main-nav button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
 
+  // Die Gruppe des aktiven Reiters hervorheben, damit sichtbar bleibt, wo man
+  // sich befindet -- im zugeklappten Menue ist der Reiter selbst unsichtbar.
+  $$(".nav-group").forEach((group) => {
+    const holdsActive = Boolean(group.querySelector(`[data-view="${view}"]`));
+    group.classList.toggle("holds-active", holdsActive);
+  });
+
   const config = {
     templates: [
       "Gemeinsame Inhalte",
@@ -1771,6 +2468,31 @@ async function switchView(view) {
       "Wissen",
       "Lösungen",
       "Hier stehen bekannte Probleme mit Symptom, Ursache und erprobtem Lösungsweg.",
+    ],
+    assistant: [
+      "Arbeiten",
+      "Symptom-Assistent",
+      "Ein paar Fragen führen vom Symptom zur passenden Lösung.",
+    ],
+    cases: [
+      "Arbeiten",
+      "Meine Fälle",
+      "Hier sammelst du je Ticket, was du benutzt hast -- daraus entsteht die Dokumentation.",
+    ],
+    escalation: [
+      "Arbeiten",
+      "Eskalation",
+      "Wann wird an wen weitergegeben, mit Zuständigkeit und Reaktionszeit.",
+    ],
+    handover: [
+      "Team",
+      "Dienstübergabe",
+      "Was die nächste Schicht wissen muss -- offene Fälle, Auffälligkeiten, Notizen.",
+    ],
+    stats: [
+      "Team",
+      "Statistik",
+      "Was wird genutzt, wo fehlt Wissen, wer pflegt die Wissensbasis.",
     ],
     diagnose: [
       "Werkzeuge",
@@ -1822,6 +2544,11 @@ async function switchView(view) {
   updateQuickbarVisibility();
 
   if (view === "solutions") renderSolutions();
+  if (view === "assistant") renderAssistant();
+  if (view === "cases") await loadCases();
+  if (view === "escalation") await loadEscalation();
+  if (view === "handover") await loadHandovers();
+  if (view === "stats") await loadStats();
   if (view === "proposals" || view === "approvals") await loadProposals(view);
   if (view === "feedback") await loadFeedback();
   if (view === "news") await loadNews();
@@ -3519,8 +4246,34 @@ $("#logout-button").addEventListener("click", async () => {
 });
 
 $("#main-nav").addEventListener("click", (event) => {
+  // Gruppenkopf: Menue auf- und zuklappen, andere Gruppen schliessen.
+  const groupButton = event.target.closest(".nav-group-button");
+  if (groupButton) {
+    const group = groupButton.closest(".nav-group");
+    const wasOpen = group.classList.contains("open");
+    closeNavGroups();
+    group.classList.toggle("open", !wasOpen);
+    groupButton.setAttribute("aria-expanded", String(!wasOpen));
+    return;
+  }
+
   const button = event.target.closest("[data-view]");
-  if (button) switchView(button.dataset.view);
+  if (button) {
+    closeNavGroups();
+    switchView(button.dataset.view);
+  }
+});
+
+function closeNavGroups() {
+  $$(".nav-group").forEach((group) => {
+    group.classList.remove("open");
+    group.querySelector(".nav-group-button")?.setAttribute("aria-expanded", "false");
+  });
+}
+
+// Klick ausserhalb schliesst offene Menues -- sonst bleiben sie stehen.
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".nav-group")) closeNavGroups();
 });
 
 $$("dialog").forEach((dialog) => {
@@ -3653,6 +4406,8 @@ $("#commands-list").addEventListener("click", (event) => {
   if (command.risk_level === "high" && !confirm("Dieser Befehl ist als hohes Risiko markiert. Wirklich kopieren?")) return;
   copyText(command.command);
   addRecentItem("command", command.id, command.name);
+  countContentUsage("command", command.id);
+  trackInCase("command", command.id, command.name, command.command);
 });
 
 $("#approvals-list").addEventListener("click", (event) => {
@@ -3741,10 +4496,21 @@ $("#quickbar-items").addEventListener("click", (event) => {
     return;
   }
 
+  if (button.dataset.recentType === "solution") {
+    const solution = state.solutions.find((item) => item.id === id);
+    if (solution) {
+      copyText(solution.solution);
+      addRecentItem("solution", solution.id, solution.title);
+      countContentUsage("solution", solution.id);
+    }
+    return;
+  }
+
   const command = state.commands.find((item) => item.id === id);
   if (command) {
     copyText(command.command);
     addRecentItem("command", command.id, command.name);
+    countContentUsage("command", command.id);
   }
 });
 
@@ -3863,11 +4629,31 @@ $("#solution-severity-filter").addEventListener("change", renderSolutions);
 $("#solution-sort").addEventListener("change", renderSolutions);
 
 $("#solutions-list").addEventListener("click", (event) => {
+  // Einzelnen Befehl aus einem Schritt kopieren.
+  const stepCopy = event.target.closest("[data-copy-step]");
+  if (stepCopy) {
+    copyText(stepCopy.dataset.copyStep);
+    return;
+  }
+
+  const helpful = event.target.closest("[data-helpful-solution]");
+  if (helpful) {
+    const id = Number(helpful.dataset.helpfulSolution);
+    countContentUsage("solution", id, true);
+    showToast("Danke -- das hilft bei der Pflege der Wissensbasis.");
+    return;
+  }
+
   const copyButton = event.target.closest("[data-copy-solution]");
   if (copyButton) {
     const solution = state.solutions.find(
       (item) => item.id === Number(copyButton.dataset.copySolution));
-    if (solution) copyText(solution.solution);
+    if (solution) {
+      copyText(solution.solution);
+      addRecentItem("solution", solution.id, solution.title);
+      countContentUsage("solution", solution.id);
+      trackInCase("solution", solution.id, solution.title);
+    }
     return;
   }
 
@@ -3891,6 +4677,302 @@ $("#solutions-list").addEventListener("click", (event) => {
         renderSolutions();
       })
       .catch((error) => alert(error.message));
+  }
+});
+
+/* ============================================================
+   Verdrahtung der neuen Bereiche
+   ============================================================ */
+
+// --- Schnellsuche ---------------------------------------------------------
+$("#palette-button").addEventListener("click", openPalette);
+$("#palette-input").addEventListener("input", () => {
+  paletteState.index = 0;
+  renderPalette();
+});
+
+$("#palette-input").addEventListener("keydown", (event) => {
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    movePaletteSelection(1);
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    movePaletteSelection(-1);
+  } else if (event.key === "Enter") {
+    event.preventDefault();
+    usePaletteItem(paletteState.index).catch((error) => alert(error.message));
+  }
+});
+
+$("#palette-results").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-palette-index]");
+  if (button) {
+    usePaletteItem(Number(button.dataset.paletteIndex))
+      .catch((error) => alert(error.message));
+  }
+});
+
+// Strg+K oeffnet die Suche von ueberall. In Eingabefeldern greift die
+// Tastenkombination bewusst auch -- sie ersetzt dort nichts Eigenes.
+document.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    if (!$("#app-view").classList.contains("hidden")) openPalette();
+  }
+});
+
+// --- Symptom-Assistent ----------------------------------------------------
+$("#assistant-body").addEventListener("click", (event) => {
+  const option = event.target.closest("[data-assistant-option]");
+  if (option) {
+    chooseAssistantOption(Number(option.dataset.assistantOption));
+    return;
+  }
+
+  if (event.target.closest("[data-assistant-reset]")) {
+    resetAssistant();
+    return;
+  }
+
+  if (event.target.closest("[data-assistant-escalate]")) {
+    switchView("escalation");
+    return;
+  }
+
+  const hit = event.target.closest("[data-assistant-solution]");
+  if (hit) {
+    const id = Number(hit.dataset.assistantSolution);
+    const solution = state.solutions.find((item) => item.id === id);
+    if (solution) {
+      copyText(solution.solution);
+      countContentUsage("solution", id, true);
+      addRecentItem("solution", id, solution.title);
+      trackInCase("solution", id, solution.title, "Über den Assistenten gefunden");
+    }
+  }
+});
+
+// --- Faelle ---------------------------------------------------------------
+$("#case-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await api("/api/cases", {
+      method: "POST",
+      body: JSON.stringify({
+        ticketRef: $("#case-ticket").value,
+        title: $("#case-title").value,
+      }),
+    });
+    event.target.reset();
+    showToast("Fall angelegt. Ab jetzt wird mitgeschrieben.");
+    await loadCases();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+$("#cases-list").addEventListener("toggle", (event) => {
+  const details = event.target.closest("details");
+  if (details?.open) {
+    const body = details.querySelector("[data-case-body]");
+    if (body) loadCaseDetail(Number(body.dataset.caseBody)).catch(() => {});
+  }
+}, true);
+
+$("#cases-list").addEventListener("click", async (event) => {
+  const ziel = (attribut) => event.target.closest(`[${attribut}]`);
+
+  try {
+    const doc = ziel("data-case-document");
+    if (doc) {
+      await buildCaseDocumentation(Number(doc.dataset.caseDocument));
+      return;
+    }
+
+    const save = ziel("data-case-save");
+    if (save) {
+      const id = Number(save.dataset.caseSave);
+      await api(`/api/cases/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          notes: document.querySelector(`[data-case-notes="${id}"]`)?.value || null,
+          status: "open",
+        }),
+      });
+      showToast("Notizen gespeichert.");
+      return;
+    }
+
+    const close = ziel("data-case-close");
+    if (close) {
+      const id = Number(close.dataset.caseClose);
+      await api(`/api/cases/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          notes: document.querySelector(`[data-case-notes="${id}"]`)?.value || null,
+          status: "closed",
+        }),
+      });
+      showToast("Fall abgeschlossen.");
+      await loadCases();
+      return;
+    }
+
+    const remove = ziel("data-case-delete");
+    if (remove) {
+      if (!confirm("Diesen Fall mitsamt Schritten löschen?")) return;
+      await api(`/api/cases/${remove.dataset.caseDelete}`, { method: "DELETE" });
+      showToast("Fall gelöscht.");
+      await loadCases();
+      return;
+    }
+
+    const entryDelete = ziel("data-case-entry-delete");
+    if (entryDelete) {
+      const caseId = entryDelete.dataset.case;
+      await api(`/api/cases/${caseId}/entries/${entryDelete.dataset.caseEntryDelete}`,
+        { method: "DELETE" });
+      const body = document.querySelector(`[data-case-body="${caseId}"]`);
+      if (body) body.dataset.loaded = "";
+      await loadCaseDetail(Number(caseId));
+    }
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+// --- Eskalation -----------------------------------------------------------
+$("#new-escalation-button").addEventListener("click", () => openEscalationDialog());
+
+$("#escalation-list").addEventListener("click", async (event) => {
+  const edit = event.target.closest("[data-escalation-edit]");
+  if (edit) {
+    const level = state.escalationLevels.find(
+      (item) => item.id === Number(edit.dataset.escalationEdit));
+    if (level) openEscalationDialog(level);
+    return;
+  }
+
+  const remove = event.target.closest("[data-escalation-delete]");
+  if (remove) {
+    if (!confirm("Diese Stufe entfernen?")) return;
+    try {
+      await api(`/api/escalation/${remove.dataset.escalationDelete}`, { method: "DELETE" });
+      showToast("Stufe entfernt.");
+      await loadEscalation();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+});
+
+$("#escalation-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const levelId = $("#escalation-dialog").dataset.levelId;
+
+  const payload = {
+    position: Number($("#escalation-position").value) || 0,
+    name: $("#escalation-name").value,
+    responsible: $("#escalation-responsible").value,
+    contact: $("#escalation-contact").value || null,
+    responseTime: $("#escalation-response").value || null,
+    criteria: $("#escalation-criteria").value || null,
+  };
+
+  try {
+    await api(levelId ? `/api/escalation/${levelId}` : "/api/escalation", {
+      method: levelId ? "PUT" : "POST",
+      body: JSON.stringify(payload),
+    });
+    $("#escalation-dialog").close();
+    showToast("Eskalationsstufe gespeichert.");
+    await loadEscalation();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+// --- Dienstuebergabe ------------------------------------------------------
+$("#handover-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await api("/api/handovers", {
+      method: "POST",
+      body: JSON.stringify({
+        shiftLabel: $("#handover-shift").value,
+        openCases: $("#handover-cases").value || null,
+        incidents: $("#handover-incidents").value || null,
+        notes: $("#handover-notes").value || null,
+      }),
+    });
+    event.target.reset();
+    showToast("Übergabe gespeichert.");
+    await loadHandovers();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+$("#handover-list").addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-handover-ack]");
+  if (!button) return;
+
+  try {
+    await api(`/api/handovers/${button.dataset.handoverAck}/acknowledge`, {
+      method: "POST",
+      body: "{}",
+    });
+    showToast("Übernahme bestätigt.");
+    await loadHandovers();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+// --- Erinnerungen ---------------------------------------------------------
+$("#reminder-button").addEventListener("click", async () => {
+  await loadReminders().catch(() => {});
+  $("#reminder-dialog").showModal();
+});
+
+$("#reminder-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const message = $("#reminder-message").value.trim();
+  const dueAt = $("#reminder-due").value;
+
+  if (!message || !dueAt) {
+    alert("Bitte Text und Zeitpunkt angeben.");
+    return;
+  }
+
+  try {
+    await api("/api/reminders", {
+      method: "POST",
+      body: JSON.stringify({
+        message,
+        ticketRef: $("#reminder-ticket").value || null,
+        dueAt,
+      }),
+    });
+    $("#reminder-message").value = "";
+    $("#reminder-ticket").value = "";
+    $("#reminder-due").value = "";
+    showToast("Erinnerung angelegt.");
+    await loadReminders();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+$("#reminder-list").addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-reminder-done]");
+  if (!button) return;
+
+  try {
+    await api(`/api/reminders/${button.dataset.reminderDone}`, { method: "DELETE" });
+    await loadReminders();
+  } catch (error) {
+    alert(error.message);
   }
 });
 

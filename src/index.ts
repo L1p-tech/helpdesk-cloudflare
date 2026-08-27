@@ -1794,6 +1794,500 @@ async function handleHistory(
  * Plausibilitaets-, keine Betrugssicherung -- fuer eine interne Bestenliste
  * bewusst ausreichend.
  */
+/* ============================================================
+   Fall-Arbeitsblatt
+   ============================================================
+   Haelt waehrend der Bearbeitung fest, was benutzt wurde, und erzeugt daraus
+   die Ticket-Dokumentation. Jeder Fall gehoert genau einem Benutzer -- alle
+   Abfragen filtern deshalb zusaetzlich auf user_id, damit niemand fremde
+   Faelle liest oder aendert.
+*/
+const CASE_ENTRY_KINDS = ["template", "command", "solution", "note"] as const;
+
+async function handleCases(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  path: string,
+): Promise<Response | null> {
+  if (path === "/api/cases" && request.method === "GET") {
+    const rows = await env.DB.prepare(
+      `SELECT id, ticket_ref, title, status, notes, created_at, closed_at
+       FROM cases WHERE user_id = ?1
+       ORDER BY status = 'closed', updated_at DESC
+       LIMIT 50`,
+    ).bind(user.id).all();
+
+    return json({ cases: rows.results });
+  }
+
+  if (path === "/api/cases" && request.method === "POST") {
+    const body = await readJson<Record<string, unknown>>(request);
+    const ticketRef = requiredString(body.ticketRef, "Ticketnummer", 60);
+    const title = requiredString(body.title, "Kurzbeschreibung", 200);
+
+    const result = await env.DB.prepare(
+      `INSERT INTO cases (user_id, ticket_ref, title) VALUES (?1, ?2, ?3)`,
+    ).bind(user.id, ticketRef, title).run();
+
+    return json({ id: Number(result.meta.last_row_id) }, { status: 201 });
+  }
+
+  const caseMatch = path.match(/^\/api\/cases\/(\d+)$/);
+  if (caseMatch && request.method === "GET") {
+    const caseId = positiveInteger(caseMatch[1], "Fall-ID");
+
+    const record = await env.DB.prepare(
+      `SELECT id, ticket_ref, title, status, notes, created_at, closed_at
+       FROM cases WHERE id = ?1 AND user_id = ?2`,
+    ).bind(caseId, user.id).first();
+
+    if (!record) throw new HttpError(404, "Fall wurde nicht gefunden.");
+
+    const entries = await env.DB.prepare(
+      `SELECT id, kind, ref_id, label, detail, created_at
+       FROM case_entries WHERE case_id = ?1 ORDER BY created_at`,
+    ).bind(caseId).all();
+
+    return json({ case: record, entries: entries.results });
+  }
+
+  if (caseMatch && request.method === "PUT") {
+    const caseId = positiveInteger(caseMatch[1], "Fall-ID");
+    const body = await readJson<Record<string, unknown>>(request);
+    const notes = optionalString(body.notes, 20_000);
+    const status = oneOf(body.status ?? "open", ["open", "closed"] as const, "Ungültiger Status.");
+
+    const result = await env.DB.prepare(
+      `UPDATE cases
+       SET notes = ?1, status = ?2,
+           closed_at = CASE WHEN ?2 = 'closed' THEN CURRENT_TIMESTAMP ELSE NULL END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?3 AND user_id = ?4`,
+    ).bind(notes, status, caseId, user.id).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Fall wurde nicht gefunden.");
+    }
+    return json({ ok: true });
+  }
+
+  if (caseMatch && request.method === "DELETE") {
+    const caseId = positiveInteger(caseMatch[1], "Fall-ID");
+    const result = await env.DB.prepare(
+      "DELETE FROM cases WHERE id = ?1 AND user_id = ?2",
+    ).bind(caseId, user.id).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Fall wurde nicht gefunden.");
+    }
+    return json({ ok: true });
+  }
+
+  const entryMatch = path.match(/^\/api\/cases\/(\d+)\/entries$/);
+  if (entryMatch && request.method === "POST") {
+    const caseId = positiveInteger(entryMatch[1], "Fall-ID");
+    const body = await readJson<Record<string, unknown>>(request);
+    const kind = oneOf(body.kind, CASE_ENTRY_KINDS, "Ungültige Eintragsart.");
+    const label = requiredString(body.label, "Bezeichnung", 300);
+    const detail = optionalString(body.detail, 20_000);
+    const refId = body.refId ? positiveInteger(body.refId, "Verweis") : null;
+
+    // Zugehoerigkeit pruefen, bevor etwas angehaengt wird.
+    const owned = await env.DB.prepare(
+      "SELECT id FROM cases WHERE id = ?1 AND user_id = ?2",
+    ).bind(caseId, user.id).first();
+
+    if (!owned) throw new HttpError(404, "Fall wurde nicht gefunden.");
+
+    await env.DB.prepare(
+      `INSERT INTO case_entries (case_id, kind, ref_id, label, detail)
+       VALUES (?1, ?2, ?3, ?4, ?5)`,
+    ).bind(caseId, kind, refId, label, detail).run();
+
+    await env.DB.prepare(
+      "UPDATE cases SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+    ).bind(caseId).run();
+
+    return json({ ok: true }, { status: 201 });
+  }
+
+  const entryDeleteMatch = path.match(/^\/api\/cases\/(\d+)\/entries\/(\d+)$/);
+  if (entryDeleteMatch && request.method === "DELETE") {
+    const caseId = positiveInteger(entryDeleteMatch[1], "Fall-ID");
+    const entryId = positiveInteger(entryDeleteMatch[2], "Eintrags-ID");
+
+    // Der Join auf cases stellt sicher, dass nur eigene Eintraege verschwinden.
+    const result = await env.DB.prepare(
+      `DELETE FROM case_entries
+       WHERE id = ?1 AND case_id = ?2
+         AND EXISTS (SELECT 1 FROM cases WHERE id = ?2 AND user_id = ?3)`,
+    ).bind(entryId, caseId, user.id).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Eintrag wurde nicht gefunden.");
+    }
+    return json({ ok: true });
+  }
+
+  return null;
+}
+
+/* ============================================================
+   Erinnerungen
+   ============================================================
+   Faellige Erinnerungen stellt der zeitgesteuerte Lauf als Benachrichtigung
+   zu (siehe deliverDueReminders).
+*/
+async function handleReminders(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  path: string,
+): Promise<Response | null> {
+  if (path === "/api/reminders" && request.method === "GET") {
+    const rows = await env.DB.prepare(
+      `SELECT id, message, ticket_ref, due_at, done, notified_at
+       FROM reminders WHERE user_id = ?1 AND done = 0
+       ORDER BY due_at
+       LIMIT 50`,
+    ).bind(user.id).all();
+
+    return json({ reminders: rows.results });
+  }
+
+  if (path === "/api/reminders" && request.method === "POST") {
+    const body = await readJson<Record<string, unknown>>(request);
+    const message = requiredString(body.message, "Text", 500);
+    const ticketRef = optionalString(body.ticketRef, 60);
+    const dueAt = requiredString(body.dueAt, "Zeitpunkt", 40);
+
+    // Der Wert kommt aus einem datetime-local-Feld und ist damit
+    // nutzerkontrolliert -- ohne Pruefung landete Unsinn in der Sortierung.
+    if (Number.isNaN(Date.parse(dueAt))) {
+      throw new HttpError(400, "Zeitpunkt ist ungültig.");
+    }
+
+    const result = await env.DB.prepare(
+      `INSERT INTO reminders (user_id, message, ticket_ref, due_at)
+       VALUES (?1, ?2, ?3, ?4)`,
+    ).bind(user.id, message, ticketRef, new Date(dueAt).toISOString()).run();
+
+    return json({ id: Number(result.meta.last_row_id) }, { status: 201 });
+  }
+
+  const reminderMatch = path.match(/^\/api\/reminders\/(\d+)$/);
+  if (reminderMatch && request.method === "DELETE") {
+    const reminderId = positiveInteger(reminderMatch[1], "Erinnerungs-ID");
+
+    const result = await env.DB.prepare(
+      "UPDATE reminders SET done = 1 WHERE id = ?1 AND user_id = ?2 AND done = 0",
+    ).bind(reminderId, user.id).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Erinnerung wurde nicht gefunden.");
+    }
+    return json({ ok: true });
+  }
+
+  return null;
+}
+
+/**
+ * Stellt faellige Erinnerungen als Benachrichtigung zu.
+ *
+ * `notified_at` verhindert Doppelzustellung: Der Lauf greift nur Eintraege ab,
+ * die noch nie zugestellt wurden.
+ */
+async function deliverDueReminders(env: Env): Promise<void> {
+  const due = await env.DB.prepare(
+    `SELECT id, user_id, message, ticket_ref
+     FROM reminders
+     WHERE done = 0 AND notified_at IS NULL AND due_at <= CURRENT_TIMESTAMP
+     LIMIT 100`,
+  ).all<{ id: number; user_id: number; message: string; ticket_ref: string | null }>();
+
+  for (const reminder of due.results) {
+    await notify(
+      env,
+      reminder.user_id,
+      "reminder",
+      "Erinnerung fällig",
+      reminder.ticket_ref
+        ? `${reminder.ticket_ref}: ${reminder.message}`
+        : reminder.message,
+    );
+
+    await env.DB.prepare(
+      "UPDATE reminders SET notified_at = CURRENT_TIMESTAMP WHERE id = ?1",
+    ).bind(reminder.id).run();
+  }
+}
+
+/* ============================================================
+   Eskalation und Dienstuebergabe
+   ============================================================ */
+async function handleEscalation(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  path: string,
+): Promise<Response | null> {
+  if (path === "/api/escalation" && request.method === "GET") {
+    const rows = await env.DB.prepare(
+      `SELECT id, position, name, responsible, contact, response_time, criteria
+       FROM escalation_levels WHERE active = 1
+       ORDER BY position, id`,
+    ).all();
+
+    return json({ levels: rows.results });
+  }
+
+  if (path === "/api/escalation" && request.method === "POST") {
+    requireRole(user, ["admin"]);
+    const body = await readJson<Record<string, unknown>>(request);
+
+    const result = await env.DB.prepare(
+      `INSERT INTO escalation_levels
+        (position, name, responsible, contact, response_time, criteria)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+    ).bind(
+      Number(body.position) || 0,
+      requiredString(body.name, "Bezeichnung", 120),
+      requiredString(body.responsible, "Zuständigkeit", 200),
+      optionalString(body.contact, 200),
+      optionalString(body.responseTime, 120),
+      optionalString(body.criteria, 2000),
+    ).run();
+
+    const levelId = Number(result.meta.last_row_id);
+    await audit(env, user.id, "create", "escalation_level", levelId);
+    return json({ id: levelId }, { status: 201 });
+  }
+
+  const levelMatch = path.match(/^\/api\/escalation\/(\d+)$/);
+  if (levelMatch && request.method === "PUT") {
+    requireRole(user, ["admin"]);
+    const levelId = positiveInteger(levelMatch[1], "Stufen-ID");
+    const body = await readJson<Record<string, unknown>>(request);
+
+    const result = await env.DB.prepare(
+      `UPDATE escalation_levels
+       SET position = ?1, name = ?2, responsible = ?3, contact = ?4,
+           response_time = ?5, criteria = ?6, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?7 AND active = 1`,
+    ).bind(
+      Number(body.position) || 0,
+      requiredString(body.name, "Bezeichnung", 120),
+      requiredString(body.responsible, "Zuständigkeit", 200),
+      optionalString(body.contact, 200),
+      optionalString(body.responseTime, 120),
+      optionalString(body.criteria, 2000),
+      levelId,
+    ).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Eskalationsstufe wurde nicht gefunden.");
+    }
+
+    await audit(env, user.id, "update", "escalation_level", levelId);
+    return json({ ok: true });
+  }
+
+  if (levelMatch && request.method === "DELETE") {
+    requireRole(user, ["admin"]);
+    const levelId = positiveInteger(levelMatch[1], "Stufen-ID");
+
+    const result = await env.DB.prepare(
+      "UPDATE escalation_levels SET active = 0 WHERE id = ?1 AND active = 1",
+    ).bind(levelId).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(404, "Eskalationsstufe wurde nicht gefunden.");
+    }
+
+    await audit(env, user.id, "delete", "escalation_level", levelId);
+    return json({ ok: true });
+  }
+
+  return null;
+}
+
+async function handleHandovers(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  path: string,
+): Promise<Response | null> {
+  if (path === "/api/handovers" && request.method === "GET") {
+    const rows = await env.DB.prepare(
+      `SELECT h.id, h.shift_label, h.open_cases, h.incidents, h.notes,
+              h.created_at, h.acknowledged_at,
+              COALESCE(h.created_by_name, ?1) AS created_by_name,
+              h.acknowledged_by_name
+       FROM handovers h
+       ORDER BY h.created_at DESC
+       LIMIT 30`,
+    ).bind(DELETED_USER_LABEL).all();
+
+    return json({ handovers: rows.results });
+  }
+
+  if (path === "/api/handovers" && request.method === "POST") {
+    const body = await readJson<Record<string, unknown>>(request);
+    const shiftLabel = requiredString(body.shiftLabel, "Schicht", 120);
+    const openCases = optionalString(body.openCases, 20_000);
+    const incidents = optionalString(body.incidents, 20_000);
+    const notes = optionalString(body.notes, 20_000);
+
+    if (!openCases && !incidents && !notes) {
+      throw new HttpError(400, "Bitte mindestens einen Bereich ausfüllen.");
+    }
+
+    const result = await env.DB.prepare(
+      `INSERT INTO handovers
+        (shift_label, open_cases, incidents, notes, created_by, created_by_name)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+    ).bind(shiftLabel, openCases, incidents, notes, user.id, user.displayName).run();
+
+    const handoverId = Number(result.meta.last_row_id);
+    await audit(env, user.id, "create", "handover", handoverId);
+    return json({ id: handoverId }, { status: 201 });
+  }
+
+  const ackMatch = path.match(/^\/api\/handovers\/(\d+)\/acknowledge$/);
+  if (ackMatch && request.method === "POST") {
+    const handoverId = positiveInteger(ackMatch[1], "Übergabe-ID");
+
+    // Nur einmal bestaetigen, und nicht die eigene Uebergabe -- sonst waere die
+    // Bestaetigung ohne Aussage.
+    const result = await env.DB.prepare(
+      `UPDATE handovers
+       SET acknowledged_by = ?1, acknowledged_by_name = ?2,
+           acknowledged_at = CURRENT_TIMESTAMP
+       WHERE id = ?3 AND acknowledged_at IS NULL AND created_by IS NOT ?1`,
+    ).bind(user.id, user.displayName, handoverId).run();
+
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new HttpError(
+        409,
+        "Übergabe wurde bereits bestätigt oder stammt von dir selbst.",
+      );
+    }
+
+    await audit(env, user.id, "acknowledge", "handover", handoverId);
+    return json({ ok: true });
+  }
+
+  return null;
+}
+
+/* ============================================================
+   Nutzung und Statistik
+   ============================================================ */
+async function handleUsage(
+  request: Request,
+  env: Env,
+  user: AuthUser,
+  path: string,
+): Promise<Response | null> {
+  // Zaehlt eine Oeffnung oder eine Rueckmeldung "hat geholfen".
+  if (path === "/api/usage" && request.method === "POST") {
+    const body = await readJson<Record<string, unknown>>(request);
+    const contentType = oneOf(body.contentType, CONTENT_TYPES, "Ungültige Inhaltsart.");
+    const contentId = positiveInteger(body.contentId, "Inhalts-ID");
+    const helpful = body.helpful === true;
+
+    await env.DB.prepare(
+      `INSERT INTO content_usage (content_type, content_id, opened_count, helpful_count)
+       VALUES (?1, ?2, 1, ?3)
+       ON CONFLICT (content_type, content_id) DO UPDATE SET
+         opened_count = opened_count + 1,
+         helpful_count = helpful_count + ?3,
+         last_used_at = CURRENT_TIMESTAMP`,
+    ).bind(contentType, contentId, helpful ? 1 : 0).run();
+
+    return json({ ok: true });
+  }
+
+  // Suche ohne Treffer festhalten -- zeigt, welches Wissen fehlt.
+  if (path === "/api/usage/miss" && request.method === "POST") {
+    const body = await readJson<Record<string, unknown>>(request);
+    const term = requiredString(body.term, "Suchbegriff", 200);
+    const scope = oneOf(
+      body.scope,
+      ["templates", "commands", "solutions"] as const,
+      "Ungültiger Bereich.",
+    );
+
+    await env.DB.prepare(
+      "INSERT INTO search_misses (term, scope, user_id) VALUES (?1, ?2, ?3)",
+    ).bind(term.toLowerCase(), scope, user.id).run();
+
+    return json({ ok: true });
+  }
+
+  if (path === "/api/usage/stats" && request.method === "GET") {
+    const [topSolutions, topCommands, misses, contributors, counts] = await Promise.all([
+      env.DB.prepare(
+        `SELECT s.id, s.title, s.category, u.opened_count, u.helpful_count
+         FROM content_usage u
+         JOIN solutions s ON s.id = u.content_id AND s.active = 1
+         WHERE u.content_type = 'solution'
+         ORDER BY u.opened_count DESC LIMIT 10`,
+      ).all(),
+      env.DB.prepare(
+        `SELECT c.id, c.name AS title, c.category, u.opened_count, u.helpful_count
+         FROM content_usage u
+         JOIN commands c ON c.id = u.content_id AND c.active = 1
+         WHERE u.content_type = 'command'
+         ORDER BY u.opened_count DESC LIMIT 10`,
+      ).all(),
+      env.DB.prepare(
+        `SELECT term, scope, COUNT(*) AS treffer, MAX(created_at) AS zuletzt
+         FROM search_misses
+         WHERE created_at >= datetime('now', '-90 days')
+         GROUP BY term, scope
+         HAVING COUNT(*) > 1
+         ORDER BY treffer DESC LIMIT 15`,
+      ).all(),
+      // Beitraege je Person: Wer pflegt die Wissensbasis?
+      env.DB.prepare(
+        `SELECT name, SUM(anzahl) AS beitraege FROM (
+           SELECT COALESCE(created_by_name, ?1) AS name, COUNT(*) AS anzahl
+           FROM templates WHERE active = 1 GROUP BY created_by_name
+           UNION ALL
+           SELECT COALESCE(created_by_name, ?1) AS name, COUNT(*) AS anzahl
+           FROM commands WHERE active = 1 GROUP BY created_by_name
+           UNION ALL
+           SELECT COALESCE(created_by_name, ?1) AS name, COUNT(*) AS anzahl
+           FROM solutions WHERE active = 1 GROUP BY created_by_name
+         ) GROUP BY name ORDER BY beitraege DESC LIMIT 15`,
+      ).bind(DELETED_USER_LABEL).all(),
+      env.DB.prepare(
+        `SELECT
+           (SELECT COUNT(*) FROM templates WHERE active = 1) AS vorlagen,
+           (SELECT COUNT(*) FROM commands WHERE active = 1) AS befehle,
+           (SELECT COUNT(*) FROM solutions WHERE active = 1) AS loesungen,
+           (SELECT COUNT(*) FROM cases WHERE status = 'open') AS offene_faelle,
+           (SELECT COUNT(*) FROM template_proposals WHERE status = 'pending')
+             + (SELECT COUNT(*) FROM content_proposals WHERE status = 'pending')
+             AS offene_vorschlaege`,
+      ).first(),
+    ]);
+
+    return json({
+      topSolutions: topSolutions.results,
+      topCommands: topCommands.results,
+      misses: misses.results,
+      contributors: contributors.results,
+      counts,
+    });
+  }
+
+  return null;
+}
+
 async function handleGame(
   request: Request,
   env: Env,
@@ -2237,6 +2731,11 @@ const AUTHENTICATED_HANDLERS = [
   handleCommands,
   handleSolutions,
   handleContentProposals,
+  handleCases,
+  handleReminders,
+  handleEscalation,
+  handleHandovers,
+  handleUsage,
   handleFeedback,
   handleUsers,
   handleHistory,
@@ -2296,6 +2795,14 @@ export default {
       // die einzelnen Quellen behandeln ihre Fehler bereits selbst, und ein
       // erneuter Versuch folgt ohnehin in 30 Minuten.
       console.error("Zeitgesteuerter Feed-Abruf fehlgeschlagen:", error);
+    }
+
+    // Eigener Block: Schlaegt der Feed-Abruf fehl, sollen die Erinnerungen
+    // trotzdem zugestellt werden -- und umgekehrt.
+    try {
+      await deliverDueReminders(env);
+    } catch (error) {
+      console.error("Zustellung faelliger Erinnerungen fehlgeschlagen:", error);
     }
   },
 } satisfies ExportedHandler<Env>;
