@@ -535,8 +535,14 @@ async function handleProposals(
   path: string,
 ): Promise<Response | null> {
   if (path === "/api/proposals" && request.method === "GET") {
-    // Pruefer sehen alle offenen Vorschlaege, Mitarbeiter nur ihre eigenen.
-    const isReviewer = user.role === "admin" || user.role === "editor";
+    /*
+     * `scope=mine` liefert die eigenen Vorschlaege, sonst die offenen zur
+     * Pruefung. Ohne diese Unterscheidung entschied allein die Rolle, wodurch
+     * Pruefer auch unter "Meine Vorschlaege" fremde Einreichungen sahen.
+     */
+    const scope = new URL(request.url).searchParams.get("scope");
+    const isReviewer = scope !== "mine"
+      && (user.role === "admin" || user.role === "editor");
     const query = env.DB.prepare(
       `SELECT p.*, c.name AS category_name, c.color AS category_color,
               d.title AS duplicate_title
@@ -973,8 +979,10 @@ async function handleContentProposals(
   path: string,
 ): Promise<Response | null> {
   if (path === "/api/content-proposals" && request.method === "GET") {
-    // Pruefer sehen alle offenen, Mitarbeiter ihre eigenen -- wie bei Vorlagen.
-    const isReviewer = user.role === "admin" || user.role === "editor";
+    // Wie bei den Vorlagen: `scope=mine` erzwingt die eigene Sicht.
+    const scope = new URL(request.url).searchParams.get("scope");
+    const isReviewer = scope !== "mine"
+      && (user.role === "admin" || user.role === "editor");
     const query = env.DB.prepare(
       `SELECT id, content_type, target_id, proposal_type, title, payload_json,
               reason, status, submitted_by, submitted_by_name, review_note,

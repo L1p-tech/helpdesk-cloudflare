@@ -478,12 +478,13 @@ function renderQuickbar() {
 
 /** Zeigt die Schnellleiste nur dort, wo sie Bezug hat und Inhalt zeigt. */
 function updateQuickbarVisibility() {
-  const relevantView = ["templates", "commands"].includes(state.activeView);
+  // Auf allen Reitern sichtbar: Der Schnellzugriff wird auch dann gebraucht,
+  // wenn man gerade im Ticket-Generator oder in der Diagnose steht.
   const hasContent = state.recentItems.length > 0
     || state.templates.some((item) => isFavorite("template", item.id))
     || state.commands.some((item) => isFavorite("command", item.id));
 
-  $("#quickbar").classList.toggle("hidden", !relevantView || !hasContent);
+  $("#quickbar").classList.toggle("hidden", !hasContent);
 }
 
 function renderDiagnosticChecklist() {
@@ -1478,9 +1479,12 @@ function safeParse(value) {
 }
 
 async function loadProposals(view) {
+  // Unter "Meine Vorschlaege" zaehlt die eigene Sicht -- auch fuer Pruefer,
+  // die sonst dort die Einreichungen aller Kollegen sehen wuerden.
+  const scope = view === "approvals" ? "" : "?scope=mine";
   const [data, contentData] = await Promise.all([
-    api("/api/proposals"),
-    api("/api/content-proposals"),
+    api(`/api/proposals${scope}`),
+    api(`/api/content-proposals${scope}`),
   ]);
   state.proposals = data.proposals;
   state.contentProposals = contentData.proposals;
@@ -1808,11 +1812,13 @@ async function switchView(view) {
   $("#view-eyebrow").textContent = config[0];
   $("#view-title").textContent = config[1];
   $("#view-description").textContent = config[2];
+  // Je Reiter der passende Knopf in der Kopfzeile -- die Beschriftung setzen
+  // renderCommands und renderSolutions anhand der Rolle.
   $("#new-proposal-button").classList.toggle("hidden", view !== "templates");
+  $("#new-command-button").classList.toggle("hidden", view !== "commands");
+  $("#new-solution-button").classList.toggle("hidden", view !== "solutions");
 
-  // Die Schnellleiste zeigt zuletzt kopierte Vorlagen und Befehle -- auf den
-  // uebrigen Reitern (Verwaltung, Meldungen, Spiel ...) hat sie keinen Bezug
-  // und schob dort nur den eigentlichen Inhalt nach unten.
+  // Die Schnellleiste bleibt auf jedem Reiter erreichbar.
   updateQuickbarVisibility();
 
   if (view === "solutions") renderSolutions();
