@@ -1296,6 +1296,36 @@ async function handleHistory(
     return json({ ok: true });
   }
 
+  // Einzelne Version aus der Historie entfernen.
+  //
+  // Wie beim Papierkorb nur fuer Admins: Der Vorgang ist nicht umkehrbar.
+  // Betroffen ist ausschliesslich der Historieneintrag -- die Vorlage selbst
+  // und ihr aktueller Stand bleiben unberuehrt.
+  const versionPurgeMatch = path.match(/^\/api\/history\/version\/(\d+)$/);
+  if (versionPurgeMatch && request.method === "DELETE") {
+    requireRole(user, ["admin"]);
+    const versionId = positiveInteger(versionPurgeMatch[1], "Versions-ID");
+
+    // Titel und Versionsnummer vorher lesen, damit das Protokoll
+    // nachvollziehbar bleibt.
+    const version = await env.DB.prepare(
+      "SELECT template_id, version, title FROM template_versions WHERE id = ?1",
+    ).bind(versionId).first<{ template_id: number; version: number; title: string }>();
+
+    if (!version) throw new HttpError(404, "Version wurde nicht gefunden.");
+
+    await env.DB.prepare(
+      "DELETE FROM template_versions WHERE id = ?1",
+    ).bind(versionId).run();
+
+    await audit(env, user.id, "purge", "template_version", versionId, {
+      templateId: version.template_id,
+      version: version.version,
+      title: version.title,
+    });
+    return json({ ok: true });
+  }
+
   // Endgueltiges Loeschen aus dem Papierkorb.
   //
   // Bewusst nur fuer Admins, waehrend Wiederherstellen auch Redakteuren offen

@@ -686,8 +686,10 @@ function historyRow(item, type) {
         ${canRestore
         ? `<button type="button" data-restore-${type}="${item.id}">Wiederherstellen</button>`
         : ""}
-        ${type === "template" && isAdmin()
-        ? `<button class="danger-button" type="button" data-purge-template="${item.id}">Endgültig löschen</button>`
+        ${isAdmin()
+        ? `<button class="danger-button" type="button" data-purge-${type}="${item.id}">${
+          type === "template" ? "Endgültig löschen" : "Version löschen"
+        }</button>`
         : ""}
       </div>
     </article>
@@ -722,6 +724,25 @@ async function restoreHistoryItem(type, id) {
  * Der Titel steht in der Rueckfrage, damit klar ist, welche Vorlage betroffen
  * ist -- der Vorgang laesst sich nicht rueckgaengig machen.
  */
+/**
+ * Entfernt einen einzelnen Eintrag aus der Versionshistorie.
+ *
+ * Betroffen ist nur der alte Stand -- die Vorlage selbst bleibt unveraendert.
+ * Das steht auch in der Rueckfrage, damit die Tragweite klar ist.
+ */
+async function purgeVersion(id) {
+  const row = $(`[data-purge-version="${id}"]`)?.closest(".history-row");
+  const title = row?.querySelector("h4")?.textContent ?? "Dieser Stand";
+
+  if (!confirm(`Diese Version von „${title}“ endgültig löschen?\n\nDer alte Stand wird unwiderruflich aus der Historie entfernt. Die Vorlage selbst bleibt unverändert.`)) {
+    return;
+  }
+
+  await api(`/api/history/version/${id}`, { method: "DELETE" });
+  showToast("Version wurde gelöscht.");
+  await loadHistory();
+}
+
 async function purgeTemplate(id) {
   const title = $(`[data-purge-template="${id}"]`)
     ?.closest(".history-row")
@@ -3374,9 +3395,18 @@ $("#history-refresh-button").addEventListener("click", () => {
   loadHistory().catch((error) => alert(error.message));
 });
 $("#template-version-list").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-restore-version]");
-  if (button) restoreHistoryItem("version", Number(button.dataset.restoreVersion))
-    .catch((error) => alert(error.message));
+  const restoreButton = event.target.closest("[data-restore-version]");
+  if (restoreButton) {
+    restoreHistoryItem("version", Number(restoreButton.dataset.restoreVersion))
+      .catch((error) => alert(error.message));
+    return;
+  }
+
+  const purgeButton = event.target.closest("[data-purge-version]");
+  if (purgeButton) {
+    purgeVersion(Number(purgeButton.dataset.purgeVersion))
+      .catch((error) => alert(error.message));
+  }
 });
 $("#template-trash-list").addEventListener("click", (event) => {
   const restoreButton = event.target.closest("[data-restore-template]");
