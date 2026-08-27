@@ -1587,7 +1587,7 @@ function templateCard(template) {
     : "";
 
   return `
-    <details class="card">
+    <details class="card category-card" style="--category-color:${template.category_color}">
       <summary>
         <button
           class="favorite-button ${favorite ? "active" : ""}"
