@@ -214,12 +214,15 @@ h1, h2, h3, h4, p { margin-top: 0; }
  * Die Höhenbegrenzung verhindert, dass das hochkante Motiv das Formular auf
  * kleinen Bildschirmen aus dem sichtbaren Bereich schiebt.
  */
-.login-cat {
+.login-media {
   width: min(460px, 100%);
   /* Keine Höhenbegrenzung: Das Bild soll vollständig und in seinen echten
      Proportionen erscheinen. Es steht unter dem Formular, das Anmelden bleibt
      also auch dann erreichbar, wenn die Seite dadurch scrollt. */
   height: auto;
+  /* Das GIF ist kleiner als die Kartenbreite -- ohne diese Angabe würde es
+     hochskaliert und dabei unscharf. */
+  max-width: 370px;
   margin-top: 20px;
   border-radius: 24px;
   border: 1px solid var(--border);
