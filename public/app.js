@@ -975,6 +975,44 @@ function renderTemplates() {
     : `<div class="panel muted">Keine Vorlagen gefunden.</div>`;
 }
 
+/** Feste Farben fuer bekannte Bereiche -- passend zu den Kategorien der Vorlagen. */
+const COMMAND_CATEGORY_COLORS = {
+  netzwerk: "#42a7c6",
+  windows: "#4a7cff",
+  benutzer: "#5b8def",
+  drucker: "#d89b36",
+  software: "#2ea86e",
+  hardware: "#d55f5f",
+  vpn: "#b36ae2",
+  "e-mail": "#d97706",
+  berechtigungen: "#5b8def",
+  sicherheit: "#8b5cf6",
+  speicher: "#1f9d8b",
+  dienste: "#c05621",
+};
+
+/** Ausweichpalette fuer Bereiche ohne feste Farbe. */
+const CATEGORY_FALLBACK_COLORS = [
+  "#4a7cff", "#2ea86e", "#d89b36", "#b36ae2", "#d55f5f",
+  "#42a7c6", "#1f9d8b", "#c05621", "#8b5cf6", "#d97706",
+];
+
+/**
+ * Liefert eine stabile Farbe fuer einen Bereich. Bekannte Bereiche bekommen ihre
+ * feste Farbe, alle anderen eine per Namen gehashte -- so bleibt sie ueber
+ * Neuladen hinweg gleich.
+ */
+function commandCategoryColor(category) {
+  const key = String(category || "").trim().toLowerCase();
+  if (COMMAND_CATEGORY_COLORS[key]) return COMMAND_CATEGORY_COLORS[key];
+
+  let hash = 0;
+  for (let index = 0; index < key.length; index += 1) {
+    hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
+  }
+  return CATEGORY_FALLBACK_COLORS[hash % CATEGORY_FALLBACK_COLORS.length];
+}
+
 function commandCard(command) {
   const warning = command.risk_level === "high"
     ? "Hohes Risiko"
@@ -982,9 +1020,10 @@ function commandCard(command) {
       ? "Mittleres Risiko"
       : "Niedriges Risiko";
   const favorite = isFavorite("command", command.id);
+  const color = commandCategoryColor(command.category);
 
   return `
-    <details class="card">
+    <details class="card category-card" style="--category-color:${color}">
       <summary>
         <button
           class="favorite-button ${favorite ? "active" : ""}"
@@ -995,19 +1034,25 @@ function commandCard(command) {
           title="${favorite ? "Favorit entfernen" : "Als Favorit markieren"}"
         >★</button>
         <div class="summary-main">
-          <span class="badge">${escapeHtml(command.category)}</span>
+          <span
+            class="badge category-badge"
+            style="--category-color:${color}"
+          >${escapeHtml(command.category)}</span>
           <span class="summary-title">${escapeHtml(command.name)}</span>
         </div>
-        <span class="summary-meta">${escapeHtml(command.shell)} · ${warning}</span>
+        <span class="summary-meta">
+          <span class="badge shell-badge">${escapeHtml(command.shell)}</span>
+          <span class="badge risk-badge risk-${escapeHtml(command.risk_level)}">${warning}</span>
+        </span>
       </summary>
       <div class="card-content">
         <p class="muted">${escapeHtml(command.description)}</p>
         <div class="badges">
-          <span class="badge">${escapeHtml(command.shell)}</span>
-          <span class="badge">${warning}</span>
-          ${command.requires_admin ? '<span class="badge">Admin</span>' : ""}
-          ${command.remote_capable ? '<span class="badge">Remote</span>' : ""}
-          ${command.restart_required ? '<span class="badge">Neustart</span>' : ""}
+          <span class="badge shell-badge">${escapeHtml(command.shell)}</span>
+          <span class="badge risk-badge risk-${escapeHtml(command.risk_level)}">${warning}</span>
+          ${command.requires_admin ? '<span class="badge flag-badge flag-admin">Admin</span>' : ""}
+          ${command.remote_capable ? '<span class="badge flag-badge flag-remote">Remote</span>' : ""}
+          ${command.restart_required ? '<span class="badge flag-badge flag-restart">Neustart</span>' : ""}
         </div>
         <code class="command-code">${escapeHtml(command.command)}</code>
         <div class="card-actions">

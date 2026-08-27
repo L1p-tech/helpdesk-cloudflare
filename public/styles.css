@@ -529,6 +529,49 @@ details.card[open] summary::after { transform: rotate(225deg); }
   border-color: color-mix(in srgb, var(--category-color) 42%, transparent);
 }
 
+/* Farbiger Streifen am Kartenrand -- macht die Bereiche in langen Listen sichtbar. */
+.category-card {
+  border-left: 4px solid color-mix(in srgb, var(--category-color) 65%, transparent);
+}
+.category-card:hover {
+  border-left-color: var(--category-color);
+}
+details.card.category-card[open] {
+  border-color: color-mix(in srgb, var(--category-color) 45%, transparent);
+  border-left-color: var(--category-color);
+}
+
+/* Umgebung, Risiko und Zusatzhinweise farblich trennen. */
+.shell-badge {
+  color: color-mix(in srgb, #8aa0c8 75%, white 25%);
+  background: color-mix(in srgb, #8aa0c8 15%, transparent);
+  border-color: color-mix(in srgb, #8aa0c8 35%, transparent);
+}
+.risk-badge { border-color: color-mix(in srgb, var(--risk-color) 42%, transparent); }
+.risk-badge {
+  color: color-mix(in srgb, var(--risk-color) 72%, white 28%);
+  background: color-mix(in srgb, var(--risk-color) 16%, transparent);
+}
+.risk-low { --risk-color: #2ea86e; }
+.risk-medium { --risk-color: #d89b36; }
+.risk-high { --risk-color: #d55f5f; }
+
+.flag-badge {
+  color: color-mix(in srgb, var(--flag-color) 72%, white 28%);
+  background: color-mix(in srgb, var(--flag-color) 15%, transparent);
+  border-color: color-mix(in srgb, var(--flag-color) 38%, transparent);
+}
+.flag-admin { --flag-color: #b36ae2; }
+.flag-remote { --flag-color: #42a7c6; }
+.flag-restart { --flag-color: #d97706; }
+
+/* Badges in der Kopfzeile der Befehle nebeneinander halten. */
+.category-card .summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .template-body, .command-code, .output-box {
   display: block;
   width: 100%;
