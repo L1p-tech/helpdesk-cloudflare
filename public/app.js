@@ -500,6 +500,26 @@ async function loadCases() {
   $("#cases-list").innerHTML = state.cases.length
     ? state.cases.map(caseCard).join("")
     : '<div class="panel muted">Noch kein Fall angelegt.</div>';
+
+  updateCaseIndicator();
+}
+
+/**
+ * Zeigt in der Kopfzeile, welcher Fall gerade mitschreibt.
+ *
+ * Ohne den Hinweis fragt die Anwendung nach dem Kopieren nach einem Fall, den
+ * man womoeglich vor Stunden geoeffnet und laengst vergessen hat.
+ */
+function updateCaseIndicator() {
+  const anzeige = $("#case-indicator");
+  if (!anzeige) return;
+
+  const offen = state.cases.find((item) => item.status === "open");
+  anzeige.classList.toggle("hidden", !offen);
+  if (offen) {
+    anzeige.textContent = `● ${offen.ticket_ref}`;
+    anzeige.title = `Offener Fall: ${offen.title}`;
+  }
 }
 
 function caseCard(record) {
@@ -541,7 +561,7 @@ async function loadCaseDetail(caseId) {
           <button class="btn-link" type="button"
                   data-case-entry-delete="${entry.id}" data-case="${caseId}">Entfernen</button>
         </li>`).join("")}</ol>`
-    : '<p class="muted">Noch nichts festgehalten. Kopierte Vorlagen, Befehle und Lösungen landen automatisch hier.</p>';
+    : '<p class="muted">Noch nichts festgehalten. Nach dem Kopieren einer Vorlage, eines Befehls oder einer Lösung wird gefragt, ob es hierher gehört.</p>';
 
   container.innerHTML = `
     ${entries}
@@ -598,21 +618,60 @@ async function buildCaseDocumentation(caseId) {
 }
 
 /**
- * Haengt einen benutzten Inhalt an den offenen Fall an.
+ * Bietet an, einen benutzten Inhalt an den offenen Fall zu haengen.
  *
- * Ohne offenen Fall passiert nichts -- das Mitschreiben ist ein Angebot, kein
- * Zwang, und soll den normalen Ablauf nicht stoeren.
+ * Bewusst als Rueckfrage statt automatisch: Wer zwischendurch etwas fuer einen
+ * Kollegen heraussucht, haette es sonst im Fall stehen und muesste es dort
+ * wieder entfernen. Ohne Antwort passiert nichts -- der Hinweis verschwindet
+ * von selbst.
  */
 function trackInCase(kind, refId, label, detail = null) {
   const offen = state.cases.find((item) => item.status === "open");
   if (!offen) return;
 
-  api(`/api/cases/${offen.id}/entries`, {
-    method: "POST",
-    body: JSON.stringify({ kind, refId, label, detail }),
-  }).catch(() => {
-    // Mitschreiben ist Beiwerk und darf das Kopieren nicht stoeren.
+  askCaseCapture(offen, { kind, refId, label, detail });
+}
+
+let caseAskTimer = null;
+
+function askCaseCapture(fall, eintrag) {
+  const box = $("#case-ask");
+  clearTimeout(caseAskTimer);
+
+  box.innerHTML = `
+    <div class="case-ask-text">
+      <strong>Kopiert.</strong>
+      <span>Zu ${escapeHtml(fall.ticket_ref)} hinzufügen?</span>
+    </div>
+    <div class="case-ask-actions">
+      <button class="case-ask-yes" type="button">Ja</button>
+      <button class="case-ask-no" type="button">Nein</button>
+    </div>`;
+  box.classList.remove("hidden");
+
+  const schliessen = () => {
+    clearTimeout(caseAskTimer);
+    box.classList.add("hidden");
+  };
+
+  box.querySelector(".case-ask-yes").addEventListener("click", async () => {
+    schliessen();
+    try {
+      await api(`/api/cases/${fall.id}/entries`, {
+        method: "POST",
+        body: JSON.stringify(eintrag),
+      });
+      showToast(`Zu ${fall.ticket_ref} hinzugefügt.`);
+      if (state.activeView === "cases") await loadCases();
+    } catch (error) {
+      alert(error.message);
+    }
   });
+
+  box.querySelector(".case-ask-no").addEventListener("click", schliessen);
+
+  // Ohne Antwort nichts hinzufuegen -- Wegklicken ist die sichere Voreinstellung.
+  caseAskTimer = setTimeout(schliessen, 6000);
 }
 
 /* ============================================================
@@ -2477,7 +2536,7 @@ async function switchView(view) {
     cases: [
       "Arbeiten",
       "Meine Fälle",
-      "Hier sammelst du je Ticket, was du benutzt hast -- daraus entsteht die Dokumentation.",
+      "Ein offener Fall fragt nach jedem Kopieren, ob es dazugehört -- daraus entsteht die Dokumentation.",
     ],
     escalation: [
       "Arbeiten",
@@ -4930,6 +4989,9 @@ $("#handover-list").addEventListener("click", async (event) => {
 });
 
 // --- Erinnerungen ---------------------------------------------------------
+// Klick auf die Fallanzeige fuehrt direkt zum Fall.
+$("#case-indicator").addEventListener("click", () => switchView("cases"));
+
 $("#reminder-button").addEventListener("click", async () => {
   await loadReminders().catch(() => {});
   $("#reminder-dialog").showModal();

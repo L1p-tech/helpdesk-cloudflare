@@ -97,6 +97,8 @@
         </div>
 
         <div class="nav-spacer"></div>
+        <button class="nav-action case-indicator hidden" id="case-indicator"
+                type="button" title="Offener Fall"></button>
         <button class="nav-action" id="palette-button" type="button" title="Schnellsuche (Strg+K)">
           <span class="nav-action-icon">⌕</span> Suche
           <kbd class="nav-kbd">Strg K</kbd>
@@ -123,6 +125,9 @@
         </div>
 
         <div id="toast" class="toast hidden"></div>
+
+        <!-- Rueckfrage nach dem Kopieren: soll das in den offenen Fall? -->
+        <div id="case-ask" class="case-ask hidden" role="status"></div>
 
         <section class="view" id="view-templates">
           <div class="controls">
@@ -220,8 +225,9 @@
               <div>
                 <h3>Fall anlegen</h3>
                 <p class="panel-hint">
-                  Während der Bearbeitung sammelt der Fall mit, was du benutzt
-                  hast -- daraus entsteht die Ticket-Dokumentation.
+                  Solange ein Fall offen ist, fragt die Anwendung nach jedem
+                  Kopieren, ob es dazugehört. Daraus entsteht die
+                  Ticket-Dokumentation.
                 </p>
               </div>
             </div>
