@@ -1552,11 +1552,23 @@ function syncProposalCategoryMode() {
 }
 
 function replacePersonalPlaceholders(text) {
-  return replaceLiteral(text, "[ICH]", state.settings.signatureName || "[ICH]");
+  // Gleiche Rangfolge wie bei den erzeugten Ticket-Texten: bevorzugt der
+  // selbst gesetzte Signaturname, sonst der Anmeldename. Nur wenn beides
+  // fehlt, bleibt der Platzhalter sichtbar stehen.
+  const name = state.settings.signatureName || state.user?.displayName || "[ICH]";
+  return replaceLiteral(text, "[ICH]", name);
 }
 
+/**
+ * Kopiert Text in die Zwischenablage.
+ *
+ * Die persoenlichen Platzhalter werden bewusst hier und nicht bei den
+ * Aufrufern ersetzt: So ist kein Kopierweg davon ausgenommen - egal ob
+ * Vorlagenliste, Loesung oder Schnellsuche. Bei Texten ohne Platzhalter
+ * bleibt der Aufruf wirkungslos.
+ */
 async function copyText(text) {
-  await navigator.clipboard.writeText(text);
+  await navigator.clipboard.writeText(replacePersonalPlaceholders(text));
   showToast("In Zwischenablage kopiert.");
 }
 
@@ -1568,7 +1580,7 @@ async function copyText(text) {
  * scheitern, dass die Statistik nicht geschrieben werden konnte.
  */
 async function copyTemplate(template) {
-  await copyText(replacePersonalPlaceholders(template.body));
+  await copyText(template.body);
   addRecentItem("template", template.id, template.title);
   trackInCase("template", template.id, template.title);
 
