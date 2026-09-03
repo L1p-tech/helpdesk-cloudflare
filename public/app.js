@@ -766,6 +766,53 @@ function handoverSection(titel, inhalt) {
 /* ============================================================
    Statistik
    ============================================================ */
+/** Beschriftung der Formulare je Bereich, in dem gesucht wurde. */
+const MISS_SCOPE_LABELS = {
+  templates: "Vorlage",
+  commands: "Befehl",
+  solutions: "Lösung",
+  all: "Eintrag",
+};
+
+/**
+ * Eine Wissensluecke mit den passenden Aktionen.
+ *
+ * Welches Formular vorgeschlagen wird, richtet sich nach dem Bereich, in dem
+ * am haeufigsten vergeblich gesucht wurde. Bei der Schnellsuche ("all") laesst
+ * sich das nicht sagen -- dort werden alle drei Moeglichkeiten angeboten.
+ */
+function missRow(item) {
+  const term = escapeHtml(item.term);
+  const scope = item.scope || "all";
+  const personen = Number(item.personen || 0);
+
+  const arten = scope === "all"
+    ? ["templates", "commands", "solutions"]
+    : [scope];
+
+  const aktionen = arten.map((art) => `
+    <button type="button" class="btn-miss" data-miss-create="${art}"
+            data-miss-term="${term}">
+      + ${MISS_SCOPE_LABELS[art]}
+    </button>`).join("");
+
+  const abhaken = canReview()
+    ? `<button type="button" class="btn-miss" data-miss-resolve="${term}"
+               title="Lücke als erledigt abhaken">✓ Erledigt</button>`
+    : "";
+
+  return `
+    <li class="miss-row">
+      <div class="miss-main">
+        <span class="miss-term">${term}</span>
+        <span class="muted">
+          ${item.treffer}× gesucht${personen > 1 ? ` · von ${personen} Personen` : ""}
+        </span>
+      </div>
+      <div class="miss-actions">${aktionen}${abhaken}</div>
+    </li>`;
+}
+
 async function loadStats() {
   const data = await api("/api/usage/stats");
   const counts = data.counts || {};
@@ -813,12 +860,14 @@ async function loadStats() {
 
       <div class="panel-box">
         <h3>Gesucht, nichts gefunden</h3>
-        <p class="panel-hint">Hier fehlt Wissen -- diese Begriffe liefern keine Treffer.</p>
-        ${liste(data.misses.map((item) => `
-          <li>
-            <span>${escapeHtml(item.term)}</span>
-            <span class="muted">${item.treffer}× gesucht</span>
-          </li>`), "Keine erfolglosen Suchen -- gutes Zeichen.")}
+        <p class="panel-hint">
+          Hier fehlt Wissen -- diese Begriffe liefern keine Treffer.
+          ${canReview()
+            ? "Lege den fehlenden Eintrag direkt an oder hake die Lücke ab."
+            : "Du kannst den fehlenden Eintrag vorschlagen."}
+        </p>
+        ${liste(data.misses.map((item) => missRow(item)),
+          "Keine erfolglosen Suchen -- gutes Zeichen.")}
       </div>
 
       <div class="panel-box">
@@ -1109,7 +1158,9 @@ function renderPalette() {
   if (!paletteState.items.length) {
     container.innerHTML = '<p class="palette-empty">Nichts gefunden.</p>';
     // Erfolglose Suchen festhalten -- daraus wird sichtbar, welches Wissen fehlt.
-    reportSearchMiss(term, "solutions");
+    // "all", weil die Schnellsuche ueber alle drei Arten gleichzeitig sucht:
+    // welche davon gefehlt hat, laesst sich hier nicht sagen.
+    reportSearchMiss(term, "all");
     return;
   }
 
@@ -1770,6 +1821,8 @@ function renderTemplates() {
   $("#templates-list").innerHTML = templates.length
     ? templates.map(templateCard).join("")
     : `<div class="panel muted">Keine Vorlagen gefunden.</div>`;
+
+  if (search && !templates.length) reportSearchMiss(search, "templates");
 }
 
 /** Feste Farben fuer bekannte Bereiche -- passend zu den Kategorien der Vorlagen. */
@@ -1926,6 +1979,8 @@ function renderCommands() {
   $("#commands-list").innerHTML = commands.length
     ? commands.map(commandCard).join("")
     : `<div class="panel muted">Keine Befehle gefunden.</div>`;
+
+  if (search && !commands.length) reportSearchMiss(search, "commands");
 
   // Mitarbeiter schlagen vor, Redakteure und Admins legen direkt an.
   const button = $("#new-command-button");
@@ -2107,6 +2162,8 @@ function renderSolutions() {
   list.innerHTML = solutions.length
     ? solutions.map(solutionCard).join("")
     : `<div class="panel muted">Keine Lösungen gefunden.</div>`;
+
+  if (search && !solutions.length) reportSearchMiss(search, "solutions");
 
   // Beschriftung des Knopfs richtet sich nach der Rolle.
   const button = $("#new-solution-button");
@@ -4830,6 +4887,71 @@ $("#solutions-list").addEventListener("click", (event) => {
    ============================================================ */
 
 // --- Schnellsuche ---------------------------------------------------------
+/* ============================================================
+   Wissensluecken schliessen
+   ============================================================ */
+
+/**
+ * Oeffnet das passende Formular mit dem Suchbegriff als Titel.
+ *
+ * Der Begriff steht in der Datenbank klein geschrieben, weil die Auswertung
+ * sonst "Drucker" und "drucker" getrennt zaehlen wuerde. Fuer den Titel wird
+ * der erste Buchstabe wieder gross gesetzt.
+ */
+function createFromMiss(art, term) {
+  const titel = term.charAt(0).toUpperCase() + term.slice(1);
+
+  if (art === "templates") {
+    openProposal();
+    $("#proposal-title").value = titel;
+    $("#proposal-reason").value = `Wurde mehrfach vergeblich gesucht: "${term}"`;
+    $("#proposal-body").focus();
+    return;
+  }
+
+  if (art === "commands") {
+    openCommandDialog();
+    $("#command-name").value = titel;
+    const grund = $("#command-reason");
+    if (grund) grund.value = `Wurde mehrfach vergeblich gesucht: "${term}"`;
+    $("#command-code").focus();
+    return;
+  }
+
+  openSolutionDialog();
+  $("#solution-title").value = titel;
+  // Der Suchbegriff ist der beste vorhandene Hinweis auf das Symptom.
+  $("#solution-symptom").value = titel;
+  const grund = $("#solution-reason");
+  if (grund) grund.value = `Wurde mehrfach vergeblich gesucht: "${term}"`;
+  $("#solution-steps").focus();
+}
+
+$("#stats-body").addEventListener("click", async (event) => {
+  const anlegen = event.target.closest("[data-miss-create]");
+  if (anlegen) {
+    createFromMiss(anlegen.dataset.missCreate, anlegen.dataset.missTerm);
+    return;
+  }
+
+  const abhaken = event.target.closest("[data-miss-resolve]");
+  if (!abhaken) return;
+
+  const term = abhaken.dataset.missResolve;
+  if (!confirm(`Lücke "${term}" als erledigt abhaken?`)) return;
+
+  try {
+    await api("/api/usage/miss/resolve", {
+      method: "POST",
+      body: JSON.stringify({ term }),
+    });
+    showToast("Lücke abgehakt.");
+    await loadStats();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
 $("#palette-button").addEventListener("click", openPalette);
 $("#palette-input").addEventListener("input", () => {
   paletteState.index = 0;

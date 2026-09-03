@@ -2225,9 +2225,10 @@ async function handleUsage(
   if (path === "/api/usage/miss" && request.method === "POST") {
     const body = await readJson<Record<string, unknown>>(request);
     const term = requiredString(body.term, "Suchbegriff", 200);
+    // "all" kommt aus der Schnellsuche, die ueber alle Arten gleichzeitig sucht.
     const scope = oneOf(
       body.scope,
-      ["templates", "commands", "solutions"] as const,
+      ["templates", "commands", "solutions", "all"] as const,
       "Ungültiger Bereich.",
     );
 
@@ -2236,6 +2237,31 @@ async function handleUsage(
     ).bind(term.toLowerCase(), scope, user.id).run();
 
     return json({ ok: true });
+  }
+
+  /**
+   * Hakt eine Wissensluecke ab.
+   *
+   * Es werden alle Eintraege desselben Begriffs erledigt, nicht nur einer:
+   * Die Auswertung fasst sie ohnehin zusammen, und wer die Luecke schliesst,
+   * schliesst sie fuer alle Suchen dieses Begriffs. Die Zeilen bleiben
+   * erhalten, damit die Rohdaten spaeter noch auswertbar sind.
+   */
+  if (path === "/api/usage/miss/resolve" && request.method === "POST") {
+    if (user.role !== "admin" && user.role !== "editor") {
+      throw new HttpError(403, "Nur Redakteure und Administratoren können Lücken abhaken.");
+    }
+
+    const body = await readJson<Record<string, unknown>>(request);
+    const term = requiredString(body.term, "Suchbegriff", 200);
+
+    const result = await env.DB.prepare(
+      `UPDATE search_misses
+         SET resolved_at = CURRENT_TIMESTAMP, resolved_by = ?2
+       WHERE term = ?1 AND resolved_at IS NULL`,
+    ).bind(term.toLowerCase(), user.id).run();
+
+    return json({ ok: true, erledigt: result.meta.changes ?? 0 });
   }
 
   if (path === "/api/usage/stats" && request.method === "GET") {
@@ -2254,13 +2280,22 @@ async function handleUsage(
          WHERE u.content_type = 'command'
          ORDER BY u.opened_count DESC LIMIT 10`,
       ).all(),
+      // Nur offene Luecken. Gruppiert wird allein nach Begriff -- derselbe
+      // Suchbegriff aus Schnellsuche und Bereichssuche ist dieselbe Luecke.
+      // Der haeufigste Bereich kommt als Hinweis mit, damit das passende
+      // Formular vorgeschlagen werden kann.
       env.DB.prepare(
-        `SELECT term, scope, COUNT(*) AS treffer, MAX(created_at) AS zuletzt
-         FROM search_misses
+        `SELECT term, COUNT(*) AS treffer, MAX(created_at) AS zuletzt,
+                COUNT(DISTINCT user_id) AS personen,
+                (SELECT scope FROM search_misses inner_m
+                  WHERE inner_m.term = m.term AND inner_m.resolved_at IS NULL
+                  GROUP BY scope ORDER BY COUNT(*) DESC LIMIT 1) AS scope
+         FROM search_misses m
          WHERE created_at >= datetime('now', '-90 days')
-         GROUP BY term, scope
+           AND resolved_at IS NULL
+         GROUP BY term
          HAVING COUNT(*) > 1
-         ORDER BY treffer DESC LIMIT 15`,
+         ORDER BY treffer DESC, zuletzt DESC LIMIT 15`,
       ).all(),
       // Beitraege je Person: Wer pflegt die Wissensbasis?
       env.DB.prepare(

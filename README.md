@@ -8,6 +8,8 @@
 - gemeinsame Vorlagen und Befehle
 - Vorschlags- und Freigabeprozess
 - automatische Duplikatprüfung
+- Wissenslücken: erfolglose Suchen werden erfasst und lassen sich direkt
+  in eine Vorlage, einen Befehl oder eine Lösung überführen
 - Versionsschutz bei gleichzeitigen Änderungen
 - persönliche Speicherung von `[ICH]`
 - Benutzer- und Kategorienverwaltung

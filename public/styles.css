@@ -2155,6 +2155,44 @@ input[type="color"] { height: 40px; }
   font-size: 13px;
 }
 
+/* Wissensluecken: Begriff links, Aktionen rechts -- auf schmalen Fenstern
+   rutschen die Knoepfe unter den Begriff, statt ihn zu quetschen. */
+.miss-row {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.miss-main {
+  display: flex;
+  flex: 1 1 180px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.miss-term {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.miss-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.btn-miss {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-dark);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.btn-miss:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--text-strong);
+}
+
 /* Loesungsweg als abhakbare Schritte. */
 .solution-steps {
   margin: 0;
