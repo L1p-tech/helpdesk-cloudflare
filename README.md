@@ -111,6 +111,15 @@ Testreihenfolge:
 npm run deploy
 ```
 
+Vor dem Deploy prüft `scripts/predeploy.mjs`, ob das Schema der
+Produktionsdatenbank zum Code passt. Sind Migrationen offen, werden sie
+aufgelistet und nach einer kurzen Bestätigung angewendet. Ohne diesen Schritt
+kann der Worker live gehen, bevor seine Spalten existieren — die betroffenen
+Seiten antworten dann mit einem internen Serverfehler.
+
+Ohne Terminal (CI) bricht der Deploy stattdessen ab. `HELPDESK_MIGRATE=ja`
+wendet Migrationen dort bewusst ohne Rückfrage an.
+
 Danach im Cloudflare-Dashboard:
 
 1. **Workers & Pages**
