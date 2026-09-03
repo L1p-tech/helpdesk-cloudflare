@@ -12,6 +12,7 @@
   in eine Vorlage, einen Befehl oder eine Lösung überführen
 - Versionsschutz bei gleichzeitigen Änderungen
 - persönliche Speicherung von `[ICH]`
+- Pixel-Avatare: jeder baut seine Figur, sie erscheint neben dem Namen
 - Benutzer- und Kategorienverwaltung
 - Benachrichtigungen in der Datenbank
 - Änderungsprotokoll

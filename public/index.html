@@ -596,6 +596,28 @@
             <p class="panel-hint">Dieser Wert wird nur für dein Konto gespeichert.</p>
             <button class="btn-primary" type="submit">Speichern</button>
           </form>
+
+          <section class="panel form-panel narrow" id="avatar-editor">
+            <h3>Dein Pixel-Avatar</h3>
+            <p class="panel-hint">
+              Erscheint neben deinem Namen im Chat, bei Vorschlägen und in der
+              Statistik.
+            </p>
+            <div class="avatar-editor-body">
+              <div class="avatar-preview-wrap">
+                <canvas id="avatar-preview" width="256" height="256"
+                        aria-label="Vorschau deines Avatars"></canvas>
+                <button class="btn-miss" id="avatar-random" type="button">
+                  🎲 Zufällig
+                </button>
+              </div>
+              <div class="avatar-controls" id="avatar-controls"></div>
+            </div>
+            <div class="avatar-actions">
+              <button class="btn-primary" id="avatar-save" type="button">Avatar speichern</button>
+              <button class="btn-cancel" id="avatar-reset" type="button">Zurücksetzen</button>
+            </div>
+          </section>
         </section>
       </section>
 

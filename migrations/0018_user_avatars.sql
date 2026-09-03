@@ -1,0 +1,12 @@
+-- Pixel-Avatare der Benutzer.
+--
+-- Bewusst auf "users" und nicht in "user_settings.preferences_json": Der
+-- Avatar wird auch von anderen gesehen (Chat, Vorschlaege, Statistik), die
+-- Einstellungen liest dagegen nur der Besitzer selbst. Waere er dort
+-- gespeichert, muesste jede Anzeige fremde Einstellungen mitlesen duerfen.
+--
+-- Gespeichert wird ein kleines JSON-Objekt mit den gewaehlten Merkmalen
+-- (Frisur, Farben, ...), nicht ein fertiges Bild: Das sind rund 60 Zeichen
+-- statt einiger Kilobyte, und das Aussehen laesst sich spaeter verfeinern,
+-- ohne gespeicherte Bilder neu erzeugen zu muessen.
+ALTER TABLE users ADD COLUMN avatar_json TEXT;

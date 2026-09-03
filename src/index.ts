@@ -33,6 +33,7 @@ import {
   json,
   readJson,
 } from "./http";
+import { normalizeAvatar, parseAvatar } from "./avatar";
 import { ensureDefaultLibrary } from "./library";
 import { fetchFeed } from "./feeds";
 import type { AuthUser, Env, Role } from "./types";
@@ -448,7 +449,8 @@ async function handleBootstrap(
   await ensureDefaultLibrary(env, { id: user.id, displayName: user.displayName });
   await ensureTemplateUsageTable(env);
 
-  const [categories, templates, commands, solutions, settings, notifications] = await Promise.all([
+  const [categories, templates, commands, solutions, settings, notifications, avatars] =
+    await Promise.all([
     env.DB.prepare(
       "SELECT id, slug, name, color FROM categories WHERE active = 1 ORDER BY name COLLATE NOCASE",
     ).all(),
@@ -489,6 +491,12 @@ async function handleBootstrap(
        FROM notifications WHERE user_id = ?1 AND read_at IS NULL
        ORDER BY created_at DESC LIMIT 30`,
     ).bind(user.id).all(),
+    // Avatare aller aktiven Benutzer. Sie werden neben fremden Namen gezeigt
+    // (Chat, Vorschlaege, Statistik) und sind deshalb fuer alle sichtbar --
+    // enthalten aber ausser dem Aussehen keine persoenlichen Angaben.
+    env.DB.prepare(
+      `SELECT id, display_name, avatar_json FROM users WHERE active = 1`,
+    ).all(),
   ]);
 
   return json({
@@ -503,6 +511,11 @@ async function handleBootstrap(
       preferences_json: "{}",
     },
     notifications: notifications.results,
+    avatars: (avatars.results as Array<Record<string, unknown>>).map((row) => ({
+      id: row.id,
+      name: row.display_name,
+      avatar: parseAvatar(row.avatar_json as string | null),
+    })),
   });
 }
 
@@ -531,6 +544,16 @@ async function handleSettings(
   )
     .bind(user.id, signatureName, JSON.stringify(favorites), JSON.stringify(preferences))
     .run();
+
+  // Der Avatar liegt auf "users", weil ihn auch andere sehen. Er wird nur
+  // angefasst, wenn das Feld mitgeschickt wurde -- so loescht ein Speichern
+  // der uebrigen Einstellungen den Avatar nicht.
+  if (body.avatar !== undefined) {
+    const avatar = normalizeAvatar(body.avatar);
+    await env.DB.prepare(
+      "UPDATE users SET avatar_json = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+    ).bind(user.id, JSON.stringify(avatar)).run();
+  }
 
   return json({ ok: true });
 }
