@@ -1897,21 +1897,69 @@ input[type="color"] { height: 40px; }
   overflow-y: auto;
   padding: 8px;
 }
+.palette-row {
+  border: 1px solid transparent;
+  border-radius: 14px;
+}
+.palette-row.active {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+}
+.palette-row.open {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border-color: var(--border);
+}
+.palette-row.open.active {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+}
 .palette-item {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
   padding: 11px 13px;
-  border: 1px solid transparent;
+  border: none;
   border-radius: 14px;
   background: transparent;
   color: var(--text);
   text-align: left;
 }
-.palette-item:hover, .palette-item.active {
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
-  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+.palette-row:not(.active) .palette-item:hover {
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+}
+.palette-caret {
+  flex-shrink: 0;
+  width: 10px;
+  color: var(--muted-dark);
+  font-size: 10px;
+}
+.palette-preview {
+  padding: 0 13px 12px 35px;
+}
+.palette-preview-text {
+  max-height: 240px;
+  margin: 0 0 10px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.palette-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+.palette-preview-actions button {
+  padding: 7px 16px;
+  border-radius: 10px;
+  font-size: 12px;
 }
 .palette-kind {
   flex-shrink: 0;

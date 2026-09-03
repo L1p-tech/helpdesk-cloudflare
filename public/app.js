@@ -1043,7 +1043,14 @@ function resetAssistant() {
    Durchsucht Vorlagen, Befehle und Loesungen gleichzeitig. Alle Daten liegen
    bereits im Bootstrap -- die Suche laeuft deshalb ohne Serveranfrage.
 */
-const paletteState = { items: [], index: 0 };
+// "expanded" haelt fest, welcher Treffer aufgeklappt ist -- bewusst nur einer,
+// damit die Liste bei vielen Treffern ueberschaubar bleibt. Der Schluessel ist
+// "art:id", weil sich die laufenden Nummern beim Tippen staendig verschieben.
+const paletteState = { items: [], index: 0, expanded: null };
+
+function paletteKey(item) {
+  return `${item.kind}:${item.id}`;
+}
 
 function paletteCandidates() {
   return [
@@ -1053,6 +1060,7 @@ function paletteCandidates() {
       title: item.title,
       hint: item.category_name,
       copy: item.body,
+      preview: item.body,
       haystack: `${item.title} ${item.body}`.toLowerCase(),
     })),
     ...state.commands.map((item) => ({
@@ -1061,6 +1069,7 @@ function paletteCandidates() {
       title: item.name,
       hint: `${item.category} · ${item.shell}`,
       copy: item.command,
+      preview: [item.command, item.description].filter(Boolean).join("\n\n"),
       haystack: `${item.name} ${item.command} ${item.description}`.toLowerCase(),
     })),
     ...state.solutions.map((item) => ({
@@ -1069,6 +1078,10 @@ function paletteCandidates() {
       title: item.title,
       hint: item.category,
       copy: item.solution,
+      // Bei Loesungen gehoert das Symptom mit in die Vorschau: erst daran
+      // erkennt man, ob es der richtige Fall ist.
+      preview: [item.symptom && `Symptom:\n${item.symptom}`, item.solution]
+        .filter(Boolean).join("\n\n"),
       haystack: `${item.title} ${item.symptom} ${item.solution}`.toLowerCase(),
     })),
   ];
@@ -1101,16 +1114,47 @@ function renderPalette() {
   }
 
   paletteState.index = Math.min(paletteState.index, paletteState.items.length - 1);
-  container.innerHTML = paletteState.items.map((item, index) => `
-    <button class="palette-item ${index === paletteState.index ? "active" : ""}"
-            type="button" data-palette-index="${index}">
-      <span class="palette-kind palette-kind-${item.kind}">${PALETTE_KIND_LABELS[item.kind]}</span>
-      <span class="palette-title">${escapeHtml(item.title)}</span>
-      <span class="palette-hint-text">${escapeHtml(item.hint || "")}</span>
-    </button>`).join("");
+  container.innerHTML = paletteState.items
+    .map((item, index) => paletteRow(item, index))
+    .join("");
 
-  container.querySelector(".palette-item.active")
+  container.querySelector(".palette-row.active")
     ?.scrollIntoView({ block: "nearest" });
+}
+
+/**
+ * Eine Trefferzeile, bei Bedarf mit aufgeklappter Vorschau.
+ *
+ * Der Volltext wird nur fuer den aufgeklappten Treffer erzeugt. Bei bis zu 40
+ * Treffern mit langen Vorlagentexten waere es sonst viel Markup, das niemand
+ * zu sehen bekommt.
+ */
+function paletteRow(item, index) {
+  const open = paletteState.expanded === paletteKey(item);
+  const active = index === paletteState.index;
+  const preview = item.preview || item.copy || "";
+
+  const details = open
+    ? `
+      <div class="palette-preview">
+        <pre class="palette-preview-text">${escapeHtml(replacePersonalPlaceholders(preview))}</pre>
+        <div class="palette-preview-actions">
+          <button type="button" class="primary" data-palette-copy="${index}">Kopieren</button>
+        </div>
+      </div>`
+    : "";
+
+  return `
+    <div class="palette-row ${active ? "active" : ""} ${open ? "open" : ""}">
+      <button class="palette-item" type="button" data-palette-index="${index}"
+              aria-expanded="${open}">
+        <span class="palette-caret" aria-hidden="true">${open ? "▾" : "▸"}</span>
+        <span class="palette-kind palette-kind-${item.kind}">${PALETTE_KIND_LABELS[item.kind]}</span>
+        <span class="palette-title">${escapeHtml(item.title)}</span>
+        <span class="palette-hint-text">${escapeHtml(item.hint || "")}</span>
+      </button>
+      ${details}
+    </div>`;
 }
 
 /**
@@ -1140,6 +1184,19 @@ function movePaletteSelection(offset) {
   renderPalette();
 }
 
+/** Klappt einen Treffer auf oder zu. Ohne Argument: den ausgewaehlten. */
+function togglePaletteExpanded(index = paletteState.index, force = null) {
+  const item = paletteState.items[index];
+  if (!item) return;
+
+  const key = paletteKey(item);
+  const open = force === null ? paletteState.expanded !== key : force;
+
+  paletteState.expanded = open ? key : null;
+  paletteState.index = index;
+  renderPalette();
+}
+
 async function usePaletteItem(index) {
   const item = paletteState.items[index];
   if (!item) return;
@@ -1152,6 +1209,7 @@ async function usePaletteItem(index) {
 
 function openPalette() {
   paletteState.index = 0;
+  paletteState.expanded = null;
   $("#palette-input").value = "";
   renderPalette();
   $("#palette-dialog").showModal();
@@ -4785,6 +4843,23 @@ $("#palette-input").addEventListener("keydown", (event) => {
   } else if (event.key === "ArrowUp") {
     event.preventDefault();
     movePaletteSelection(-1);
+  } else if (event.key === "ArrowRight") {
+    // Nur aufklappen, wenn der Cursor am Zeilenende steht -- sonst wuerde die
+    // Taste das Bewegen im Suchbegriff unmoeglich machen.
+    const input = event.target;
+    if (input.selectionStart === input.value.length) {
+      event.preventDefault();
+      togglePaletteExpanded(paletteState.index, true);
+    }
+  } else if (event.key === "ArrowLeft") {
+    const input = event.target;
+    if (input.selectionStart === input.value.length && paletteState.expanded) {
+      event.preventDefault();
+      togglePaletteExpanded(paletteState.index, false);
+    }
+  } else if (event.key === "Tab") {
+    event.preventDefault();
+    togglePaletteExpanded();
   } else if (event.key === "Enter") {
     event.preventDefault();
     usePaletteItem(paletteState.index).catch((error) => alert(error.message));
@@ -4792,11 +4867,17 @@ $("#palette-input").addEventListener("keydown", (event) => {
 });
 
 $("#palette-results").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-palette-index]");
-  if (button) {
-    usePaletteItem(Number(button.dataset.paletteIndex))
+  // Der Kopieren-Knopf zuerst: er liegt innerhalb der Zeile, sonst wuerde die
+  // Zeile darunter das Ereignis abfangen und nur zuklappen.
+  const copyButton = event.target.closest("[data-palette-copy]");
+  if (copyButton) {
+    usePaletteItem(Number(copyButton.dataset.paletteCopy))
       .catch((error) => alert(error.message));
+    return;
   }
+
+  const row = event.target.closest("[data-palette-index]");
+  if (row) togglePaletteExpanded(Number(row.dataset.paletteIndex));
 });
 
 // Strg+K oeffnet die Suche von ueberall. In Eingabefeldern greift die
