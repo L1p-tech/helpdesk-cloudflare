@@ -14,14 +14,15 @@
 - persönliche Speicherung von `[ICH]`
 - Pixel-Avatare: jeder baut seine Figur, sie erscheint neben dem Namen
 - Benutzer- und Kategorienverwaltung
-- Benachrichtigungen in der Datenbank
+- Benachrichtigungen mit Ungelesen-Zähler und Lesestatus
+- Erinnerungen mit Zeitzonenbehandlung und einmaliger Zustellung
 - Änderungsprotokoll
 - Helpdesk-Runner mit D1-Leaderboard
 - vollständig statische Oberfläche plus Worker-API
 
 ## 1. Voraussetzungen
 
-- Node.js 20 oder neuer
+- Node.js 20.19 oder neuer
 - Cloudflare-Account
 - Domain im Cloudflare-Account
 - Wrangler-Anmeldung über `npx wrangler login`
@@ -88,7 +89,7 @@ Der Setup-Endpunkt funktioniert nur, solange noch kein Benutzer existiert.
 ## 7. Lokal testen
 
 ```bash
-npm run typecheck
+npm run check
 npm run dev
 ```
 
@@ -104,6 +105,15 @@ Testreihenfolge:
 6. `[ICH]` speichern und Kopierfunktion testen.
 7. Befehl mit hohem Risiko kopieren.
 8. Spiel starten und Leaderboard prüfen.
+
+Automatisierte Tests laufen isoliert mit Miniflare/Workerd und JSDOM:
+
+```bash
+npm test
+```
+
+Hinweise für vorhandene Installationen und alte Passwort-Hashes stehen in
+[UPDATE-ANLEITUNG.md](UPDATE-ANLEITUNG.md).
 
 ## 8. Veröffentlichen
 

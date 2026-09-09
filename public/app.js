@@ -1,3 +1,5 @@
+import { createNotifications } from "./notifications.js";
+
 const state = {
   user: null,
   categories: [],
@@ -45,6 +47,7 @@ const TYPING_PROMPTS = [
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+const notificationCenter = createNotifications({ api, formatDateTime, onError: (error) => showToast(error.message) });
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -87,6 +90,7 @@ function handleExpiredSession() {
 
   // Ohne Stopp liefe das Chat-Polling im Hintergrund endlos gegen 401 weiter.
   stopChatPolling();
+  notificationCenter.stop();
 
   $("#app-view").classList.add("hidden");
   $("#login-view").classList.remove("hidden");
@@ -1856,6 +1860,7 @@ function applyRoleVisibility() {
 async function loadBootstrap() {
   const data = await api("/api/bootstrap");
   state.user = data.user;
+  notificationCenter.start();
   state.categories = data.categories;
   state.templates = data.templates;
   state.commands = data.commands;
@@ -2465,6 +2470,7 @@ function openSolutionDialog(solution = null) {
 
   dialog.dataset.mode = direct ? "direct" : "proposal";
   dialog.dataset.solutionId = solution?.id || "";
+  dialog.dataset.baseVersion = solution?.version || "";
 
   $("#solution-title").value = solution?.title || "";
   $("#solution-category").value = solution?.category || "";
@@ -2490,6 +2496,8 @@ async function submitSolution(event) {
   const solutionId = dialog.dataset.solutionId || "";
 
   const payload = {
+    version: Number(dialog.dataset.baseVersion) || null,
+    baseVersion: Number(dialog.dataset.baseVersion) || null,
     category: $("#solution-category").value,
     title: $("#solution-title").value,
     symptom: $("#solution-symptom").value,
@@ -2681,6 +2689,7 @@ async function loadProposals(view) {
 
 function openProposal(template = null) {
   $("#proposal-template-id").value = template?.id || "";
+  $("#proposal-dialog").dataset.baseVersion = template?.version || "";
   $("#proposal-title").value = template?.title || "";
   $("#proposal-category").value = template?.category_id || state.categories[0]?.id || "";
   const directEdit = Boolean(isAdmin() && template);
@@ -2709,6 +2718,7 @@ async function checkDuplicate() {
       title: $("#proposal-title").value,
       body: $("#proposal-body").value,
       templateId: $("#proposal-template-id").value || null,
+      baseVersion: Number($("#proposal-dialog").dataset.baseVersion) || null,
     }),
   });
 
@@ -2725,6 +2735,7 @@ async function submitProposal(event) {
     const categoryMode = selectedProposalCategoryMode();
     const payload = {
       templateId: $("#proposal-template-id").value || null,
+      baseVersion: Number($("#proposal-dialog").dataset.baseVersion) || null,
       title: $("#proposal-title").value,
       categoryMode,
       categoryId: categoryMode === "existing" ? Number($("#proposal-category").value) : null,
@@ -2739,6 +2750,7 @@ async function submitProposal(event) {
       await api(`/api/templates/${$("#proposal-template-id").value}`, {
         method: "PUT",
         body: JSON.stringify({
+          version: payload.baseVersion,
           title: payload.title,
           categoryId: Number($("#proposal-category").value),
           body: payload.body,
@@ -3183,7 +3195,7 @@ async function loadUsers() {
         <span>${escapeHtml(user.username)}</span>
       </div>
       <span>${roleLabel(user.role)}</span>
-      <span>${user.active ? "Aktiv" : "Gesperrt"}</span>
+      <span>${user.password_reset_required ? "Passwort erneuern" : user.active ? "Aktiv" : "Gesperrt"}</span>
       <div class="user-row-actions">
         <button class="btn-ghost" type="button" data-user-action="edit" data-user-id="${user.id}" data-user-name="${escapeHtml(user.display_name)}" data-user-login="${escapeHtml(user.username)}" data-user-role="${user.role}">
           Bearbeiten
@@ -5632,7 +5644,7 @@ $("#reminder-form").addEventListener("submit", async (event) => {
       body: JSON.stringify({
         message,
         ticketRef: $("#reminder-ticket").value || null,
-        dueAt,
+        dueAt: new Date(dueAt).toISOString(),
       }),
     });
     $("#reminder-message").value = "";

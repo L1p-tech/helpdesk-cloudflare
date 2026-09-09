@@ -16,10 +16,9 @@
       "migrations_dir": "migrations"
     }
   ],
-  // Holt die Nachrichtenquellen alle 30 Minuten, auch wenn niemand die Seite
-  // benutzt. Ohne diesen Ausloeser liefe der Abruf nur beim Seitenaufruf mit.
+  // Prueft Erinnerungen jede Minute; Feeds behalten ihre eigene 30-Minuten-Schranke.
   "triggers": {
-    "crons": ["*/30 * * * *"]
+    "crons": ["* * * * *"]
   },
   "vars": {
     "SESSION_TTL_HOURS": "12"

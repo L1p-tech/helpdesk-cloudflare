@@ -50,17 +50,16 @@ export async function hashPassword(
     ["deriveBits"],
   );
 
-  // Gespeicherte Iterationszahlen aus aelteren Datensaetzen koennen ueber dem
-  // Laufzeitlimit liegen. Ungeprueft wuerde deriveBits werfen und der Login
-  // waere fuer diese Konten dauerhaft blockiert, statt nur langsamer zu sein.
-  const safeIterations = Math.min(iterations, MAX_PBKDF2_ITERATIONS);
+  if (!Number.isInteger(iterations) || iterations < 1 || iterations > MAX_PBKDF2_ITERATIONS) {
+    throw new Error("Nicht unterstützte PBKDF2-Iterationszahl; Passwort muss neu gesetzt werden.");
+  }
 
   const bits = await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
       hash: "SHA-256",
       salt: new Uint8Array(salt).buffer,
-      iterations: safeIterations,
+      iterations,
     },
     key,
     256,
@@ -69,7 +68,7 @@ export async function hashPassword(
   return {
     hash: toBase64(new Uint8Array(bits)),
     salt: toBase64(salt),
-    iterations: safeIterations,
+    iterations,
   };
 }
 

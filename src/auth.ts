@@ -1,4 +1,4 @@
-import { hashPassword, randomToken, sha256, timingSafeEqual } from "./crypto";
+import { hashPassword, MAX_PBKDF2_ITERATIONS, randomToken, sha256, timingSafeEqual } from "./crypto";
 import { getClientIp, HttpError } from "./http";
 import type { AuthUser, Env, Role, SessionRow } from "./types";
 
@@ -117,6 +117,10 @@ export async function login(
 
   if (row.locked_until && Date.parse(row.locked_until) > Date.now()) {
     throw new HttpError(429, "Konto vorübergehend gesperrt. Bitte später erneut versuchen.");
+  }
+
+  if (row.password_iterations > MAX_PBKDF2_ITERATIONS || row.password_iterations < 1) {
+    throw new HttpError(403, "Dieses Konto benötigt eine Passworterneuerung durch einen Administrator.");
   }
 
   const candidate = await hashPassword(

@@ -11,7 +11,7 @@ CREATE TABLE template_proposals_new (
   title TEXT NOT NULL,
   body TEXT NOT NULL,
   reason TEXT,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('draft', 'pending', 'changes_requested', 'approved', 'rejected', 'withdrawn')),
   duplicate_score REAL NOT NULL DEFAULT 0,
   duplicate_template_id INTEGER,
   submitted_by INTEGER,
@@ -37,7 +37,7 @@ SELECT
   p.id, p.template_id, p.base_version, p.proposal_type, p.category_id, p.proposed_category_name,
   p.proposed_category_color, p.title, p.body, p.reason, p.status, p.duplicate_score, p.duplicate_template_id,
   p.submitted_by, COALESCE(u.display_name, 'Ehemaliger Mitarbeiter'), p.reviewed_by, p.review_note,
-  p.submitted_at, p.reviewed_at, p.updated_at
+  COALESCE(p.submitted_at, p.updated_at, CURRENT_TIMESTAMP), p.reviewed_at, p.updated_at
 FROM template_proposals p
 LEFT JOIN users u ON u.id = p.submitted_by;
 

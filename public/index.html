@@ -114,6 +114,9 @@
           <span class="nav-action-icon">⌕</span> Suche
           <kbd class="nav-kbd">Strg K</kbd>
         </button>
+        <button class="nav-action" id="notification-button" type="button" aria-haspopup="dialog" aria-label="Benachrichtigungen">
+          Benachrichtigungen <span class="reminder-count hidden" id="notification-count" aria-live="polite"></span>
+        </button>
         <button class="nav-action" id="reminder-button" type="button" title="Erinnerungen">
           <span class="nav-action-icon">⏰</span> Erinnerungen
           <span class="reminder-count hidden" id="reminder-count"></span>
@@ -791,6 +794,19 @@
       <kbd>↑</kbd><kbd>↓</kbd> wählen · <kbd>Tab</kbd> aufklappen ·
       <kbd>Enter</kbd> kopieren · <kbd>Esc</kbd> schließen
     </p>
+  </dialog>
+
+  <dialog id="notification-dialog" aria-labelledby="notification-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="notification-title">Benachrichtigungen</h2>
+        <button class="modal-close" type="button" data-close-dialog aria-label="Dialog schließen">✕</button>
+      </div>
+      <div class="modal-body" id="notification-list"></div>
+      <div class="modal-footer">
+        <button class="btn-save" id="notification-read-visible" type="button">Angezeigte als gelesen markieren</button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="reminder-dialog">

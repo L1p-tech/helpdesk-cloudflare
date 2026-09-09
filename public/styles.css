@@ -2501,3 +2501,8 @@ button.primary:hover {
   gap: 8px;
   margin-top: 16px;
 }
+
+.notification-row { padding: 1rem 0; border-bottom: 1px solid var(--border, #3b4050); }
+.notification-row p { white-space: pre-wrap; overflow-wrap: anywhere; margin: .5rem 0; }
+.notification-row .btn-link { display: block; margin-top: .5rem; }
+#notification-list { max-height: 60vh; overflow-y: auto; }

@@ -23,8 +23,10 @@ import {
   requireRole,
   requireUser,
 } from "./auth";
+import { handleReminders, handleNotifications, deliverDueReminders } from "./notifications";
+import { commitMutation, expectPending, expectVersion, precondition } from "./mutations";
 import { hashPassword } from "./crypto";
-import { audit, DELETED_USER_LABEL, ignoreMissingTable, notify } from "./db";
+import { audit, DELETED_USER_LABEL, ignoreMissingTable, notificationStatement } from "./db";
 import { duplicateScore } from "./duplicates";
 import {
   assertSameOrigin,
@@ -86,6 +88,7 @@ interface TemplateSnapshot {
 interface ContentProposalRow {
   id: number;
   content_type: "command" | "solution";
+  base_version: number | null;
   target_id: number | null;
   proposal_type: "create" | "update";
   title: string;
@@ -108,13 +111,6 @@ interface ProposalRow {
   status: string;
   submitted_by: number | null;
   submitted_by_name: string;
-}
-
-interface CategoryRow {
-  id: number;
-  slug: string;
-  name: string;
-  color: string;
 }
 
 interface FeedbackRow {
@@ -254,53 +250,6 @@ function slugifyCategory(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 60);
-}
-
-/**
- * Ermittelt die Zielkategorie eines Vorschlags.
- *
- * Vorschlaege duerfen eine neue Kategorie vorschlagen. Diese wird erst beim
- * Genehmigen angelegt -- und nur dann, wenn nicht zwischenzeitlich jemand eine
- * gleichnamige Kategorie erstellt hat.
- */
-async function resolveProposalCategory(
-  env: Env,
-  userId: number,
-  categoryId: number | null,
-  proposedCategoryName: string | null,
-  proposedCategoryColor: string | null,
-): Promise<number> {
-  if (proposedCategoryName) {
-    const existing = await env.DB.prepare(
-      `SELECT id, slug, name, color
-       FROM categories
-       WHERE lower(name) = lower(?1)
-       LIMIT 1`,
-    ).bind(proposedCategoryName).first<CategoryRow>();
-
-    if (existing) return existing.id;
-
-    const slug = slugifyCategory(proposedCategoryName);
-    if (!slug) throw new HttpError(400, "Kategoriename ist ungültig.");
-
-    const result = await env.DB.prepare(
-      `INSERT INTO categories (slug, name, color, created_by)
-       VALUES (?1, ?2, ?3, ?4)`,
-    ).bind(
-      slug,
-      proposedCategoryName,
-      proposedCategoryColor ?? "#4a7cff",
-      userId,
-    ).run();
-
-    return Number(result.meta.last_row_id);
-  }
-
-  if (categoryId === null) {
-    throw new HttpError(400, "Kategorie fehlt.");
-  }
-
-  return categoryId;
 }
 
 /** Liest eine aktive Vorlage oder wirft 404. */
@@ -473,12 +422,12 @@ async function handleBootstrap(
        ORDER BY t.updated_at DESC`,
     ).bind(DELETED_USER_LABEL, user.id).all(),
     env.DB.prepare(
-      `SELECT id, category, name, command, description, shell, requires_admin,
+      `SELECT id, version, category, name, command, description, shell, requires_admin,
               risk_level, remote_capable, restart_required
        FROM commands WHERE active = 1 ORDER BY category, name COLLATE NOCASE`,
     ).all(),
     env.DB.prepare(
-      `SELECT id, category, title, symptom, cause, solution, severity, updated_at,
+      `SELECT id, version, category, title, symptom, cause, solution, severity, updated_at,
               COALESCE(created_by_name, ?1) AS created_by_name
        FROM solutions WHERE active = 1 ORDER BY category, title COLLATE NOCASE`,
     ).bind(DELETED_USER_LABEL).all(),
@@ -627,7 +576,8 @@ async function handleProposals(
     if (templateId !== null) {
       const template = await loadActiveTemplate(env, templateId);
       proposalType = "update";
-      baseVersion = template.version;
+      baseVersion = positiveInteger(body.baseVersion, "Ausgangsversion");
+      if (template.version !== baseVersion) throw new HttpError(409, "Die Vorlage wurde geändert. Bitte den aktuellen Stand neu öffnen.");
     }
 
     const duplicate = await findDuplicate(env, title, templateBody, templateId);
@@ -694,23 +644,6 @@ async function handleProposals(
     if (action === "approve") {
       const templateId = await applyApprovedProposal(env, user, proposal, note);
 
-      await env.DB.prepare(
-        `UPDATE template_proposals
-         SET status = 'approved', reviewed_by = ?1, review_note = ?2,
-             reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP,
-             template_id = ?3
-         WHERE id = ?4`,
-      ).bind(user.id, note, templateId, proposalId).run();
-
-      if (proposal.submitted_by !== null) {
-        await notify(
-          env,
-          proposal.submitted_by,
-          "proposal_approved",
-          "Vorlage genehmigt",
-          `Dein Vorschlag „${proposal.title}“ wurde genehmigt.`,
-        );
-      }
       await audit(env, user.id, "approve", "template_proposal", proposalId, { templateId });
 
       return json({ ok: true, templateId });
@@ -723,22 +656,20 @@ async function handleProposals(
     }
 
     const status = action === "reject" ? "rejected" : "changes_requested";
-    await env.DB.prepare(
+    await commitMutation(env, [
+      expectPending(env, "template_proposals", proposalId),
+      env.DB.prepare(
       `UPDATE template_proposals
        SET status = ?1, reviewed_by = ?2, review_note = ?3,
            reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?4`,
-    ).bind(status, user.id, note, proposalId).run();
-
-    if (proposal.submitted_by !== null) {
-      await notify(
-        env,
-        proposal.submitted_by,
+    ).bind(status, user.id, note, proposalId),
+      notificationStatement(env, proposal.submitted_by,
         status === "rejected" ? "proposal_rejected" : "changes_requested",
-        status === "rejected" ? "Vorlage abgelehnt" : "Überarbeitung angefordert",
-        `„${proposal.title}“: ${note}`,
-      );
-    }
+        status === "rejected" ? "Vorschlag abgelehnt" : "Überarbeitung angefordert",
+        `„${proposal.title}“: ${note}`),
+    ]);
+
     await audit(env, user.id, action, "template_proposal", proposalId, { note });
 
     return json({ ok: true });
@@ -756,70 +687,58 @@ async function handleProposals(
  * bricht der Vorgang mit 409 ab, statt fremde Aenderungen zu ueberschreiben.
  */
 async function applyApprovedProposal(
-  env: Env,
-  user: AuthUser,
-  proposal: ProposalRow,
-  note: string | null,
+  env: Env, user: AuthUser, proposal: ProposalRow, note: string | null,
 ): Promise<number> {
-  const categoryId = await resolveProposalCategory(
-    env,
-    user.id,
-    proposal.category_id,
-    proposal.proposed_category_name,
-    proposal.proposed_category_color,
-  );
-
-  if (proposal.proposal_type === "create") {
-    // Urheberschaft bleibt beim Einreicher, die letzte Aenderung beim Pruefer.
-    const result = await env.DB.prepare(
-      `INSERT INTO templates
-        (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
-       VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7)`,
-    ).bind(
-      categoryId,
-      proposal.title,
-      proposal.body,
-      proposal.submitted_by,
-      proposal.submitted_by_name,
-      user.id,
-      user.displayName,
-    ).run();
-
-    return Number(result.meta.last_row_id);
+  const statements = [expectPending(env, "template_proposals", proposal.id)];
+  if (proposal.proposed_category_name) {
+    const slug = slugifyCategory(proposal.proposed_category_name);
+    if (!slug) throw new HttpError(400, "Kategoriename ist ungültig.");
+    statements.push(env.DB.prepare(
+      `INSERT INTO categories (slug, name, color, created_by)
+       SELECT ?1, ?2, ?3, ?4 WHERE NOT EXISTS
+         (SELECT 1 FROM categories WHERE lower(name) = lower(?2))`,
+    ).bind(slug, proposal.proposed_category_name, proposal.proposed_category_color ?? "#4a7cff", user.id));
   }
-
-  if (!proposal.template_id) throw new HttpError(409, "Zielvorlage fehlt.");
-
-  const current = await env.DB.prepare(
-    `SELECT ${TEMPLATE_SNAPSHOT_COLUMNS} FROM templates WHERE id = ?1 AND active = 1`,
-  ).bind(proposal.template_id).first<TemplateSnapshot>();
-
-  if (!current) throw new HttpError(404, "Zielvorlage wurde nicht gefunden.");
-  if (current.version !== proposal.base_version) {
-    throw new HttpError(
-      409,
-      "Die Vorlage wurde zwischenzeitlich geändert. Vorschlag bitte erneut prüfen.",
+  const categoryId = proposal.proposed_category_name ? null : proposal.category_id;
+  const categoryName = proposal.proposed_category_name;
+  statements.push(precondition(env,
+    "EXISTS (SELECT 1 FROM categories WHERE active = 1 AND (id = ?1 OR lower(name) = lower(?2)))",
+    categoryId, categoryName,
+  ));
+  let insertionIndex = -1;
+  if (proposal.proposal_type === "create") {
+    insertionIndex = statements.length;
+    statements.push(env.DB.prepare(
+      `INSERT INTO templates
+       (category_id, title, body, version, created_by, created_by_name, updated_by, updated_by_name)
+       VALUES ((SELECT id FROM categories WHERE active = 1 AND (id = ?1 OR lower(name) = lower(?2))),
+               ?3, ?4, 1, ?5, ?6, ?7, ?8)`,
+    ).bind(categoryId, categoryName, proposal.title, proposal.body,
+      proposal.submitted_by, proposal.submitted_by_name, user.id, user.displayName));
+  } else {
+    if (!proposal.template_id || !proposal.base_version) throw new HttpError(409, "Zielvorlage oder Ausgangsversion fehlt.");
+    const current = await loadActiveTemplate(env, proposal.template_id);
+    statements.push(
+      expectVersion(env, "templates", current.id, proposal.base_version),
+      archiveTemplateVersion(env, current, user, note),
+      env.DB.prepare(
+        `UPDATE templates SET category_id =
+           (SELECT id FROM categories WHERE active = 1 AND (id = ?1 OR lower(name) = lower(?2))),
+         title = ?3, body = ?4, version = version + 1,
+         updated_by = ?5, updated_by_name = ?6, updated_at = CURRENT_TIMESTAMP WHERE id = ?7`,
+      ).bind(categoryId, categoryName, proposal.title, proposal.body, user.id, user.displayName, current.id),
     );
   }
-
-  await env.DB.batch([
-    archiveTemplateVersion(env, current, user, note),
-    env.DB.prepare(
-      `UPDATE templates
-       SET category_id = ?1, title = ?2, body = ?3, version = version + 1,
-           updated_by = ?4, updated_by_name = ?5, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?6`,
-    ).bind(
-      categoryId,
-      proposal.title,
-      proposal.body,
-      user.id,
-      user.displayName,
-      proposal.template_id,
-    ),
-  ]);
-
-  return proposal.template_id;
+  // For creates this immediately follows the INSERT, within the same transaction.
+  statements.push(env.DB.prepare(
+    `UPDATE template_proposals SET status = 'approved', reviewed_by = ?1, review_note = ?2,
+       reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP,
+       template_id = ${insertionIndex >= 0 ? "last_insert_rowid()" : "template_id"} WHERE id = ?3`,
+  ).bind(user.id, note, proposal.id));
+  statements.push(notificationStatement(env, proposal.submitted_by, "proposal_approved",
+    "Vorlage genehmigt", `Dein Vorschlag „${proposal.title}“ wurde genehmigt.`));
+  const results = await commitMutation(env, statements);
+  return insertionIndex >= 0 ? Number(results[insertionIndex]!.meta.last_row_id) : proposal.template_id!;
 }
 
 async function handleCategories(
@@ -897,7 +816,8 @@ async function handleTemplates(
     const categoryId = positiveInteger(body.categoryId, "Kategorie");
     const note = optionalString(body.note, 1000) ?? "Direktbearbeitung durch Administrator";
 
-    await env.DB.batch([
+    await commitMutation(env, [
+      expectVersion(env, "templates", templateId, positiveInteger(body.version, "Version")),
       archiveTemplateVersion(env, current, user, note),
       env.DB.prepare(
         `UPDATE templates
@@ -913,11 +833,12 @@ async function handleTemplates(
 
   // Loeschen ist ein Soft-Delete (active = 0); die Vorlage bleibt im Papierkorb
   // wiederherstellbar.
-  await env.DB.batch([
+  await commitMutation(env, [
+    expectVersion(env, "templates", templateId, current.version),
     archiveTemplateVersion(env, current, user, "Vorlage archiviert"),
     env.DB.prepare(
       `UPDATE templates
-       SET active = 0, updated_by = ?1, updated_by_name = ?2, updated_at = CURRENT_TIMESTAMP
+       SET active = 0, version = version + 1, updated_by = ?1, updated_by_name = ?2, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?3`,
     ).bind(user.id, user.displayName, templateId),
   ]);
@@ -1018,7 +939,7 @@ async function handleContentProposals(
     const isReviewer = scope !== "mine"
       && (user.role === "admin" || user.role === "editor");
     const query = env.DB.prepare(
-      `SELECT id, content_type, target_id, proposal_type, title, payload_json,
+      `SELECT id, content_type, target_id, base_version, proposal_type, title, payload_json,
               reason, status, submitted_by, submitted_by_name, review_note,
               submitted_at, reviewed_at
        FROM content_proposals
@@ -1047,19 +968,22 @@ async function handleContentProposals(
 
     // Bezieht sich der Vorschlag auf einen bestehenden Eintrag, muss es den
     // auch geben -- sonst liefe er beim Genehmigen ins Leere.
+    let baseVersion: number | null = null;
     if (targetId !== null) {
+      baseVersion = positiveInteger(body.baseVersion, "Ausgangsversion");
       const table = contentType === "command" ? "commands" : "solutions";
       const existing = await env.DB.prepare(
-        `SELECT id FROM ${table} WHERE id = ?1 AND active = 1`,
-      ).bind(targetId).first();
+        `SELECT id, version FROM ${table} WHERE id = ?1 AND active = 1`,
+      ).bind(targetId).first<{ id: number; version: number }>();
       if (!existing) throw new HttpError(404, "Der zu ändernde Eintrag wurde nicht gefunden.");
+      if (existing.version !== baseVersion) throw new HttpError(409, "Der Eintrag wurde geändert. Bitte den aktuellen Stand neu öffnen.");
     }
 
     const result = await env.DB.prepare(
       `INSERT INTO content_proposals
-        (content_type, target_id, proposal_type, title, payload_json, reason,
+        (content_type, target_id, base_version, proposal_type, title, payload_json, reason,
          status, submitted_by, submitted_by_name, submitted_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?7, ?8, CURRENT_TIMESTAMP)`,
+       VALUES (?1, ?2, ?9, ?3, ?4, ?5, ?6, 'pending', ?7, ?8, CURRENT_TIMESTAMP)`,
     ).bind(
       contentType,
       targetId,
@@ -1069,6 +993,7 @@ async function handleContentProposals(
       reason,
       user.id,
       user.displayName,
+      baseVersion,
     ).run();
 
     const proposalId = Number(result.meta.last_row_id);
@@ -1087,7 +1012,7 @@ async function handleContentProposals(
     const note = optionalString(body.note, 2000);
 
     const proposal = await env.DB.prepare(
-      `SELECT id, content_type, target_id, proposal_type, title, payload_json,
+      `SELECT id, content_type, target_id, base_version, proposal_type, title, payload_json,
               status, submitted_by, submitted_by_name
        FROM content_proposals WHERE id = ?1`,
     ).bind(proposalId).first<ContentProposalRow>();
@@ -1098,25 +1023,8 @@ async function handleContentProposals(
     }
 
     if (action === "approve") {
-      const targetId = await applyContentProposal(env, user, proposal);
+      const targetId = await applyContentProposal(env, user, proposal, note);
 
-      await env.DB.prepare(
-        `UPDATE content_proposals
-         SET status = 'approved', reviewed_by = ?1, review_note = ?2,
-             reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP,
-             target_id = ?3
-         WHERE id = ?4`,
-      ).bind(user.id, note, targetId, proposalId).run();
-
-      if (proposal.submitted_by !== null) {
-        await notify(
-          env,
-          proposal.submitted_by,
-          "proposal_approved",
-          proposal.content_type === "command" ? "Befehl genehmigt" : "Lösung genehmigt",
-          `Dein Vorschlag „${proposal.title}“ wurde genehmigt.`,
-        );
-      }
       await audit(env, user.id, "approve", "content_proposal", proposalId, { targetId });
       return json({ ok: true, targetId });
     }
@@ -1126,22 +1034,20 @@ async function handleContentProposals(
     }
 
     const status = action === "reject" ? "rejected" : "changes_requested";
-    await env.DB.prepare(
+    await commitMutation(env, [
+      expectPending(env, "content_proposals", proposalId),
+      env.DB.prepare(
       `UPDATE content_proposals
        SET status = ?1, reviewed_by = ?2, review_note = ?3,
            reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?4`,
-    ).bind(status, user.id, note, proposalId).run();
-
-    if (proposal.submitted_by !== null) {
-      await notify(
-        env,
-        proposal.submitted_by,
+    ).bind(status, user.id, note, proposalId),
+      notificationStatement(env, proposal.submitted_by,
         status === "rejected" ? "proposal_rejected" : "changes_requested",
         status === "rejected" ? "Vorschlag abgelehnt" : "Überarbeitung angefordert",
-        `„${proposal.title}“: ${note}`,
-      );
-    }
+        `„${proposal.title}“: ${note}`),
+    ]);
+
     await audit(env, user.id, action, "content_proposal", proposalId, { note });
     return json({ ok: true });
   }
@@ -1176,94 +1082,59 @@ async function handleContentProposals(
  * den Bestand wandern.
  */
 async function applyContentProposal(
-  env: Env,
-  user: AuthUser,
-  proposal: ContentProposalRow,
+  env: Env, user: AuthUser, proposal: ContentProposalRow, note: string | null,
 ): Promise<number> {
-  let raw: Record<string, unknown>;
-  try {
-    raw = JSON.parse(proposal.payload_json) as Record<string, unknown>;
-  } catch {
-    throw new HttpError(409, "Der Vorschlag enthält keine lesbaren Daten.");
+  const raw: Record<string, unknown> = JSON.parse(proposal.payload_json);
+  const statements = [expectPending(env, "content_proposals", proposal.id)];
+  const create = proposal.proposal_type === "create";
+  const table = proposal.content_type === "command" ? "commands" : "solutions";
+  if (!create) {
+    if (!proposal.target_id || !proposal.base_version) {
+      throw new HttpError(409, "Die Ausgangsversion fehlt. Bitte den Vorschlag anhand des aktuellen Eintrags neu einreichen.");
+    }
+    statements.push(expectVersion(env, table, proposal.target_id, proposal.base_version));
   }
-
   if (proposal.content_type === "solution") {
-    const payload = parseSolutionPayload(raw);
-
-    if (proposal.proposal_type === "create") {
-      // Urheberschaft bleibt beim Einreicher, die letzte Aenderung beim Pruefer.
-      return insertSolution(
-        env, payload, proposal.submitted_by, proposal.submitted_by_name, user,
-      );
+    const p = parseSolutionPayload(raw);
+    if (create) {
+      statements.push(precondition(env, "NOT EXISTS (SELECT 1 FROM solutions WHERE active = 1 AND lower(title) = lower(?1))", p.title));
+      statements.push(solutionInsert(env, p, proposal.submitted_by, proposal.submitted_by_name, user));
+    } else {
+      statements.push(env.DB.prepare(
+        `UPDATE solutions SET category = ?1, title = ?2, symptom = ?3, cause = ?4,
+         solution = ?5, severity = ?6, updated_by = ?7, updated_by_name = ?8,
+         updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = ?9`,
+      ).bind(p.category, p.title, p.symptom, p.cause, p.solution, p.severity, user.id, user.displayName, proposal.target_id));
     }
-
-    if (!proposal.target_id) throw new HttpError(409, "Ziel-Lösung fehlt.");
-    const result = await env.DB.prepare(
-      `UPDATE solutions
-       SET category = ?1, title = ?2, symptom = ?3, cause = ?4, solution = ?5,
-           severity = ?6, updated_by = ?7, updated_by_name = ?8,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?9 AND active = 1`,
-    ).bind(
-      payload.category, payload.title, payload.symptom, payload.cause,
-      payload.solution, payload.severity, user.id, user.displayName, proposal.target_id,
-    ).run();
-
-    if ((result.meta.changes ?? 0) === 0) {
-      throw new HttpError(404, "Die zu ändernde Lösung existiert nicht mehr.");
-    }
-    return proposal.target_id;
-  }
-
-  const payload = parseCommandPayload(raw);
-
-  if (proposal.proposal_type === "create") {
-    const duplicate = await env.DB.prepare(
-      `SELECT id FROM commands
-       WHERE active = 1 AND (lower(name) = lower(?1) OR command = ?2)
-       LIMIT 1`,
-    ).bind(payload.name, payload.command).first();
-
-    if (duplicate) {
-      throw new HttpError(409, "Inzwischen existiert bereits ein gleichnamiger Befehl.");
-    }
-
-    const result = await env.DB.prepare(
-      `INSERT INTO commands
-        (category, name, command, description, shell, requires_admin, risk_level,
-         remote_capable, restart_required, created_by, created_by_name,
-         updated_by, updated_by_name)
+  } else {
+    const p = parseCommandPayload(raw);
+    statements.push(precondition(env,
+      "NOT EXISTS (SELECT 1 FROM commands WHERE active = 1 AND (lower(name) = lower(?1) OR command = ?2) AND (?3 IS NULL OR id != ?3))",
+      p.name, p.command, proposal.target_id,
+    ));
+    statements.push(create ? env.DB.prepare(
+      `INSERT INTO commands (category, name, command, description, shell, requires_admin, risk_level,
+       remote_capable, restart_required, created_by, created_by_name, updated_by, updated_by_name)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
-    ).bind(
-      payload.category, payload.name, payload.command, payload.description,
-      payload.shell, payload.requiresAdmin, payload.riskLevel,
-      payload.remoteCapable, payload.restartRequired,
-      proposal.submitted_by, proposal.submitted_by_name,
-      user.id, user.displayName,
-    ).run();
-
-    return Number(result.meta.last_row_id);
+    ).bind(p.category, p.name, p.command, p.description, p.shell, p.requiresAdmin, p.riskLevel,
+      p.remoteCapable, p.restartRequired, proposal.submitted_by, proposal.submitted_by_name, user.id, user.displayName)
+    : env.DB.prepare(
+      `UPDATE commands SET category = ?1, name = ?2, command = ?3, description = ?4, shell = ?5,
+       requires_admin = ?6, risk_level = ?7, remote_capable = ?8, restart_required = ?9,
+       updated_by = ?10, updated_by_name = ?11, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = ?12`,
+    ).bind(p.category, p.name, p.command, p.description, p.shell, p.requiresAdmin, p.riskLevel,
+      p.remoteCapable, p.restartRequired, user.id, user.displayName, proposal.target_id));
   }
-
-  if (!proposal.target_id) throw new HttpError(409, "Ziel-Befehl fehlt.");
-  const result = await env.DB.prepare(
-    `UPDATE commands
-     SET category = ?1, name = ?2, command = ?3, description = ?4, shell = ?5,
-         requires_admin = ?6, risk_level = ?7, remote_capable = ?8,
-         restart_required = ?9, updated_by = ?10, updated_by_name = ?11,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE id = ?12 AND active = 1`,
-  ).bind(
-    payload.category, payload.name, payload.command, payload.description,
-    payload.shell, payload.requiresAdmin, payload.riskLevel,
-    payload.remoteCapable, payload.restartRequired,
-    user.id, user.displayName, proposal.target_id,
-  ).run();
-
-  if ((result.meta.changes ?? 0) === 0) {
-    throw new HttpError(404, "Der zu ändernde Befehl existiert nicht mehr.");
-  }
-  return proposal.target_id;
+  const writeIndex = statements.length - 1;
+  statements.push(env.DB.prepare(
+    `UPDATE content_proposals SET status = 'approved', reviewed_by = ?1, review_note = ?2,
+     reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP,
+     target_id = ${create ? "last_insert_rowid()" : "target_id"} WHERE id = ?3`,
+  ).bind(user.id, note, proposal.id));
+  statements.push(notificationStatement(env, proposal.submitted_by, "proposal_approved",
+    "Vorschlag genehmigt", `Dein Vorschlag „${proposal.title}“ wurde genehmigt.`));
+  const results = await commitMutation(env, statements);
+  return create ? Number(results[writeIndex]!.meta.last_row_id) : proposal.target_id!;
 }
 
 /**
@@ -1331,20 +1202,19 @@ async function handleSolutions(
     const body = await readJson<Record<string, unknown>>(request);
     const payload = parseSolutionPayload(body);
 
-    const result = await env.DB.prepare(
+    await commitMutation(env, [
+      expectVersion(env, "solutions", solutionId, positiveInteger(body.version, "Version")),
+      env.DB.prepare(
       `UPDATE solutions
        SET category = ?1, title = ?2, symptom = ?3, cause = ?4, solution = ?5,
            severity = ?6, updated_by = ?7, updated_by_name = ?8,
-           updated_at = CURRENT_TIMESTAMP
+           updated_at = CURRENT_TIMESTAMP, version = version + 1
        WHERE id = ?9 AND active = 1`,
     ).bind(
       payload.category, payload.title, payload.symptom, payload.cause,
       payload.solution, payload.severity, user.id, user.displayName, solutionId,
-    ).run();
-
-    if ((result.meta.changes ?? 0) === 0) {
-      throw new HttpError(404, "Lösung wurde nicht gefunden.");
-    }
+    ),
+    ]);
 
     await audit(env, user.id, "update", "solution", solutionId);
     return json({ ok: true });
@@ -1379,7 +1249,15 @@ async function insertSolution(
   authorName: string,
   editor: AuthUser,
 ): Promise<number> {
-  const result = await env.DB.prepare(
+  const result = await solutionInsert(env, payload, authorId, authorName, editor).run();
+  return Number(result.meta.last_row_id);
+}
+
+function solutionInsert(
+  env: Env, payload: ReturnType<typeof parseSolutionPayload>, authorId: number | null,
+  authorName: string, editor: AuthUser,
+): D1PreparedStatement {
+  return env.DB.prepare(
     `INSERT INTO solutions
       (category, title, symptom, cause, solution, severity,
        created_by, created_by_name, updated_by, updated_by_name)
@@ -1388,9 +1266,7 @@ async function insertSolution(
     payload.category, payload.title, payload.symptom, payload.cause,
     payload.solution, payload.severity,
     authorId, authorName, editor.id, editor.displayName,
-  ).run();
-
-  return Number(result.meta.last_row_id);
+  );
 }
 
 async function handleFeedback(
@@ -1499,7 +1375,8 @@ async function handleUsers(
   if (path === "/api/users" && request.method === "GET") {
     requireRole(user, ["admin"]);
     const result = await env.DB.prepare(
-      `SELECT id, username, display_name, role, active, created_at
+      `SELECT id, username, display_name, role, active, created_at,
+         (password_iterations > 100000 OR password_iterations < 1) AS password_reset_required
        FROM users ORDER BY display_name COLLATE NOCASE`,
     ).all();
     return json({ users: result.results });
@@ -1552,41 +1429,21 @@ async function handleUsers(
       throw new HttpError(400, "Die eigene Administratorrolle kann nicht entzogen werden.");
     }
 
-    await env.DB.prepare(
-      `UPDATE users
-       SET display_name = COALESCE(?1, display_name),
-           role = COALESCE(?2, role),
-           active = COALESCE(?3, active),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?4`,
-    )
-      .bind(
-        body.displayName ? requiredString(body.displayName, "Anzeigename", 80) : null,
-        role,
-        typeof body.active === "boolean" ? (body.active ? 1 : 0) : null,
-        targetId,
-      )
-      .run();
-
-    if (body.password) {
-      const passwordData = await hashPassword(validPassword(body.password));
-      await env.DB.prepare(
-        `UPDATE users
-         SET password_hash = ?1, password_salt = ?2, password_iterations = ?3,
-             failed_login_count = 0, locked_until = NULL,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?4`,
-      )
-        .bind(
-          passwordData.hash,
-          passwordData.salt,
-          passwordData.iterations,
-          targetId,
-        )
-        .run();
-      // Nach einem Passwortwechsel sind alle bestehenden Sitzungen ungueltig.
-      await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?1").bind(targetId).run();
+    const passwordData = body.password === undefined ? null : await hashPassword(validPassword(body.password));
+    const statements = [env.DB.prepare(
+      `UPDATE users SET display_name = COALESCE(?1, display_name), role = COALESCE(?2, role),
+       active = COALESCE(?3, active), updated_at = CURRENT_TIMESTAMP WHERE id = ?4`,
+    ).bind(body.displayName ? requiredString(body.displayName, "Anzeigename", 80) : null,
+      role, typeof body.active === "boolean" ? (body.active ? 1 : 0) : null, targetId)];
+    if (passwordData) {
+      statements.push(env.DB.prepare(
+        `UPDATE users SET password_hash = ?1, password_salt = ?2, password_iterations = ?3,
+         failed_login_count = 0, locked_until = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?4`,
+      ).bind(passwordData.hash, passwordData.salt, passwordData.iterations, targetId),
+        env.DB.prepare("DELETE FROM sessions WHERE user_id = ?1").bind(targetId));
     }
+    const results = await env.DB.batch(statements);
+    if (!results[0]?.meta.changes) throw new HttpError(404, "Benutzer nicht gefunden.");
 
     await audit(env, user.id, "update", "user", targetId);
     return json({ ok: true });
@@ -1703,7 +1560,8 @@ async function handleHistory(
 
     if (!current) throw new HttpError(404, "Zielvorlage wurde nicht gefunden.");
 
-    await env.DB.batch([
+    await commitMutation(env, [
+      expectVersion(env, "templates", current.id, current.version, false),
       // Erst den aktuellen Stand sichern, damit das Zurueckholen umkehrbar ist.
       archiveTemplateVersion(
         env,
@@ -1740,7 +1598,7 @@ async function handleHistory(
 
     const result = await env.DB.prepare(
       `UPDATE templates
-       SET active = 1, updated_by = ?1, updated_by_name = ?2, updated_at = CURRENT_TIMESTAMP
+       SET active = 1, version = version + 1, updated_by = ?1, updated_by_name = ?2, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?3 AND active = 0`,
     ).bind(user.id, user.displayName, templateId).run();
 
@@ -1973,91 +1831,6 @@ async function handleCases(
    Faellige Erinnerungen stellt der zeitgesteuerte Lauf als Benachrichtigung
    zu (siehe deliverDueReminders).
 */
-async function handleReminders(
-  request: Request,
-  env: Env,
-  user: AuthUser,
-  path: string,
-): Promise<Response | null> {
-  if (path === "/api/reminders" && request.method === "GET") {
-    const rows = await env.DB.prepare(
-      `SELECT id, message, ticket_ref, due_at, done, notified_at
-       FROM reminders WHERE user_id = ?1 AND done = 0
-       ORDER BY due_at
-       LIMIT 50`,
-    ).bind(user.id).all();
-
-    return json({ reminders: rows.results });
-  }
-
-  if (path === "/api/reminders" && request.method === "POST") {
-    const body = await readJson<Record<string, unknown>>(request);
-    const message = requiredString(body.message, "Text", 500);
-    const ticketRef = optionalString(body.ticketRef, 60);
-    const dueAt = requiredString(body.dueAt, "Zeitpunkt", 40);
-
-    // Der Wert kommt aus einem datetime-local-Feld und ist damit
-    // nutzerkontrolliert -- ohne Pruefung landete Unsinn in der Sortierung.
-    if (Number.isNaN(Date.parse(dueAt))) {
-      throw new HttpError(400, "Zeitpunkt ist ungültig.");
-    }
-
-    const result = await env.DB.prepare(
-      `INSERT INTO reminders (user_id, message, ticket_ref, due_at)
-       VALUES (?1, ?2, ?3, ?4)`,
-    ).bind(user.id, message, ticketRef, new Date(dueAt).toISOString()).run();
-
-    return json({ id: Number(result.meta.last_row_id) }, { status: 201 });
-  }
-
-  const reminderMatch = path.match(/^\/api\/reminders\/(\d+)$/);
-  if (reminderMatch && request.method === "DELETE") {
-    const reminderId = positiveInteger(reminderMatch[1], "Erinnerungs-ID");
-
-    const result = await env.DB.prepare(
-      "UPDATE reminders SET done = 1 WHERE id = ?1 AND user_id = ?2 AND done = 0",
-    ).bind(reminderId, user.id).run();
-
-    if ((result.meta.changes ?? 0) === 0) {
-      throw new HttpError(404, "Erinnerung wurde nicht gefunden.");
-    }
-    return json({ ok: true });
-  }
-
-  return null;
-}
-
-/**
- * Stellt faellige Erinnerungen als Benachrichtigung zu.
- *
- * `notified_at` verhindert Doppelzustellung: Der Lauf greift nur Eintraege ab,
- * die noch nie zugestellt wurden.
- */
-async function deliverDueReminders(env: Env): Promise<void> {
-  const due = await env.DB.prepare(
-    `SELECT id, user_id, message, ticket_ref
-     FROM reminders
-     WHERE done = 0 AND notified_at IS NULL AND due_at <= CURRENT_TIMESTAMP
-     LIMIT 100`,
-  ).all<{ id: number; user_id: number; message: string; ticket_ref: string | null }>();
-
-  for (const reminder of due.results) {
-    await notify(
-      env,
-      reminder.user_id,
-      "reminder",
-      "Erinnerung fällig",
-      reminder.ticket_ref
-        ? `${reminder.ticket_ref}: ${reminder.message}`
-        : reminder.message,
-    );
-
-    await env.DB.prepare(
-      "UPDATE reminders SET notified_at = CURRENT_TIMESTAMP WHERE id = ?1",
-    ).bind(reminder.id).run();
-  }
-}
-
 /* ============================================================
    Eskalation und Dienstuebergabe
    ============================================================ */
@@ -2600,7 +2373,7 @@ function validFeedUrl(value: unknown): string {
 /**
  * Frischt alle Quellen auf, deren letzter Abruf zu lange her ist.
  *
- * Der Worker hat keinen Cron-Trigger, deshalb laeuft das beim Abruf mit. Die
+ * Neben dem Cron-Trigger prueft auch der Seitenabruf auf veraltete Quellen. Die
  * Quellen werden parallel geholt, damit die Wartezeit von der langsamsten
  * Quelle bestimmt wird und nicht von deren Summe.
  */
@@ -2779,7 +2552,7 @@ async function ensureChatTable(env: Env): Promise<void> {
 /**
  * Entfernt Nachrichten aelter als CHAT_RETENTION_DAYS.
  *
- * Laeuft beim Abruf mit, weil der Worker keinen Cron-Trigger hat. Der Aufwand
+ * Laeuft beim Abruf mit. Der Aufwand
  * faellt kaum ins Gewicht: Ohne abgelaufene Zeilen ist es ein Index-Scan, der
  * nichts loescht.
  */
@@ -2802,6 +2575,7 @@ const AUTHENTICATED_HANDLERS = [
   handleContentProposals,
   handleCases,
   handleReminders,
+  handleNotifications,
   handleEscalation,
   handleHandovers,
   handleUsage,
@@ -2853,8 +2627,7 @@ export default {
    *
    * `force` bleibt aus: Der Lauf soll dieselbe Alterspruefung anwenden wie der
    * Seitenaufruf, damit ein zwischenzeitlicher Abruf nicht sofort wiederholt
-   * wird. Da der Trigger im selben Takt wie NEWS_REFRESH_MINUTES laeuft, ist
-   * praktisch immer etwas faellig.
+   * wird. Erinnerungen werden jede Minute, Feeds nur bei Bedarf bearbeitet.
    */
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {
     try {

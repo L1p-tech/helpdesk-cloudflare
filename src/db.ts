@@ -24,28 +24,26 @@ export async function audit(
   entityId: number | null,
   details: unknown = {},
 ): Promise<void> {
-  await env.DB.prepare(
-    `INSERT INTO audit_log (user_id, action, entity_type, entity_id, details_json)
-     VALUES (?1, ?2, ?3, ?4, ?5)`,
-  )
-    .bind(userId, action, entityType, entityId, JSON.stringify(details))
-    .run();
+  try {
+    await env.DB.prepare(
+      `INSERT INTO audit_log (user_id, action, entity_type, entity_id, details_json)
+       VALUES (?1, ?2, ?3, ?4, ?5)`,
+    )
+      .bind(userId, action, entityType, entityId, JSON.stringify(details))
+      .run();
+  } catch (error) {
+    console.error("Audit konnte nicht gespeichert werden:", error);
+  }
 }
 
-/** Legt eine Benachrichtigung fuer einen Benutzer an (wird per Bootstrap abgeholt). */
-export async function notify(
-  env: Env,
-  userId: number,
-  type: string,
-  title: string,
-  message: string,
-): Promise<void> {
-  await env.DB.prepare(
+/** Can be included in the same transaction as a review. Deleted authors need no notification. */
+export function notificationStatement(
+  env: Env, userId: number | null, type: string, title: string, message: string,
+): D1PreparedStatement {
+  return env.DB.prepare(
     `INSERT INTO notifications (user_id, type, title, message)
-     VALUES (?1, ?2, ?3, ?4)`,
-  )
-    .bind(userId, type, title, message)
-    .run();
+     SELECT id, ?2, ?3, ?4 FROM users WHERE id = ?1`,
+  ).bind(userId, type, title, message);
 }
 
 /**
