@@ -3070,3 +3070,52 @@ details.card:hover .row-copy,
 /* Loesungen im Leitfaden: aufklappbar wie in der Loesungsliste. */
 .assistant-solutions { display: flex; flex-direction: column; gap: 6px; }
 .assistant-solution .card-content { padding-top: 4px; }
+
+/* ============================================================
+   Nachrichtenquellen farblich unterscheiden
+   ============================================================
+   Jede Quelle hat eine eigene Farbe (--source-color, gesetzt im Skript):
+   Streifen links an der Meldung und farbige Quellenmarke. So erkennt man
+   beim Ueberfliegen sofort, ob es eine BSI-Warnung oder eine heise-Meldung ist.
+*/
+.news-item {
+  position: relative;
+  padding-left: 20px;
+  border-left: 3px solid var(--source-color, var(--border));
+}
+.news-item:hover {
+  border-color: color-mix(in srgb, var(--source-color, var(--primary)) 55%, transparent);
+  border-left-color: var(--source-color, var(--primary));
+}
+.news-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--source-color, var(--accent)) 55%, transparent);
+  background: color-mix(in srgb, var(--source-color, var(--accent)) 16%, transparent);
+  color: color-mix(in srgb, var(--source-color, var(--accent)) 80%, white 20%);
+  font-weight: 700;
+}
+.news-source::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--source-color, var(--accent));
+  box-shadow: 0 0 6px var(--source-color, var(--accent));
+}
+/* Startseite: kompakter Streifen statt Kartenrand. */
+.start-news li {
+  padding-left: 10px;
+  border-left: 3px solid var(--source-color, var(--border));
+}
+.start-news .news-source { padding: 0 7px; font-size: 10.5px; }
+/* Administration: gleiche Farbe als Legende neben dem Quellennamen. */
+.news-feed-row { border-left: 3px solid var(--source-color, transparent); padding-left: 12px; }
+.news-feed-name { color: color-mix(in srgb, var(--source-color, var(--text-strong)) 75%, white 25%); }
+
+
+/* Scrollleisten im Theme statt hellgrau -- die Eigenschaft wird vererbt. */
+:root { scrollbar-color: color-mix(in srgb, var(--primary) 30%, transparent) transparent; }

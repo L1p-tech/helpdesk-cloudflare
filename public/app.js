@@ -3589,6 +3589,28 @@ async function switchView(view, { updateUrl = true } = {}) {
 */
 const newsState = { items: [], feeds: [] };
 
+/*
+ * Farbe je Nachrichtenquelle. Vergeben wird der Reihe nach in der
+ * Anlagereihenfolge (ID) statt per Namens-Hash: Bei einer Handvoll Quellen
+ * teilten sich sonst schnell zwei dieselbe Farbe. Neue Quellen bekommen die
+ * naechste freie Farbe, bestehende behalten ihre.
+ */
+const NEWS_SOURCE_COLORS = [
+  "#38bdf8", "#f59e0b", "#34d399", "#c084fc", "#f87171",
+  "#fbbf24", "#2dd4bf", "#f472b6", "#a3e635", "#818cf8",
+  "#fb923c", "#22d3ee",
+];
+
+function newsSourceColor(name, feeds = newsState.feeds) {
+  const sorted = [...feeds].sort((a, b) => Number(a.id) - Number(b.id));
+  const index = sorted.findIndex((feed) => feed.name === name);
+  if (index >= 0) return NEWS_SOURCE_COLORS[index % NEWS_SOURCE_COLORS.length];
+  // Quelle unbekannt (z. B. Liste noch nicht geladen): stabil aus dem Namen.
+  let hash = 0;
+  for (const char of String(name)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return NEWS_SOURCE_COLORS[hash % NEWS_SOURCE_COLORS.length];
+}
+
 async function loadNews(force = false) {
   $("#news-status").textContent = force
     ? "Quellen werden abgerufen…"
@@ -3650,7 +3672,7 @@ function renderNews() {
   }
 
   $("#news-list").innerHTML = visible.map((item) => `
-    <article class="news-item">
+    <article class="news-item" style="--source-color:${newsSourceColor(item.feed_name)}">
       <div class="news-meta">
         <span class="news-source">${escapeHtml(item.feed_name)}</span>
         <span class="news-category">${escapeHtml(item.category)}</span>
@@ -3692,9 +3714,9 @@ async function loadNewsFeeds() {
   newsState.feeds = data.feeds ?? [];
 
   $("#news-feeds-list").innerHTML = newsState.feeds.map((feed) => `
-    <div class="news-feed-row">
+    <div class="news-feed-row" style="--source-color:${newsSourceColor(feed.name)}">
       <div class="news-feed-main">
-        <strong>${escapeHtml(feed.name)}</strong>
+        <strong class="news-feed-name">${escapeHtml(feed.name)}</strong>
         <span class="news-feed-url">${escapeHtml(feed.url)}</span>
       </div>
       <span>${escapeHtml(feed.category)}</span>
@@ -6390,7 +6412,7 @@ async function renderStart() {
   loadStartWaiting().then((html) => stillCurrent() && fillStartCard("waiting", html))
     .catch(() => fillStartCard("waiting", '<p class="muted">Konnte nicht geladen werden.</p>'));
 
-  api("/api/news").then((data) => stillCurrent() && renderStartNews(data.items || []))
+  api("/api/news").then((data) => stillCurrent() && renderStartNews(data.items || [], data.feeds || []))
     .catch(() => fillStartCard("news", '<p class="muted">Meldungen konnten nicht geladen werden.</p>'));
 }
 
@@ -6539,12 +6561,12 @@ async function loadStartWaiting() {
     <p class="muted">Fehlt dir eine Vorlage? Schlag sie vor – das Team profitiert.</p>`;
 }
 
-function renderStartNews(items) {
+function renderStartNews(items, feeds = []) {
   fillStartCard("news", items.length
     ? `<ul class="start-news">${items.slice(0, 6).map((item) => `
-        <li>
+        <li style="--source-color:${newsSourceColor(item.feed_name, feeds)}">
           <a href="${escapeAttribute(item.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a>
-          <span class="muted">${escapeHtml(item.feed_name)}${item.published_at ? ` · ${relativeTime(item.published_at)}` : ""}</span>
+          <span class="muted"><span class="news-source">${escapeHtml(item.feed_name)}</span>${item.published_at ? ` · ${relativeTime(item.published_at)}` : ""}</span>
         </li>`).join("")}</ul>`
     : '<p class="muted">Keine Meldungen. Quellen pflegen Admins unter Administration.</p>');
 }
