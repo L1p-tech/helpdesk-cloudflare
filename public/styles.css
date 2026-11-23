@@ -3066,3 +3066,7 @@ details.card:hover .row-copy,
 
 /* Beim Springen zum Leitfaden nicht unter der festen Kopfzeile verschwinden. */
 #assistant-body { scroll-margin-top: calc(var(--topbar-h) + 16px); }
+
+/* Loesungen im Leitfaden: aufklappbar wie in der Loesungsliste. */
+.assistant-solutions { display: flex; flex-direction: column; gap: 6px; }
+.assistant-solution .card-content { padding-top: 4px; }

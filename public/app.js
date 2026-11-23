@@ -1486,14 +1486,7 @@ function renderAssistantGuide() {
           </label>`).join("")}
       </div>`)}
     ${liste("Passende Lösungen aus der Wissensbasis", loesungen.length
-      ? `<div class="assistant-hits">${loesungen.map((item) => `
-          <button class="assistant-hit" type="button" data-assistant-solution="${item.id}" title="Lösungsweg kopieren">
-            <span class="badge category-badge" style="--category-color:${commandCategoryColor(item.category)}">
-              ${escapeHtml(item.category)}
-            </span>
-            <span>${escapeHtml(item.title)}</span>
-            <svg class="ico"><use href="#i-copy"/></svg>
-          </button>`).join("")}</div>`
+      ? `<div class="assistant-solutions">${loesungen.map(assistantSolutionCard).join("")}</div>`
       : "")}
     ${liste("Hilfreiche Befehle", befehle.length
       ? `<div class="assistant-commands">${befehle.map((command) => `
@@ -1516,6 +1509,49 @@ function renderAssistantGuide() {
       <button class="btn-link" type="button" data-assistant-back>← Zurück</button>
       <button class="btn-link" type="button" data-assistant-reset>Von vorn beginnen</button>
     </div>`;
+}
+
+/**
+ * Eine Loesung im Leitfaden: zugeklappt mit Kopierknopf, aufgeklappt mit
+ * Symptom, Ursache und Loesungsweg -- wie in der Loesungsliste, damit man vor
+ * dem Kopieren pruefen kann, ob es wirklich passt.
+ */
+function assistantSolutionCard(solution) {
+  const color = commandCategoryColor(solution.category);
+  const severity = SEVERITY_LABELS[solution.severity] || solution.severity;
+  return `
+    <details class="card category-card assistant-solution" style="--category-color:${color}"
+             data-assistant-solution-card="${solution.id}">
+      <summary>
+        <div class="summary-main">
+          <span class="badge category-badge">${escapeHtml(solution.category)}</span>
+          <span class="summary-title">${escapeHtml(solution.title)}</span>
+        </div>
+        ${severity ? `<span class="summary-meta">
+          <span class="badge risk-badge risk-${escapeHtml(solution.severity)}">${escapeHtml(severity)}</span>
+        </span>` : ""}
+        ${rowCopyButton("data-assistant-solution", solution.id, "Lösungsweg kopieren")}
+      </summary>
+      <div class="card-content">
+        <div class="solution-block">
+          <span class="solution-label">Symptom</span>
+          <div class="template-body">${escapeHtml(solution.symptom)}</div>
+        </div>
+        ${solution.cause ? `
+          <div class="solution-block">
+            <span class="solution-label">Ursache</span>
+            <div class="template-body">${escapeHtml(solution.cause)}</div>
+          </div>` : ""}
+        <div class="solution-block">
+          <span class="solution-label">Lösungsweg</span>
+          ${renderSolutionSteps(solution)}
+        </div>
+        <div class="card-actions">
+          <button class="primary" type="button" data-assistant-solution="${solution.id}">Lösungsweg kopieren</button>
+          <button type="button" data-assistant-helpful="${solution.id}">Hat geholfen</button>
+        </div>
+      </div>
+    </details>`;
 }
 
 /* ---------- Bedienung ---------- */
@@ -5876,6 +5912,20 @@ document.addEventListener("keydown", (event) => {
 
 // --- Symptom-Assistent ----------------------------------------------------
 $("#assistant-body").addEventListener("click", (event) => {
+  // Einzelnen Befehl aus einem Schritt einer aufgeklappten Loesung kopieren.
+  const stepCopy = event.target.closest("[data-copy-step]");
+  if (stepCopy) {
+    copyText(stepCopy.dataset.copyStep).catch((error) => alert(error.message));
+    return;
+  }
+
+  const helpful = event.target.closest("[data-assistant-helpful]");
+  if (helpful) {
+    countContentUsage("solution", Number(helpful.dataset.assistantHelpful), true);
+    showToast("Danke -- das hilft bei der Pflege der Wissensbasis.");
+    return;
+  }
+
   const option = event.target.closest("[data-assistant-option]");
   if (option) {
     chooseAssistantOption(Number(option.dataset.assistantOption));
@@ -5911,10 +5961,21 @@ $("#assistant-body").addEventListener("click", (event) => {
       reportSearchMiss(`assistent: ${ASSISTANT_GUIDES[assistantState.leitfaden].titel}`, "solutions");
     }
     const erledigt = $$("#assistant-body [data-assistant-step]").map((box) => box.checked);
+    const aufgeklappt = $$("#assistant-body [data-assistant-solution-card]")
+      .filter((card) => card.open)
+      .map((card) => card.dataset.assistantSolutionCard);
+    const loesungsHaken = $$("#assistant-body [data-solution-steps] input")
+      .map((box) => box.checked);
     renderAssistant();
-    // Haken beim Neuzeichnen nicht verlieren.
+    // Haken und aufgeklappte Loesungen beim Neuzeichnen nicht verlieren.
     $$("#assistant-body [data-assistant-step]").forEach((box, index) => {
       box.checked = Boolean(erledigt[index]);
+    });
+    $$("#assistant-body [data-assistant-solution-card]").forEach((card) => {
+      card.open = aufgeklappt.includes(card.dataset.assistantSolutionCard);
+    });
+    $$("#assistant-body [data-solution-steps] input").forEach((box, index) => {
+      box.checked = Boolean(loesungsHaken[index]);
     });
     return;
   }
@@ -5962,6 +6023,8 @@ $("#assistant-body").addEventListener("click", (event) => {
 
   const hit = event.target.closest("[data-assistant-solution]");
   if (hit) {
+    // Kopierknopf in der zugeklappten Zeile: kopieren, nicht aufklappen.
+    if (hit.closest("summary")) event.preventDefault();
     const solution = state.solutions.find((item) => item.id === Number(hit.dataset.assistantSolution));
     if (solution) {
       const guide = ASSISTANT_GUIDES[assistantState.leitfaden];
