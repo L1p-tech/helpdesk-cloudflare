@@ -501,6 +501,8 @@ export function createTraining({
     const score = quizScore();
     const total = quiz.items.length;
     redrawQuiz(module);
+    // Ergebnis zeigen: Die Seite springt nicht von selbst an eine andere Stelle.
+    root()?.querySelector("[data-training-quiz]")?.scrollIntoView?.({ block: "start", behavior: "smooth" });
 
     try {
       const data = await api("/api/training", {
@@ -599,7 +601,7 @@ export function createTraining({
       redrawQuiz(findModule(quiz.moduleId));
       // Das Quiz wird neu gezeichnet; ohne diese Zeile ginge der Tastaturfokus
       // verloren und man muesste nach jeder Antwort neu hineintabben.
-      root().querySelector(`[data-training-answer="${answer.dataset.trainingAnswer}"]`)?.focus();
+      root().querySelector(`[data-training-answer="${answer.dataset.trainingAnswer}"]`)?.focus({ preventScroll: true });
       return null;
     }
 

@@ -20,7 +20,7 @@
   Bereiche zu 94 Leitfäden mit Rückfragen, abhakbaren Schritten, passenden
   Befehlen und Lösungen; Ergebnis geht in Ticket-Generator oder Fall.
   Wissen ergänzen in `public/assistant-data.js`
-- Befehlsbibliothek mit rund 215 Befehlen in 19 Bereichen (u. a. Active
+- Befehlsbibliothek mit rund 225 Befehlen in 19 Bereichen (u. a. Active
   Directory, Sicherheit/Defender/BitLocker, Netzwerk/WLAN/VPN, Drucker,
   Outlook/Teams, Microsoft 365, Dateien, Remote, Ereignisse), jeweils mit
   Admin- und Risikohinweis. Bewusst nicht enthalten: Befehle, die Daten
@@ -28,12 +28,15 @@
   Rechner vom Netz nehmen bzw. neu starten (ein Test sichert das ab).
   Neue Standardbefehle in `src/seed-data.ts`; sie werden beim nächsten
   Seitenaufruf automatisch ergänzt, ohne Migration
-- Glossar mit rund 100 Fachwörtern aus Vorlagen, Befehlen und Lösungen,
+- Glossar mit rund 120 Fachwörtern aus Vorlagen, Befehlen und Lösungen,
   jeweils mit Beispiel und Querverweisen; auch über die Schnellsuche
   erreichbar. Begriffe ergänzen in `public/glossary-data.js`
-- Schulung mit 10 Lernmodulen (Fehlersuche, Netzwerk, Anmeldung, Microsoft 365,
-  Sicherheit am Telefon, Tickets und Eskalation, Priorisieren, Datenschutz,
-  Gespräche, der Helper selbst): einfache Erklärungen mit Grafiken, Quiz,
+- Schulung mit 16 Lernmodulen in vier Gruppen (Einarbeitung, Technik, Microsoft-Welt,
+  Alltag): Fehlersuche, Netzwerk, Anmeldung, Microsoft 365, Fernzugriff und Drucken,
+  die Microsoft-Landkarte (Entra ID = früher Azure AD, Exchange/EAC, Intune,
+  Defender), Identität, Mailfluss und Fehlercodes, Geräte, Sicherheit am Telefon,
+  Tickets, Priorisieren, Datenschutz, IT-Service (Incident/Change/Problem) u. a.:
+  einfache Erklärungen mit Grafiken, Quiz,
   Praxisfall und Checkliste für die erste Woche. Der Fortschritt wird pro
   Benutzer gespeichert und ist nur für den Benutzer selbst sichtbar. Inhalte
   ergänzen in `public/training-data.js`, Grafiken in `public/training-diagrams.js`

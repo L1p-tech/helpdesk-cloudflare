@@ -36,9 +36,14 @@ export const TRAINING_GROUPS = [
     text: "Was im Hintergrund passiert, wenn „etwas nicht geht“.",
   },
   {
+    id: "welt",
+    titel: "Microsoft-Welt – wer macht was?",
+    text: "Entra ID, Exchange, Intune & Co.: Was die Systeme tun, wo du nachsiehst und wie sie zusammenhängen.",
+  },
+  {
     id: "alltag",
     titel: "Besser im Alltag",
-    text: "Priorisieren und sauber mit Daten umgehen.",
+    text: "Priorisieren, sauber mit Daten umgehen und den IT-Service verstehen.",
   },
 ];
 
@@ -880,11 +885,563 @@ export const TRAINING_MODULES = [
   },
 
   /* =====================================================================
-     9 · Priorisieren
+     9 · Fernzugriff, VPN und Drucken
+     ===================================================================== */
+  {
+    id: "fernzugriff",
+    nr: 9,
+    titel: "Fernzugriff, VPN und Drucken",
+    kurz: "Wie man von außen ins Firmennetz kommt, wie man sicher aus der Ferne hilft – und warum Drucker so oft zicken.",
+    minuten: 9,
+    gruppe: "technik",
+    farbe: "#2dd4bf",
+    icon: "i-terminal",
+    abschnitte: [
+      {
+        titel: "Drei Wege – und was sie unterscheidet",
+        diagramm: "fernzugriff",
+        text: "Alles, was „aus der Ferne“ heißt, ist eines von drei Dingen. Sie werden gern verwechselt:\n\n- **[[VPN]]** verbindet den Rechner einer Mitarbeiterin sicher mit dem Firmennetz. Danach funktionieren Netzlaufwerke, interne Webseiten und Programme wie im Büro. Du siehst dabei nicht in ihren Rechner.\n- **[[RDP]] (Remotedesktop)** zeigt dir den Bildschirm eines anderen Rechners, zum Beispiel eines Servers oder des Büro-PCs, und lässt dich dort arbeiten. Am Arbeitsplatz-PC wird die Sitzung der Person vor Ort dabei getrennt.\n- **[[Remoteunterstützung]]** teilt den Bildschirm des Benutzers. Ihr seht und steuert gemeinsam – er sitzt dabei und muss zustimmen.",
+        merke: "Frag zuerst: Soll die Person nur ins Firmennetz kommen (VPN), brauche ich einen anderen Rechner (RDP) oder soll ich ihr an ihrem eigenen Bildschirm helfen (Remoteunterstützung)?",
+      },
+      {
+        titel: "VPN-Probleme eingrenzen",
+        text: "Meldet jemand „Ich komme nicht an die Laufwerke“, zerlege die Frage:\n\n- **Gibt es Internet?** Ohne Internet gibt es kein VPN. Öffne im Browser eine beliebige Webseite.\n- **Ist das VPN verbunden?** Die Statusanzeige des VPN-Programms zeigt es.\n- **Betrifft es eine Person oder viele?** Bei vielen liegt die Ursache oft zentral am VPN-Zugang, nicht am einzelnen Rechner.\n- **Hat sich am Konto etwas geändert?** Ein neues Passwort, ein abgelaufenes Zertifikat oder ein gesperrtes Konto lassen die VPN-Anmeldung scheitern. Das Anmeldeproblem steckt dann hinter dem VPN-Problem.\n- **Hotel- oder Café-WLAN?** Manche öffentlichen Netze blockieren VPN. Ein mobiler Hotspot ist ein guter Gegentest.\n\nWelche VPN-Software eure Firma einsetzt und wie der Zugang freigeschaltet wird, steht im Verfahren eures Betriebs.",
+        merke: "Zeigt das VPN „verbunden“, aber interne Seiten lassen sich nicht öffnen, liegt es oft an der Namensauflösung ([[DNS]]) oder an einer Regel. Schreib genau das ins Ticket.",
+      },
+      {
+        titel: "Sicher aus der Ferne helfen",
+        text: "Fernzugriff ist mächtig – deshalb gelten feste Regeln:\n\n- **Zustimmung zuerst.** Ruf an, erkläre, was du tust, und lass die Person zustimmen, bevor du etwas siehst oder steuerst.\n- **Nur das Nötige.** Bitte darum, fremde und private Fenster zu schließen, bevor ihr den Bildschirm teilt.\n- **Die Verbindung nicht abschneiden.** Starte nie den Netzwerkadapter des Rechners neu und ändere keine Netzwerkeinstellungen, über die du gerade verbunden bist – danach kommst du nicht mehr drauf.\n- **Neustarts ankündigen.** Damit nichts Ungespeichertes verloren geht.\n- **Aufschreiben.** Im Ticket steht, dass du aus der Ferne zugegriffen hast und warum.\n\nWelches Werkzeug erlaubt ist, bestimmt euer Betrieb. Nimm nie ein privates Programm.",
+      },
+      {
+        titel: "Drucken – der Weg eines Auftrags",
+        diagramm: "drucken",
+        text: "Ein Druckauftrag geht durch mehrere Stationen. Bricht eine, kommt kein Papier – aber an unterschiedlicher Stelle:\n\n- **Programm und [[Treiber]]:** Das Dokument wird für das Druckermodell übersetzt. Ein falscher oder beschädigter Treiber ergibt Fehler oder Zeichensalat.\n- **[[Spooler]] (Warteschlange):** Der Auftrag wartet hier auf seinen Druck. Ein **hängender Auftrag** blockiert oft alles dahinter.\n- **Netzwerk:** Der Drucker muss erreichbar sein – direkt oder über den [[Druckserver]].\n- **Drucker selbst:** Papier, Toner, Papierstau, Display-Meldung, „offline“.",
+        merke: "Die beste Eingrenzung sind drei Fragen: Druckt es aus einem anderen Programm? Auf einen anderen Drucker? Bei einer anderen Person? Aus den Antworten ergibt sich, welches Glied der Kette nicht funktioniert.",
+      },
+      {
+        titel: "Typische Druckerfälle",
+        text: "- **Nur eine Person kann nicht drucken:** Warteschlange am Rechner ansehen, prüfen, ob der richtige Drucker als Standard gewählt ist, Treiber und Verbindung zum Druckserver kontrollieren.\n- **Alle am selben Drucker nicht:** Dann liegt es am Drucker (Strom, Netzwerkkabel, Display) oder am Druckserver. Mehrere Betroffene melden die Störung sofort zentral.\n- **Ein Auftrag hängt fest:** Erst nur diesen Auftrag abbrechen. Hilft das nicht, den Druckspooler-Dienst neu starten. Dabei gehen die wartenden Aufträge dieses Rechners verloren – kündige das kurz an.\n- **Drucker steht auf „offline“:** Ist er wirklich aus oder nur in Windows als offline markiert? Ein Ping auf seine Adresse klärt das.",
+      },
+    ],
+    befehle: [
+      "Remoteunterstützung starten",
+      "Remotedesktop-Verbindung öffnen",
+      "Remoteverwaltung prüfen",
+      "VPN-Verbindungen anzeigen",
+      "Erreichbarkeit prüfen",
+      "Installierte Drucker anzeigen",
+      "Druckaufträge anzeigen",
+      "Standarddrucker anzeigen",
+      "Druckspooler-Dienst neu starten",
+      "Druckwarteschlange leeren",
+      "Testseite drucken",
+    ],
+    glossar: ["VPN", "RDP", "Remoteunterstützung", "Terminalserver", "Treiber", "Spooler", "Druckserver", "Netzlaufwerk"],
+    quiz: [
+      {
+        frage: "Eine Mitarbeiterin im Homeoffice erreicht das Netzlaufwerk nicht, Webseiten im Browser laufen aber. Was prüfst du zuerst?",
+        antworten: [
+          "Ob der Drucker Papier hat.",
+          "Ob das VPN verbunden ist.",
+          "Ob Outlook aktuell ist.",
+          "Ob der Bildschirm sauber ist.",
+        ],
+        richtig: 1,
+        erklaerung: "Netzlaufwerke im Firmennetz sind von außen meist nur über VPN erreichbar. Läuft das Internet, aber das VPN ist nicht verbunden, fehlen genau diese Ziele.",
+      },
+      {
+        frage: "Was unterscheidet die Remoteunterstützung von einem Remotedesktop (RDP)?",
+        antworten: [
+          "Es gibt keinen Unterschied.",
+          "RDP funktioniert nur über ein Kabel.",
+          "Bei der Remoteunterstützung sitzt der Benutzer dabei, stimmt zu und ihr seht denselben Bildschirm. Bei RDP arbeitest du in einer eigenen Sitzung auf dem anderen Rechner.",
+          "Die Remoteunterstützung braucht weder Internet noch Zustimmung.",
+        ],
+        richtig: 2,
+        erklaerung: "Bei der Remoteunterstützung arbeitet ihr gemeinsam am Bildschirm der Person. Bei RDP meldest du dich an einem anderen Rechner an und bekommst dort eine eigene Sitzung.",
+      },
+      {
+        frage: "Du hilfst per Fernzugriff und willst den Netzwerkadapter des Rechners neu starten. Was passiert wahrscheinlich?",
+        antworten: [
+          "Die Verbindung bricht ab und du sperrst dich selbst aus.",
+          "Nichts, der Fernzugriff bleibt bestehen.",
+          "Der Drucker druckt danach schneller.",
+          "Der Benutzer bekommt zusätzliche Rechte.",
+        ],
+        richtig: 0,
+        erklaerung: "Der Fernzugriff läuft über genau diese Netzwerkverbindung. Wird sie getrennt, bricht auch deine Sitzung ab – und du erreichst den Rechner nicht mehr.",
+      },
+      {
+        frage: "Ein einzelner defekter Druckauftrag blockiert die Warteschlange. Was ist ein sinnvoller erster Schritt?",
+        antworten: [
+          "Den Drucker austauschen.",
+          "Windows neu installieren.",
+          "Allen Benutzern neue Passwörter geben.",
+          "Den hängenden Auftrag abbrechen und die Warteschlange prüfen.",
+        ],
+        richtig: 3,
+        erklaerung: "Meist reicht es, den einen defekten Auftrag zu entfernen. Erst wenn das nicht hilft, folgt der Neustart des Spooler-Dienstes.",
+      },
+    ],
+    fall: {
+      titel: "Drucker im Großraumbüro",
+      situation: "Mehrere Kolleginnen im 2. OG melden, dass der Netzwerkdrucker nichts ausgibt. Am Gerät steht „Bereit“. Auf den Rechnern stehen die Aufträge in der Warteschlange.",
+      optionen: [
+        { text: "Ich lasse jede Person den Drucker neu installieren.", feedback: "Das ist aufwendig und trifft die Ursache vermutlich nicht. Mehrere Betroffene am selben Drucker sprechen für etwas Zentrales." },
+        { text: "Ich prüfe, ob der Drucker im Netz erreichbar ist und ob der Druckserver Aufträge annimmt, und melde den Fall zentral.", feedback: "Genau. Mehrere Betroffene und ein Drucker, der „Bereit“ meldet: Ein Blick auf Erreichbarkeit und Druckserver grenzt das Glied in der Kette ein, und die zentrale Meldung hilft allen anderen." },
+        { text: "Ich lösche alle Aufträge und starte alle Rechner neu.", feedback: "Das löscht fremde Aufträge, kostet Arbeitszeit und ändert nichts an einer zentralen Ursache." },
+      ],
+      beste: 1,
+    },
+  },
+
+  /* =====================================================================
+     10 · Die Microsoft-Landkarte
+     ===================================================================== */
+  {
+    id: "landkarte",
+    nr: 10,
+    titel: "Die Microsoft-Landkarte: wer macht was?",
+    kurz: "Entra ID, Exchange, Intune, Defender: Was jedes System macht und wo du nachsiehst.",
+    minuten: 9,
+    gruppe: "welt",
+    farbe: "#818cf8",
+    icon: "i-compass",
+    abschnitte: [
+      {
+        titel: "Microsoft 365 ist ein Paket, kein Programm",
+        diagramm: "landkarte",
+        text: "Hinter „Microsoft 365“ stecken viele einzelne Dienste, die zusammenarbeiten. Alles zusammen gehört zu eurem **[[Tenant]]** – dem abgetrennten Bereich eurer Firma bei Microsoft. Merk dir die Mitte der Karte:\n\n- **[[Entra ID]]** ist der Türsteher. Hier wird festgelegt, wer du bist, ob du mit [[MFA]] bestätigen musst und welche Gruppen und [[Lizenz|Lizenzen]] du hast.\n- **[[Exchange]]** kümmert sich um Mail, Kalender und [[Postfach|Postfächer]].\n- **Teams, SharePoint und OneDrive** sind Chat, Meetings und Dateien.\n- **[[Intune]]** verwaltet Geräte und Apps.\n- **[[Microsoft Defender|Defender]]** schützt vor Spam, Schadsoftware und Phishing.\n- **Das lokale [[Active Directory]]** liegt im Firmennetz und wird per [[Entra Connect]] mit der Cloud abgeglichen.\n\nFast jedes Problem in der Microsoft-Welt lässt sich einem dieser Kästen zuordnen. Damit weißt du, wo du nachsehen musst.",
+      },
+      {
+        titel: "Azure AD, Entra ID – ist das dasselbe?",
+        text: "**Ja.** Microsoft hat den Dienst „Azure Active Directory“ (kurz **Azure AD** oder AAD) im Jahr 2023 in **Microsoft Entra ID** umbenannt. Die Funktion ist dieselbe, nur der Name ist neu. Deshalb stehen in älteren Anleitungen, Fehlermeldungen und Skripten noch die alten Begriffe. „Azure AD Join“ und „Entra Join“ sind dasselbe.\n\nDrei Namen, die oft verwechselt werden:\n\n- **[[Active Directory]] (AD):** das klassische Verzeichnis **im Firmennetz**, auf Servern der Firma.\n- **[[Entra ID]]:** das Verzeichnis **in der Cloud** für Microsoft 365 – früher Azure AD.\n- **Azure:** Microsofts Cloud-Plattform für Server und Datenbanken. Wenn im Helpdesk von „Azure AD“ die Rede ist, ist fast nie Azure als Plattform gemeint, sondern der Verzeichnisdienst.",
+        merke: "Liest oder hörst du „Azure AD“, übersetze im Kopf: Entra ID. Das lokale Verzeichnis im Firmennetz heißt weiterhin Active Directory.",
+      },
+      {
+        titel: "Wohin für was? Die Verwaltungsportale",
+        diagramm: "portale",
+        text: "Jedes System hat seine eigene Verwaltungsoberfläche im Browser, ein [[Admin Center]]. Typische Adressen (deine Firma kann abweichen):\n\n- **Microsoft 365 Admin Center** – `admin.microsoft.com`: Benutzer, Lizenzen, Dienststatus, Meldungen\n- **Entra Admin Center** – `entra.microsoft.com`: Anmeldung, MFA, Geräte, Gruppen\n- **Exchange Admin Center (EAC)** – `admin.exchange.microsoft.com`: Postfächer, Verteilerlisten, Nachrichtenablaufverfolgung\n- **Microsoft Defender Portal** – `security.microsoft.com`: Quarantäne, Phishing, Bedrohungen\n- **Intune Admin Center** – `intune.microsoft.com`: Geräte, Apps, Konformität\n- **Teams Admin Center** – `admin.teams.microsoft.com`: Teams-Einstellungen und Anrufe\n\nWas du dort siehst und ändern darfst, hängt von deiner **[[Admin-Rolle|Rolle]]** ab. Fehlt ein Knopf, ist das meist gewollt und kein Fehler.",
+        merke: "Nicht jeder im Helpdesk hat Zugriff auf jedes Portal. Fehlt dir das Recht, gib den Fall mit allen Angaben an die nächste Stufe weiter. Du musst nichts umgehen.",
+      },
+      {
+        titel: "Liegt es an Microsoft oder an uns?",
+        text: "Im Microsoft 365 Admin Center zeigt der **Dienststatus**, ob Microsoft gerade eine Störung bei einem Dienst meldet. Das **Nachrichtencenter** kündigt Änderungen an. Wer die nötige Rolle hat, schaut dort nach, bevor er lange lokal sucht.\n\nBei einem Cloud-Problem hilft diese Reihenfolge:\n\n- **Zuerst:** Betrifft es nur eine Person oder mehrere?\n- **Dann:** Läuft es im Browser (Web-Test)?\n- **Dann:** Gibt es eine Störungsmeldung von Microsoft?\n- **Erst danach:** Konto, Lizenz und der einzelne Rechner.",
+      },
+    ],
+    befehle: [
+      "Lizenzen eines Benutzers anzeigen",
+      "Geräte-Join-Status anzeigen",
+      "Anmeldenamen (UPN) anzeigen",
+      "Mit Microsoft Graph verbinden",
+      "Mit Exchange Online verbinden",
+      "Office-Version anzeigen",
+    ],
+    glossar: ["Entra ID", "Active Directory", "Exchange", "Intune", "Microsoft Defender", "Entra Connect", "Admin Center", "Tenant", "Admin-Rolle", "Lizenz", "MFA"],
+    quiz: [
+      {
+        frage: "Ein Kollege sagt: „Das ist ein Azure-AD-Problem.“ Was ist damit gemeint?",
+        antworten: [
+          "Ein Problem mit dem lokalen Domänencontroller im Keller.",
+          "Ein Problem mit Microsoft Entra ID – so hieß der Dienst früher.",
+          "Ein Problem mit dem Drucker.",
+          "Ein Problem mit dem WLAN-Router.",
+        ],
+        richtig: 1,
+        erklaerung: "Azure AD wurde 2023 in Microsoft Entra ID umbenannt. Das Verzeichnis im Firmennetz heißt weiterhin Active Directory.",
+      },
+      {
+        frage: "Wo findest du Mails, die der Mailfilter zentral zurückgehalten hat?",
+        antworten: [
+          "Im Intune Admin Center.",
+          "Im Teams Admin Center.",
+          "In der Quarantäne im Microsoft Defender Portal.",
+          "Im Entra Admin Center unter „Geräte“.",
+        ],
+        richtig: 2,
+        erklaerung: "Verdächtige Mails liegen entweder im Junk-Ordner des Postfachs oder in der zentralen Quarantäne. Sie ist im Defender Portal zu sehen.",
+      },
+      {
+        frage: "Eine neue Kollegin ist im lokalen Active Directory angelegt, in Teams aber noch nicht zu finden. Was ist eine wahrscheinliche Erklärung?",
+        antworten: [
+          "Der Abgleich zur Cloud (Entra Connect) läuft nur in Abständen und war noch nicht dran.",
+          "Teams ist grundsätzlich gestört.",
+          "Das Konto wurde schon wieder gelöscht.",
+          "Der Drucker ist offline.",
+        ],
+        richtig: 0,
+        erklaerung: "Konten werden aus dem lokalen AD in die Cloud kopiert – normalerweise alle 30 Minuten. Kurz warten ist oft die einfachste Lösung.",
+      },
+      {
+        frage: "Welches System ist in der Microsoft-Welt der „Türsteher“ für Anmeldung, MFA und Gruppen?",
+        antworten: [
+          "Exchange Online",
+          "SharePoint",
+          "Microsoft Entra ID",
+          "Der Druckspooler",
+        ],
+        richtig: 2,
+        erklaerung: "Entra ID entscheidet, wer sich anmelden darf und welche Nachweise nötig sind. Exchange und SharePoint verlassen sich darauf.",
+      },
+    ],
+    fall: {
+      titel: "Wohin mit der Frage?",
+      situation: "Eine Kollegin meldet: „Im Firmenportal steht mein Gerät als ‚nicht konform‘, und seitdem komme ich nicht mehr in Teams.“ Du willst herausfinden, wo die Ursache liegt.",
+      optionen: [
+        { text: "Ich suche in Exchange das Postfach der Kollegin.", feedback: "Exchange ist für Mail und Postfächer zuständig. „Nicht konform“ ist ein Gerätezustand und gehört zu Intune." },
+        { text: "Ich sehe in Intune den Gerätezustand und die Gründe an – oder gebe den Fall mit allen Angaben weiter, wenn mir dazu das Recht fehlt.", feedback: "Genau. Die Konformität prüft Intune. Dass dadurch Teams blockiert wird, kommt von einer Zugriffsregel in Entra ID – mehr dazu im nächsten Modul." },
+        { text: "Ich lasse die Kollegin ihr Passwort ändern.", feedback: "Das Passwort ist nicht das Problem. Der Gerätezustand entscheidet, und den ändert ein neues Passwort nicht." },
+      ],
+      beste: 1,
+    },
+  },
+
+  /* =====================================================================
+     11 · Identität
+     ===================================================================== */
+  {
+    id: "identitaet",
+    nr: 11,
+    titel: "Identität: Anmeldung, Sync und Zugriffsregeln",
+    kurz: "Wie Konto, Passwort und MFA zusammenspielen – im Firmennetz, in der Cloud und dazwischen.",
+    minuten: 10,
+    gruppe: "welt",
+    farbe: "#e879f9",
+    icon: "i-key",
+    abschnitte: [
+      {
+        titel: "Zwei Verzeichnisse – eine Identität",
+        diagramm: "hybrid",
+        text: "In vielen Firmen gibt es **zwei Verzeichnisse**: das lokale [[Active Directory]] im Firmennetz und [[Entra ID]] in der Cloud. Damit eine Person trotzdem nur ein Konto hat, kopiert [[Entra Connect]] Konten, Gruppen und Eigenschaften aus dem AD in die Cloud. Man nennt das eine [[Hybrid-Umgebung]]. Der Abgleich läuft normalerweise **alle 30 Minuten**.\n\nDaraus folgt:\n\n- Eine Änderung im lokalen AD (neues Konto, geänderte Gruppe) ist in der Cloud **nicht sofort** sichtbar.\n- Es gilt: **Dort ändern, wo das Konto herkommt.** Synchronisierte Konten werden im lokalen AD geändert. In der Cloud ist so eine Änderung meist gesperrt oder geht verloren. Reine Cloud-Konten werden dagegen direkt in Entra ID gepflegt.",
+        merke: "Fragt jemand „Wo ändere ich das?“, ist die Gegenfrage: Wird das Konto aus dem lokalen AD synchronisiert? Dann dort ändern – und rund 30 Minuten warten.",
+      },
+      {
+        titel: "Passwort, MFA und Anmeldung in der Cloud",
+        text: "Beim Anmelden bei Microsoft 365 prüft Entra ID das Passwort (oder lässt es lokal prüfen) und verlangt oft einen zweiten Nachweis – [[MFA]]. Danach erhält das Gerät einen Anmelde-Token, damit nicht jedes Programm neu fragt ([[Single Sign-On|Single Sign-on]]).\n\nWichtige Begriffe:\n\n- **[[UPN]]:** der Anmeldename im Mailformat. Er kann von der Mailadresse abweichen – vergleiche beide, bevor du ein Passwortproblem vermutest.\n- **[[Authenticator]]:** die App, in der MFA bestätigt wird. Neues Handy? Dann muss die Methode neu eingerichtet werden – über einen geprüften Ablauf, nie „mal eben“ am Telefon.\n- **[[Self-Service-Passwortreset|Self-Service-Passwortreset]]:** Benutzer setzen ihr Passwort selbst zurück, wenn sie sich vorher mit eingerichteten Methoden ausweisen. Das spart Anrufe – aber nur, wenn die Methoden vorher hinterlegt wurden.\n- **[[Smart Lockout]]:** Entra ID sperrt die Anmeldung kurzzeitig, wenn zu viele falsche Versuche kommen – auch dann, wenn jemand Fremdes rät.",
+      },
+      {
+        titel: "Conditional Access: Regeln bei jeder Anmeldung",
+        diagramm: "condacc",
+        text: "Mit [[Conditional Access]] (auf Deutsch „Bedingter Zugriff“) legt die Firma Regeln fest, die bei **jeder Anmeldung** geprüft werden: Wer meldet sich an, von welchem Land, mit welchem Gerät, bei welcher App? Je nachdem wird zugelassen, **MFA** verlangt oder **blockiert**.\n\nWas das für dich bedeutet:\n\n- Passwort und MFA stimmen, aber die Anmeldung scheitert? Dann blockiert oft eine **Regel** – etwa wegen des Standorts oder weil das Gerät nicht [[Gerätekonformität|konform]] ist.\n- Die Fehlermeldung nennt häufig einen Text wie „Ihr Administrator hat den Zugriff blockiert“ oder einen **Fehlercode** (AADSTS…). Schreib den Code wörtlich ins Ticket.\n- Regeln änderst du **nie selbst**. Sie schützen die ganze Firma. Gib den Fall mit Code, Uhrzeit, Benutzer, Gerät und Standort weiter.",
+      },
+      {
+        titel: "Rollen: warum du nicht alles darfst",
+        text: "Admin-Rechte in Microsoft 365 hängen an **[[Admin-Rolle|Rollen]]**. Es gibt zum Beispiel eine Rolle für Passwort-Zurücksetzen, eine für Exchange und eine für Intune. Jede Person bekommt nur die Rollen, die sie braucht – das **Prinzip der minimalen Rechte**.\n\n- Fehlt dir ein Menüpunkt oder eine Schaltfläche, liegt es an der Rolle und nicht an einem Fehler.\n- Brauchst du mehr Rechte für eine Aufgabe, bekommst du sie über den Freigabeprozess. Du leihst dir nie Zugangsdaten anderer.\n- Konten mit Admin-Rollen sind besonders wertvolle Ziele. Wer ein Admin-Konto übernimmt, kann viel Schaden anrichten – melde jeden Verdacht sofort.",
+      },
+      {
+        titel: "Typische Anmeldeprobleme – wo schaust du?",
+        text: "- **„Konto gesperrt“ bei einem lokalen Konto** → im Active Directory prüfen: gesperrt? Passwort abgelaufen? Danach die Sperrquelle klären.\n- **„Konto vorübergehend gesperrt“ in der Cloud** → [[Smart Lockout]]. Kurz warten und nicht weiter probieren lassen. Oft rät jemand anderes.\n- **MFA-Abfrage kommt nicht an** → Handy online? Authenticator-App aktuell? Handy gewechselt? Methode im geprüften Ablauf neu einrichten.\n- **Anmeldung scheitert nur an einem Gerät** → Gerätezustand und Uhrzeit prüfen (`dsregcmd /status`, Zeitabweichung).\n- **Eine Änderung erscheint nicht in Microsoft 365** → Abgleich von Entra Connect abwarten oder prüfen lassen.",
+        merke: "Immer klären: Passt das **Konto** (lokal oder Cloud), passt das **Gerät**, passt die **Regel**?",
+      },
+    ],
+    befehle: [
+      "Benutzerkonto im Active Directory anzeigen",
+      "Gesperrte Konten finden",
+      "Sperrquelle eines Kontos finden",
+      "Passwortablauf eines Benutzers anzeigen",
+      "Konto entsperren",
+      "Geräte-Join-Status anzeigen",
+      "Anmeldenamen (UPN) anzeigen",
+      "Verzeichnis-Synchronisierung prüfen",
+      "Zeitabweichung zur Domäne prüfen",
+      "MFA-Methoden anzeigen",
+    ],
+    glossar: ["Entra ID", "Active Directory", "Entra Connect", "Hybrid-Umgebung", "MFA", "Authenticator", "Self-Service-Passwortreset", "Single Sign-On", "UPN", "Smart Lockout", "Conditional Access", "Gerätekonformität", "Admin-Rolle"],
+    quiz: [
+      {
+        frage: "Eine Mitarbeiterin wurde im lokalen Active Directory einer neuen Gruppe hinzugefügt. Nach fünf Minuten ist der Zugriff in der Cloud noch nicht da. Was ist die wahrscheinlichste Erklärung?",
+        antworten: [
+          "Sie hat ein falsches Passwort.",
+          "Teams ist grundsätzlich kaputt.",
+          "Der Bildschirm ist zu klein.",
+          "Der Abgleich zur Cloud läuft nur in Abständen (normalerweise alle 30 Minuten) und war noch nicht dran.",
+        ],
+        richtig: 3,
+        erklaerung: "Änderungen im lokalen AD kommen erst mit dem nächsten Abgleich von Entra Connect in der Cloud an.",
+      },
+      {
+        frage: "Passwort und MFA stimmen, die Anmeldung wird aber mit „Zugriff blockiert“ abgelehnt. Woran liegt das häufig?",
+        antworten: [
+          "An einem Papierstau im Drucker.",
+          "An einer Zugriffsregel (Conditional Access), zum Beispiel wegen Gerät oder Standort.",
+          "An der Bildschirmauflösung.",
+          "An einem zu langen Benutzernamen.",
+        ],
+        richtig: 1,
+        erklaerung: "Conditional Access prüft bei jeder Anmeldung zusätzliche Bedingungen. Auch mit richtigem Passwort kann eine Regel den Zugriff blockieren.",
+      },
+      {
+        frage: "Ein Konto wird aus dem lokalen AD synchronisiert. Wo änderst du es am besten?",
+        antworten: [
+          "Im lokalen Active Directory, denn dort liegt die Quelle.",
+          "Nur in der Cloud, das lokale AD ist egal.",
+          "Gar nicht – synchronisierte Konten kann niemand ändern.",
+          "Im Druckerportal.",
+        ],
+        richtig: 0,
+        erklaerung: "Bei synchronisierten Konten bestimmt das lokale AD die Werte. Der Abgleich übernimmt sie in die Cloud; eine Änderung dort ist meist gesperrt oder geht verloren.",
+      },
+      {
+        frage: "Im Portal fehlt dir eine Schaltfläche. Was ist richtig?",
+        antworten: [
+          "Mit dem Admin-Konto einer Kollegin anmelden.",
+          "Das Konto des Benutzers löschen.",
+          "Prüfen, ob deine Rolle das erlaubt, und den Fall sonst über den Freigabeprozess weitergeben – nie fremde Zugangsdaten leihen.",
+          "Den Rechner neu installieren.",
+        ],
+        richtig: 2,
+        erklaerung: "Fehlende Schaltflächen sind meist gewollt, weil die Rolle nicht reicht. Rechte holt man sich über den vorgesehenen Weg.",
+      },
+    ],
+    fall: {
+      titel: "Gesperrt – aber nicht lokal",
+      situation: "Ein Außendienstler meldet: „Ich komme seit heute früh nicht mehr in Microsoft 365 – ‚Konto vorübergehend gesperrt‘.“ Im lokalen Active Directory ist sein Konto nicht gesperrt.",
+      optionen: [
+        { text: "Ich entsperre das Konto im Active Directory.", feedback: "Dort ist nichts gesperrt, der Befehl ändert nichts. Die Meldung kommt aus der Cloud (Smart Lockout)." },
+        { text: "Ich lasse ihn kurz warten und nicht weiter probieren, frage nach auffälligen Mails oder Anmeldungen und melde einen möglichen Angriff über den Sicherheitsweg.", feedback: "Genau. Smart Lockout greift oft, weil jemand anderes Passwörter ausprobiert. Wiederholtes Versuchen hilft nicht, und der Verdacht gehört gemeldet." },
+        { text: "Ich setze sein Passwort auf ein einfaches Standardpasswort.", feedback: "Ein Standardpasswort ist gefährlich, wenn gerade jemand rät. Ein Reset gehört in den geprüften Ablauf mit Identitätsprüfung." },
+      ],
+      beste: 1,
+    },
+  },
+
+  /* =====================================================================
+     12 · Exchange und EAC
+     ===================================================================== */
+  {
+    id: "exchange",
+    nr: 12,
+    titel: "Exchange und EAC: Postfächer und Mailfluss",
+    kurz: "Was Exchange Online macht, was das EAC ist – und warum Mails nicht ankommen.",
+    minuten: 10,
+    gruppe: "welt",
+    farbe: "#fb7185",
+    icon: "i-message",
+    abschnitte: [
+      {
+        titel: "Exchange Online und das EAC",
+        text: "**[[Exchange]] Online** ist der Mailserver in der Cloud: Dort liegen Postfächer, Kalender und Kontakte aller Benutzer. Outlook, die Mail-App und Outlook im Web ([[OWA]]) sind nur verschiedene Fenster auf dasselbe [[Postfach]].\n\nDas **EAC** (Exchange Admin Center) ist die Verwaltungsoberfläche dazu. Je nach Rolle findest du dort:\n\n- **Empfänger:** Postfächer, freigegebene Postfächer, Verteilerlisten\n- **Mailfluss:** Nachrichtenablaufverfolgung, Regeln, Connectors\n- **Berichte** zu Mailverkehr und Postfächern\n\nBenutzerkonto, Passwort, MFA und Lizenz gehören **nicht** ins EAC, sondern zu Entra ID und zum Microsoft 365 Admin Center. Das Postfach ist das Ziel, das Konto die Eintrittskarte.",
+      },
+      {
+        titel: "Welche Art von Postfach ist das?",
+        text: "Nicht alles mit einer Mailadresse ist ein normales Postfach. Die Art bestimmt, was möglich ist:\n\n- **Benutzerpostfach:** gehört einer Person und braucht eine Lizenz.\n- **[[Freigegebenes Postfach]] (Shared Mailbox):** gehört einem Team, zum Beispiel info@. Mitarbeitende bekommen **Vollzugriff** und „Senden als“. Man meldet sich nicht direkt daran an, sondern öffnet es mit dem eigenen Konto. Eine Lizenz braucht es nur in Sonderfällen, etwa bei sehr großem Postfach, Archiv oder Aufbewahrungssperre.\n- **Raum- und Gerätepostfach:** zum Buchen von Räumen oder Geräten.\n- **[[Verteilerliste]]:** eine Adresse, die an mehrere Personen verteilt. Sie hat kein eigenes Postfach.\n- **Microsoft-365-Gruppe:** gemeinsame Adresse samt Teams, Dateien und Kalender.\n\nBei jeder Meldung zu einem „Gruppenpostfach“ lautet die erste Frage: Welche Art ist es genau? Der Befehl „Postfachtyp anzeigen“ verrät es.",
+        merke: "„Mail an die Gruppe kommt nicht an“ kann vier verschiedene Dinge bedeuten. Kläre erst die Art, dann die Berechtigung.",
+      },
+      {
+        titel: "Wie eine Mail ihren Weg nimmt",
+        diagramm: "mailfluss",
+        text: "Schickt jemand von außen eine Mail an name@firma.de, passiert Folgendes:\n\n- Der Absender-Server fragt im [[DNS]] nach dem **[[MX-Eintrag]]** der Domäne. Er verrät, an welchen Server die Mail geliefert wird – bei Microsoft 365 ein Name unter `mail.protection.outlook.com`.\n- Dort prüft der **Mailfilter** (Exchange Online Protection, Teil von [[Microsoft Defender|Defender]]) auf Spam, Schadsoftware und Phishing. Verdächtiges landet im Junk-Ordner oder in der **[[Quarantäne]]**.\n- Im [[Postfach]] greifen **Regeln und Weiterleitungen** des Benutzers. Erst dann zeigt Outlook die Mail.\n\nZerlege „Mail kommt nicht an“ deshalb in Teilfragen: Hat sie den Server erreicht? Hat der Filter sie zurückgehalten? Hat eine Regel sie verschoben?",
+        merke: "Die **[[Nachrichtenablaufverfolgung]]** im EAC zeigt für eine bestimmte Mail jeden Schritt samt Status – zugestellt, in Quarantäne, abgelehnt oder noch in der Warteschlange. Sie beendet viel Rätselraten.",
+      },
+      {
+        titel: "Unzustellbar: den Fehlercode lesen",
+        diagramm: "ndr",
+        text: "Kann eine Mail nicht zugestellt werden, schickt der Server dem Absender eine **Unzustellbarkeitsnachricht** (NDR). Darin steht ein Code, der beste Hinweis auf die Ursache. Die erste Ziffer **5** heißt: dauerhafter Fehler – nochmal senden ändert nichts.\n\n- **5.1.1 / 5.1.10:** Empfängeradresse falsch oder nicht gefunden. Tippfehler? Alte Adresse im Outlook-Vorschlagsspeicher?\n- **5.4.1:** Der Zielserver lehnt die Empfängeradresse ab, weil es sie dort nicht gibt.\n- **5.7.1:** nicht berechtigt. Zum Beispiel darf nur eine bestimmte Gruppe an diese Verteilerliste schreiben, oder eine Regel hat die Mail blockiert.\n- **5.1.8:** Der Absender wurde wegen sehr vieler Spam-Mails gesperrt. Das ist meist ein **gehacktes Konto** – sofort an die Sicherheitsstelle melden. Entsperrt wird erst, nachdem das Konto gesichert ist.\n- **5.2.122:** Der Empfänger hat zu viele Mails pro Stunde bekommen. Später erneut senden.\n- **5.4.14 / 5.4.6:** Mailschleife, oft durch eine falsch gesetzte Weiterleitung.\n\nDie genaue Bedeutung findest du im Wortlaut der Nachricht. Gib den Code immer wörtlich weiter.",
+      },
+      {
+        titel: "Spam, Quarantäne und gefälschte Absender",
+        text: "Zwei Fälle, die oft verwechselt werden:\n\n- **Eingehend – eine erwartete Mail fehlt:** Prüfe zuerst den Junk-Ordner, dann die Quarantäne im Defender Portal, dann die Nachrichtenablaufverfolgung. Benutzer können vieles in der Quarantäne selbst freigeben. Mails mit Schadsoftware oder als sehr sicheres Phishing erkannte Mails darf dagegen **nur ein Admin** freigeben. Eine freigegebene Mail erscheint mit dem Zeitpunkt der Freigabe im Postfach.\n- **Ausgehend – Mails der Firma landen beim Empfänger im Spam:** Dann stimmt oft etwas bei **[[SPF / DKIM / DMARC|SPF, DKIM und DMARC]]** nicht. Das sind drei Einträge im DNS, mit denen eine Domäne beweist, dass ihre Mails wirklich von ihr stammen.\n\nGib eine Mail nie vorschnell frei. Wirkt der Absender unbekannt oder drängt die Mail zu einer Handlung, behandle sie als [[Phishing]]-Verdacht und nutze die Meldewege eures Betriebs.",
+      },
+      {
+        titel: "Weiterleitungen: ein beliebter Angriffsweg",
+        text: "Wird ein Konto gehackt, richten Angreifer oft heimlich eine **Weiterleitungsregel** an eine fremde Adresse ein, um mitzulesen. Bei Verdacht auf ein gehacktes Konto gehört deshalb immer die Prüfung von Regeln und Weiterleitungen dazu (siehe Befehle unten).\n\nFindest du eine unbekannte Weiterleitung nach außen, **löschst du sie nicht selbst**, sondern meldest sie sofort der Sicherheitsstelle. Sonst gehen Beweise verloren.",
+        merke: "Gehacktes Konto heißt: nichts verändern, was Spuren löscht – erst melden, dann nach Anweisung handeln.",
+      },
+    ],
+    befehle: [
+      "Mit Exchange Online verbinden",
+      "Nachrichtenverfolgung",
+      "Quarantäne-Nachrichten anzeigen",
+      "Postfachtyp anzeigen",
+      "E-Mail-Adressen eines Postfachs anzeigen",
+      "Postfachberechtigungen anzeigen",
+      "Postfachgröße anzeigen",
+      "Weiterleitungsregeln eines Postfachs prüfen",
+      "Postfach-Weiterleitung prüfen",
+      "MX-Einträge einer Domäne anzeigen",
+      "SPF-Eintrag einer Domäne anzeigen",
+      "DMARC-Eintrag einer Domäne anzeigen",
+    ],
+    glossar: ["Exchange", "Postfach", "Freigegebenes Postfach", "Verteilerliste", "OWA", "Quarantäne", "Nachrichtenablaufverfolgung", "SMTP-Fehlercode", "MX-Eintrag", "SPF / DKIM / DMARC", "Microsoft Defender", "Stellvertretung", "Admin Center"],
+    quiz: [
+      {
+        frage: "Eine Mail an info@firma.de kommt nicht an. Mit welchem Werkzeug im EAC siehst du, was mit der Mail passiert ist?",
+        antworten: [
+          "Datenträgerverwaltung",
+          "Nachrichtenablaufverfolgung",
+          "Geräte-Manager",
+          "Task-Manager",
+        ],
+        richtig: 1,
+        erklaerung: "Die Nachrichtenablaufverfolgung zeigt den Weg und Status einer Mail: zugestellt, in Quarantäne, abgelehnt oder in der Warteschlange.",
+      },
+      {
+        frage: "Eine Unzustellbarkeitsnachricht enthält den Code 5.1.8 („bad outbound sender“). Was bedeutet das und was ist zu tun?",
+        antworten: [
+          "Die Empfängeradresse ist falsch – einfach neu senden.",
+          "Der Drucker ist offline.",
+          "Die Mail war zu kurz.",
+          "Der Absender wurde wegen Spamverdachts gesperrt – meist ein gehacktes Konto. Sofort an die Sicherheitsstelle melden.",
+        ],
+        richtig: 3,
+        erklaerung: "5.1.8 bedeutet, dass der Absender zu viel Spam verschickt hat und gesperrt wurde. Die Ursache ist meist ein kompromittiertes Konto.",
+      },
+      {
+        frage: "Welche Aussage zum freigegebenen Postfach (Shared Mailbox) stimmt?",
+        antworten: [
+          "Es braucht immer eine eigene Anmeldung mit Passwort.",
+          "Es gehört einem Team; man öffnet es mit dem eigenen Konto über Vollzugriff und „Senden als“.",
+          "Es ist dasselbe wie eine Verteilerliste.",
+          "Es lässt sich nicht in Outlook öffnen.",
+        ],
+        richtig: 1,
+        erklaerung: "Ein freigegebenes Postfach ist ein eigenes Postfach, das mehrere Personen über Berechtigungen nutzen. Eine Verteilerliste hat dagegen kein Postfach und verteilt nur.",
+      },
+      {
+        frage: "Ein Benutzer vermisst eine erwartete Mail. In welcher Reihenfolge prüfst du sinnvoll?",
+        antworten: [
+          "Junk-Ordner, Quarantäne, Nachrichtenablaufverfolgung.",
+          "Erst Windows neu installieren, dann Outlook löschen.",
+          "Gar nicht – einfach warten.",
+          "Zuerst den Drucker prüfen.",
+        ],
+        richtig: 0,
+        erklaerung: "Vom Einfachen zum Aufwendigen: Der Junk-Ordner kostet Sekunden, die Quarantäne eine Minute, und die Nachrichtenablaufverfolgung zeigt den ganzen Weg.",
+      },
+      {
+        frage: "Wer darf eine als Schadsoftware erkannte Mail aus der Quarantäne freigeben?",
+        antworten: [
+          "Jeder Benutzer mit einem Klick.",
+          "Der Absender der Mail.",
+          "Nur ein Administrator – Benutzer können das nicht.",
+          "Niemand, die Mail wird sofort zugestellt.",
+        ],
+        richtig: 2,
+        erklaerung: "Mails, die als Schadsoftware erkannt wurden, sind standardmäßig nur für Administratoren verfügbar. Das schützt vor versehentlichem Freigeben.",
+      },
+    ],
+    fall: {
+      titel: "Die Mail vom Kunden fehlt",
+      situation: "Ein Vertriebsmitarbeiter wartet auf ein Angebot, das ein Kunde nach eigener Aussage vor einer Stunde geschickt hat. Im Posteingang ist nichts. Der Kunde hat keine Unzustellbarkeitsnachricht erhalten.",
+      optionen: [
+        { text: "Ich bitte den Kunden, die Mail noch zehnmal zu schicken.", feedback: "Das belastet alle Beteiligten und klärt nichts. Erst herausfinden, wo die Mail geblieben ist." },
+        { text: "Ich lege eine Regel an, die alle Mails des Kunden immer in den Posteingang verschiebt.", feedback: "Das umgeht den Schutz, ohne die Ursache zu kennen, und kann Phishing durchlassen. Erst prüfen, warum die Mail zurückgehalten wurde." },
+        { text: "Ich prüfe Junk-Ordner und Quarantäne und verfolge die Mail mit der Nachrichtenablaufverfolgung (Absender, Zeitraum). Freigeben würde ich sie nur, wenn der Absender plausibel ist.", feedback: "Genau. So findest du die Stelle im Mailweg, und die Freigabe ist ein bewusster Schritt nach der Prüfung." },
+      ],
+      beste: 2,
+    },
+  },
+
+  /* =====================================================================
+     13 · Geräte
+     ===================================================================== */
+  {
+    id: "geraete",
+    nr: 13,
+    titel: "Geräte: Entra-Join, Intune und Firmenportal",
+    kurz: "Wie ein Rechner zur Firma gehört, was „nicht konform“ heißt und woher Geräteprobleme kommen.",
+    minuten: 9,
+    gruppe: "welt",
+    farbe: "#4ade80",
+    icon: "i-sliders",
+    abschnitte: [
+      {
+        titel: "Wie gehört ein Rechner zur Firma?",
+        diagramm: "joinzustand",
+        text: "Ein Firmenrechner ist auf unterschiedliche Weise mit der Firma „verbunden“ ([[Geräte-Join]]):\n\n- **Nur Domäne:** klassisch, nur im lokalen [[Active Directory]].\n- **Hybrid (Hybrid joined):** in der Domäne **und** in Entra ID bekannt. Verbreitet in Firmen, die lokal und Cloud mischen ([[Hybrid-Umgebung]]).\n- **Entra joined:** nur in Entra ID, ohne lokales AD. Typisch für neue, reine Cloud-Rechner.\n- **Registriert:** ein privates Gerät, auf dem ein Firmenkonto hinzugefügt wurde. Die Firma verwaltet es nur eingeschränkt.\n\nDen Zustand zeigt `dsregcmd /status`. Achte auf **AzureAdJoined**, **DomainJoined** und **WorkplaceJoined**. Der Befehl spricht noch von „Azure AD“, gemeint ist Entra ID.",
+      },
+      {
+        titel: "Intune: die Geräteverwaltung",
+        text: "[[Intune]] ist die Geräteverwaltung (MDM) von Microsoft. Es verteilt Einstellungen und Apps und prüft, ob Geräte die Vorgaben erfüllen.\n\n- **Einstellungen:** Intune setzt zum Beispiel WLAN-Profile, Verschlüsselung und Sperrbildschirm.\n- **Apps:** Programme erscheinen im **Firmenportal**, dem App-Katalog der Firma. Benutzer installieren dort selbst.\n- **Konformität:** Intune prüft Vorgaben wie „Festplatte verschlüsselt“ oder „Windows aktuell“. Das Ergebnis heißt [[Gerätekonformität|konform oder nicht konform]].\n- **[[Autopilot]]:** Neue Geräte richten sich über das Internet selbst für die Firma ein.\n\nProbleme „im Firmenportal“ betreffen meist fehlende Apps, noch nicht angekommene Richtlinien oder einen nicht konformen Zustand.",
+      },
+      {
+        titel: "Nicht konform heißt oft: Zugriff weg",
+        text: "Die Firma kann festlegen, dass nur **konforme** Geräte auf Mail, Teams und Dateien zugreifen. Umgesetzt wird das durch [[Conditional Access]] in Entra ID – die Konformität selbst kommt aus Intune. Daher die typische Meldung „Ihr Gerät erfüllt die Vorgaben nicht“ oder ein Zugriffsfehler nach der Anmeldung.\n\nSo gehst du vor:\n\n- **Grund finden:** Im Firmenportal oder in Intune steht, welche Vorgabe fehlt – meist ein fehlendes Update, eine fehlende Verschlüsselung ([[BitLocker]]) oder ein zu altes Windows.\n- **Beheben statt umgehen:** Update einspielen, Verschlüsselung abschließen, neu starten und danach im Firmenportal den Status aktualisieren lassen. Es kann etwas dauern, bis der neue Zustand in der Cloud ankommt.\n- **Nie Regeln lockern.** Ausnahmen für ein einzelnes Gerät entscheidet die Sicherheitsstelle, nicht der Helpdesk.",
+        merke: "Geräteprobleme sind selten „nur ein Rechnerproblem“: Konto, Gerätezustand und Zugriffsregel spielen zusammen.",
+      },
+      {
+        titel: "Typische Geräteprobleme",
+        text: "- **Anmeldung am Rechner klappt, in der Cloud kommt kein Zugriff:** `dsregcmd /status` prüfen – gibt es einen Cloud-Token (Block „SSO State“)? Stimmen Uhrzeit und Netzverbindung?\n- **Eine Richtlinie kommt nicht an:** Neustart und etwas Geduld lösen viel. Lokale Richtlinien zeigen die Befehle unten; Richtlinien aus Intune brauchen Zeit.\n- **„Vertrauensstellung zur Domäne fehlgeschlagen“:** Das Rechnerkonto im lokalen AD passt nicht mehr zum Rechner. Die Reparatur ist ein Fall für Berechtigte.\n- **Gerät doppelt in Entra ID oder falsch zugeordnet:** Nicht selbst löschen – Berechtigte prüfen das, weil dabei Zugriffe verloren gehen können.\n- **Neuer Rechner ohne Zugriff auf Firmen-Apps:** Hat er seine Einrichtung (Autopilot) abgeschlossen?",
+      },
+    ],
+    befehle: [
+      "Geräte-Join-Status anzeigen",
+      "Anmeldenamen (UPN) anzeigen",
+      "Gruppenrichtlinien aktualisieren",
+      "Computerrichtlinien anzeigen",
+      "Zeitdienst-Status anzeigen",
+      "BitLocker-Status anzeigen",
+      "TPM-Status anzeigen",
+      "Windows-Version und Build anzeigen",
+      "Installierte Updates anzeigen",
+      "Seriennummer auslesen",
+      "Defender-Status anzeigen",
+    ],
+    glossar: ["Intune", "Geräte-Join", "Hybrid-Umgebung", "Gerätekonformität", "Autopilot", "Conditional Access", "BitLocker", "TPM", "Gruppenrichtlinie", "Vertrauensstellung", "Entra ID"],
+    quiz: [
+      {
+        frage: "dsregcmd /status zeigt „DomainJoined: YES“ und „AzureAdJoined: YES“. Was bedeutet das?",
+        antworten: [
+          "Der Rechner ist ein privates Handy.",
+          "Der Rechner ist nur in der Cloud.",
+          "Der Rechner ist hybrid: in der lokalen Domäne und in Entra ID bekannt.",
+          "Der Rechner ist ausgeschaltet.",
+        ],
+        richtig: 2,
+        erklaerung: "Beide Werte auf YES bedeuten einen hybriden Rechner. Nur AzureAdJoined = YES wäre ein reiner Cloud-Rechner, nur DomainJoined = YES ein klassischer Domänenrechner.",
+      },
+      {
+        frage: "Ein Gerät ist „nicht konform“ und der Zugriff auf Teams wird blockiert. Wer stellt die Konformität fest und wer setzt die Sperre um?",
+        antworten: [
+          "Intune prüft die Konformität, Conditional Access in Entra ID setzt die Sperre um.",
+          "Der Drucker prüft, das WLAN blockiert.",
+          "Exchange prüft, SharePoint blockiert.",
+          "Niemand – das ist Zufall.",
+        ],
+        richtig: 0,
+        erklaerung: "Intune bewertet den Gerätezustand. Eine Zugriffsregel in Entra ID (Conditional Access) wertet das Ergebnis bei der Anmeldung aus.",
+      },
+      {
+        frage: "Was ist beim Umgang mit einem nicht konformen Gerät KEIN guter Weg?",
+        antworten: [
+          "Den Grund im Firmenportal ansehen.",
+          "Die Zugriffsregel für dieses Gerät selbst lockern.",
+          "Den fehlenden Punkt, zum Beispiel ein Update, beheben.",
+          "Den Status nach der Behebung aktualisieren lassen.",
+        ],
+        richtig: 1,
+        erklaerung: "Sicherheitsregeln lockert der Helpdesk nicht. Die Ursache wird behoben, danach meldet das Gerät wieder „konform“.",
+      },
+      {
+        frage: "Wofür ist das Firmenportal da?",
+        antworten: [
+          "Zum Bestellen von Büromaterial.",
+          "Zum Weiterleiten von Mails.",
+          "Zum Drucken auf Netzwerkdruckern.",
+          "Als App-Katalog der Firma und zur Prüfung des Gerätestatus.",
+        ],
+        richtig: 3,
+        erklaerung: "Im Firmenportal installieren Benutzer Firmen-Apps und sehen, ob ihr Gerät die Vorgaben erfüllt.",
+      },
+    ],
+    fall: {
+      titel: "Neuer Laptop, kein Zugriff",
+      situation: "Ein neuer Laptop wurde gestern ausgeliefert. Die Anmeldung am Gerät klappt, aber Outlook und Teams melden „Zugriff nicht erlaubt“. Im Firmenportal steht: „Gerät nicht konform – Verschlüsselung fehlt“.",
+      optionen: [
+        { text: "Ich bitte darum, die Zugriffsregel für dieses Gerät zu entfernen.", feedback: "Ausnahmen von Sicherheitsregeln sind keine Aufgabe des Helpdesks und lösen die Ursache nicht." },
+        { text: "Ich prüfe den Verschlüsselungsstatus (BitLocker), lasse die Verschlüsselung abschließen, starte neu und lasse das Gerät im Firmenportal den Status aktualisieren.", feedback: "Genau. Die Konformität kommt aus Intune. Sobald die Verschlüsselung aktiv ist und der Status zurückgemeldet wurde, gibt die Zugriffsregel den Weg frei." },
+        { text: "Ich installiere Windows neu.", feedback: "Das ist Overkill und löscht die Einrichtung. Die Ursache ist bekannt und deutlich kleiner." },
+      ],
+      beste: 1,
+    },
+  },
+
+  /* =====================================================================
+     14 · Priorisieren
      ===================================================================== */
   {
     id: "prioritaeten",
-    nr: 9,
+    nr: 14,
     titel: "Wichtig oder dringend? Priorisieren",
     kurz: "Welches Ticket zuerst – und wie du fair und verständlich entscheidest.",
     minuten: 8,
@@ -980,11 +1537,11 @@ export const TRAINING_MODULES = [
   },
 
   /* =====================================================================
-     10 · Datenschutz
+     15 · Datenschutz
      ===================================================================== */
   {
     id: "datenschutz",
-    nr: 10,
+    nr: 15,
     titel: "Datenschutz im Support",
     kurz: "Was ins Ticket darf, was nie – und was bei einer Panne zu tun ist.",
     minuten: 8,
@@ -1078,6 +1635,98 @@ export const TRAINING_MODULES = [
       beste: 1,
     },
   },
+
+  /* =====================================================================
+     16 · IT-Service verstehen
+     ===================================================================== */
+  {
+    id: "itservice",
+    nr: 16,
+    titel: "Incident, Anfrage, Change, Problem",
+    kurz: "Vier Arten von Vorgängen – und warum es nützt, sie auseinanderzuhalten.",
+    minuten: 8,
+    gruppe: "alltag",
+    farbe: "#a3e635",
+    icon: "i-check-list",
+    abschnitte: [
+      {
+        titel: "Nicht jedes Ticket ist gleich",
+        diagramm: "servicearten",
+        text: "Im IT-Service (oft nach dem Rahmenwerk ITIL beschrieben) unterscheidet man vier Arten von Vorgängen. Das klingt theoretisch, hilft aber im Alltag, denn jede Art hat ihren eigenen Weg:\n\n- **Incident (Störung):** Etwas, das gestern ging, geht heute nicht. Ziel: so schnell wie möglich wieder arbeiten können – notfalls mit einer [[Behelfslösung]].\n- **[[Service Request]] (Anfrage):** Etwas Normales wird bestellt – Software, Zugriff, ein neues Headset. Läuft über einen festen Ablauf, oft mit Freigabe.\n- **[[Change]] (Änderung):** Etwas an der IT wird geplant verändert, zum Beispiel ein Server-Update. Wird vorher beantragt, geprüft und freigegeben.\n- **[[Problem Management|Problem]]:** Die Ursache hinter vielen gleichartigen Incidents. Sie wird gesucht, damit die Störung nicht wiederkommt.",
+      },
+      {
+        titel: "Warum die Unterscheidung nützt",
+        text: "- **Richtige Priorität:** Die Anfrage nach einem neuen Headset ist nicht dringend. Eine Störung, die ein Team lahmlegt, schon.\n- **Richtiger Weg:** Anfragen laufen über einen Freigabeprozess, Störungen über Fehlersuche und Eskalation.\n- **Weniger Doppelarbeit:** Melden zehn Personen dasselbe, sind das zehn Incidents, aber nur ein Problem. Es reicht, einmal an der Ursache zu arbeiten.\n- **Sicherheit:** „Schnell mal“ etwas an einem Server zu ändern ist ein Change. Er braucht Freigabe, weil er andere treffen kann.\n\nWie euer Betrieb Vorgänge benennt und welche Fristen gelten, legt er selbst fest. Frag im Zweifel nach.",
+        merke: "Erkennst du bei mehreren gleichen Tickets ein Muster, sprich es an. Das ist ein **Problem**, und deine Beobachtung spart allen Zeit.",
+      },
+      {
+        titel: "Reaktionszeit und SLA",
+        text: "Ein [[SLA]] (Service Level Agreement) legt fest, wie schnell ein Team reagieren und lösen soll – meist abhängig von der Priorität. Die genauen Werte gibt dein Betrieb vor. Erfinde keine.\n\n- **Reaktionszeit:** bis sich jemand das Ticket ansieht und dem Melder antwortet.\n- **Lösungszeit:** bis die Störung behoben ist.\n- **[[Eskalation]]** ist erlaubt und erwünscht, wenn eine Frist zu reißen droht oder du nicht weiterkommst.\n\nWer eine Frist knapp werden sieht, informiert den Benutzer **rechtzeitig**. Das ist besser als Schweigen.",
+      },
+      {
+        titel: "Änderungen: nicht mal eben",
+        text: "Ein Change ist die kontrollierte Art, etwas zu ändern. Er beantwortet meist: Was soll sich ändern? Warum? Wer ist betroffen? Wann (Wartungsfenster)? Wie geht es zurück, wenn es schiefgeht?\n\nFür dich im Helpdesk heißt das:\n\n- Änderungen an Servern, am Netzwerk oder an zentralen Einstellungen führst du **nicht ohne Freigabe** durch – auch dann nicht, wenn es technisch möglich wäre.\n- Beginnt ein Problem nach einer Änderung, schreib das ins Ticket. **Was hat sich zuletzt geändert?** ist eine der besten Fragen der Fehlersuche.\n- Geplante Wartungsarbeiten stehen in den Meldungen und in der Dienstübergabe. Kündige sie Anrufern an, wenn sie betroffen sind.",
+      },
+    ],
+    befehle: [],
+    glossar: ["Ticket", "Service Request", "Change", "Problem Management", "SLA", "Behelfslösung", "Eskalation", "Major Incident"],
+    quiz: [
+      {
+        frage: "Zehn Personen melden innerhalb einer Stunde, dass das WLAN im 3. OG abbricht. Was ist das aus IT-Service-Sicht?",
+        antworten: [
+          "Zehn Anfragen (Service Requests).",
+          "Ein geplanter Change.",
+          "Zehn Incidents, hinter denen wahrscheinlich ein gemeinsames Problem steckt.",
+          "Kein IT-Thema.",
+        ],
+        richtig: 2,
+        erklaerung: "Jede Meldung ist ein Incident. Die gemeinsame Ursache ist ein Problem – dort sollte einmal gründlich gearbeitet werden.",
+      },
+      {
+        frage: "Ein Benutzer möchte Zugriff auf einen neuen Projektordner. Welche Art von Vorgang ist das?",
+        antworten: [
+          "Ein Service Request.",
+          "Ein Major Incident.",
+          "Ein Problem.",
+          "Ein Virus.",
+        ],
+        richtig: 0,
+        erklaerung: "Es ist nichts kaputt, jemand bittet um etwas Normales. Solche Anfragen laufen meist über einen festen Ablauf mit Freigabe.",
+      },
+      {
+        frage: "Du könntest „schnell mal“ eine Einstellung auf einem zentralen Server ändern. Was ist richtig?",
+        antworten: [
+          "Einfach machen, Hauptsache es hilft.",
+          "Das ist ein Change und braucht eine Freigabe.",
+          "Heimlich nachts ändern.",
+          "Den Benutzer ändern lassen.",
+        ],
+        richtig: 1,
+        erklaerung: "Änderungen an zentralen Systemen können viele treffen. Deshalb werden sie geplant, geprüft und freigegeben.",
+      },
+      {
+        frage: "Wozu dient eine Behelfslösung bei einem Incident?",
+        antworten: [
+          "Sie ersetzt die spätere Ursachensuche vollständig.",
+          "Damit die Person schnell weiterarbeiten kann, während die Ursache noch gesucht wird.",
+          "Sie ist grundsätzlich verboten.",
+          "Sie ist nur für Administratoren erlaubt.",
+        ],
+        richtig: 1,
+        erklaerung: "Eine Behelfslösung bringt die Arbeit sofort zurück. Die eigentliche Ursache wird davon unabhängig gesucht.",
+      },
+    ],
+    fall: {
+      titel: "Das dritte Mal diese Woche",
+      situation: "Zum dritten Mal in dieser Woche meldet jemand aus der Buchhaltung, dass das Fachprogramm nach dem Start einfriert. Du hast jedes Mal mit einem Neustart geholfen.",
+      optionen: [
+        { text: "Ich helfe wieder mit einem Neustart und schließe das Ticket.", feedback: "Die Person kann weiterarbeiten, aber die Ursache bleibt. Wiederkehrende gleichartige Störungen deuten auf ein Problem hin." },
+        { text: "Ich helfe mit dem Neustart, notiere den Zusammenhang in allen drei Tickets und melde das Muster, damit die Ursache gesucht wird.", feedback: "Genau. Die Behelfslösung hilft jetzt, die Meldung des Musters hilft dauerhaft – das ist der Kern von Problem Management." },
+        { text: "Ich ändere selbst Einstellungen auf dem Server, auf dem das Programm läuft.", feedback: "Änderungen an Servern brauchen eine Freigabe (Change). Ohne sie riskierst du neue Störungen für alle." },
+      ],
+      beste: 1,
+    },
+  },
 ];
 
 /**
@@ -1093,6 +1742,7 @@ export const FIRST_WEEK = [
   { id: "check:woche1:fehlersuche", text: "Modul „Systematische Fehlersuche“ bestanden", modul: "fehlersuche" },
   { id: "check:woche1:eskalation", text: "Eskalationsstufen angesehen und weiß, wen ich wann anrufe", ansicht: "escalation" },
   { id: "check:woche1:sicherheit", text: "Modul „Sicherheit am Telefon“ bestanden", modul: "sicherheit" },
+  { id: "check:woche1:landkarte", text: "Modul „Die Microsoft-Landkarte“ bestanden – Entra ID, Exchange, Intune & Co. auseinanderhalten", modul: "landkarte" },
   { id: "check:woche1:mithoeren", text: "Ein Gespräch mit einem erfahrenen Kollegen mitgehört" },
   { id: "check:woche1:uebergabe", text: "Eine Dienstübergabe gelesen und bestätigt", ansicht: "handover" },
 ];

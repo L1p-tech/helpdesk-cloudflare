@@ -301,6 +301,171 @@ export const DIAGRAMS = {
     row2.forEach((lines, index) => { inner += box(xs[index], 124, w, 98, lines, index === 3 ? "good" : ""); });
     return svg(236, inner, "Übersicht der Bereiche im Helpdesk-Helper");
   },
+
+  /* ---- Microsoft-Welt ---- */
+  landkarte() {
+    const top = [
+      [4, ["Exchange Online", "Mail, Postfächer, Kalender", "Verwaltung: EAC"]],
+      [218, ["Teams", "Chat, Anrufe, Meetings", "Verwaltung: Teams Admin Center"]],
+      [432, ["SharePoint · OneDrive", "Dateien und Websites", "Verwaltung: SharePoint Admin"]],
+    ];
+    const bottom = [
+      [4, ["Lokales Active Directory", "Konten im Firmennetz", "↔ Entra Connect"], ""],
+      [218, ["Intune", "Geräte und Apps verwalten", "Firmenportal"], "accent"],
+      [432, ["Defender", "Schutz für Mail und Geräte", "Quarantäne, Phishing"], "warn"],
+    ];
+    let inner = "";
+    top.forEach(([x, lines]) => {
+      inner += box(x, 12, 204, 84, lines) + arrow(x + 102, 128, x + 102, 100);
+    });
+    inner += box(4, 130, 632, 86, ["Entra ID – der Türsteher für alles", "Anmeldung · MFA · Gruppen · Lizenzen · Gerätezustand", "früher „Azure AD“ – derselbe Dienst, nur neu benannt"], "primary");
+    bottom.forEach(([x, lines, cls]) => {
+      inner += arrow(x + 102, 244, x + 102, 220) + box(x, 248, 204, 84, lines, cls);
+    });
+    return svg(344, inner, "Landkarte der Microsoft-Welt: Entra ID in der Mitte, darum Exchange, Teams, SharePoint, lokales AD, Intune und Defender");
+  },
+
+  portale() {
+    const w = 124;
+    const xs = [2, 130, 258, 386, 514];
+    const asks = [
+      ["Benutzer, Lizenz", "Dienststatus", "Rollen"],
+      ["Anmeldung", "MFA, Geräte-Join", "Konto gesperrt"],
+      ["Postfach", "Mailfluss", "Mail fehlt"],
+      ["Spam", "Quarantäne", "Phishing"],
+      ["Geräte, Apps", "Konformität", "Firmenportal"],
+    ];
+    const goals = [
+      ["Microsoft 365", "Admin Center"],
+      ["Entra", "Admin Center"],
+      ["Exchange", "Admin Center (EAC)"],
+      ["Defender", "Portal"],
+      ["Intune", "Admin Center"],
+    ];
+    let inner = "";
+    asks.forEach((lines, index) => {
+      inner += box(xs[index], 12, w, 84, lines)
+        + arrow(xs[index] + w / 2, 100, xs[index] + w / 2, 134)
+        + box(xs[index], 138, w, 66, goals[index], index === 1 ? "primary" : "good");
+    });
+    inner += text(320, 232, "Die Frage bestimmt das Portal – und deine Rolle, was du dort siehst.", "dg-s");
+    return svg(248, inner, "Welche Frage gehört in welches Verwaltungsportal");
+  },
+
+  hybrid() {
+    return svg(250, steps([
+      ["Lokales AD", "Konten, Gruppen,", "Anmeldedaten"],
+      ["Entra Connect", "Server der Firma,", "kopiert Änderungen"],
+      ["Entra ID", "Cloud-Verzeichnis", "(früher Azure AD)"],
+      ["Microsoft 365", "Outlook, Teams,", "SharePoint"],
+    ], 14, 96, ["", "accent", "primary", "good"])
+      + text(247, 136, "normalerweise alle 30 Minuten", "dg-s")
+      + box(4, 156, 632, 80, ["Faustregel bei „neu angelegt, aber nicht sichtbar“", "Erst im lokalen AD, dann Abgleich, dann Cloud – kurz warten,", "bevor du an der falschen Stelle suchst."], "warn"),
+    "Weg einer Änderung vom lokalen Active Directory über Entra Connect in die Cloud");
+  },
+
+  joinzustand() {
+    const w = 142;
+    const xs = [4, 166, 328, 490];
+    const items = [
+      [["Nur Domäne", "klassisch, lokal", "", "DomainJoined: YES", "AzureAdJoined: NO"], ""],
+      [["Hybrid", "Domäne + Cloud", "", "DomainJoined: YES", "AzureAdJoined: YES"], "good"],
+      [["Entra joined", "nur Cloud, ohne AD", "", "DomainJoined: NO", "AzureAdJoined: YES"], "primary"],
+      [["Registriert", "privates Gerät", "", "WorkplaceJoined: YES", "(nur ein Konto)"], "accent"],
+    ];
+    let inner = "";
+    items.forEach(([lines, cls], index) => { inner += box(xs[index], 12, w, 130, lines, cls); });
+    inner += box(4, 162, 628, 62, ["So prüfst du es", "dsregcmd /status – die Zeilen stehen im Block „Device State“"]);
+    return svg(238, inner, "Vier Geräte-Zustände: nur Domäne, hybrid, Entra joined, registriert");
+  },
+
+  mailfluss() {
+    return svg(238, steps([
+      ["Absender", "schreibt an", "name@firma.de"],
+      ["DNS · MX", "verrät, wohin", "die Mail soll"],
+      ["Mailfilter", "Spam, Malware,", "Phishing prüfen"],
+      ["Postfach", "Regeln prüfen,", "dann Outlook"],
+    ], 14, 96, ["", "", "accent", "good"])
+      + arrow(399, 114, 399, 146)
+      + box(328, 150, 142, 74, ["Quarantäne", "verdächtige Mails", "warten dort"], "warn")
+      + box(4, 150, 300, 74, ["Nachrichtenablaufverfolgung", "zeigt jeden dieser Schritte", "für eine bestimmte Mail"], "primary"),
+    "Weg einer Mail: Absender, DNS-MX-Eintrag, Mailfilter, Postfach; verdächtige Mails gehen in die Quarantäne");
+  },
+
+  ndr() {
+    const w = 204;
+    const xs = [4, 218, 432];
+    const items = [
+      [["5.1.1 · 5.1.10", "Adresse falsch oder", "Empfänger nicht gefunden"], "warn"],
+      [["5.4.1", "Empfängeradresse beim", "Zielserver abgelehnt"], "warn"],
+      [["5.7.1", "nicht berechtigt oder", "durch eine Regel blockiert"], "accent"],
+      [["5.1.8", "Absender gesperrt:", "oft ein gehacktes Konto!"], "bad"],
+      [["5.2.122", "Empfänger hat zu viele", "Mails pro Stunde erhalten"], ""],
+      [["5.4.14 · 5.4.6", "Mailschleife, meist durch", "falsche Weiterleitung"], ""],
+    ];
+    let inner = "";
+    items.forEach(([lines, cls], index) => {
+      inner += box(xs[index % 3], 10 + Math.floor(index / 3) * 96, w, 84, lines, cls);
+    });
+    inner += text(320, 220, "Immer zuerst den Code in der Unzustellbarkeitsnachricht ablesen.", "dg-s");
+    return svg(236, inner, "Häufige Fehlercodes in Unzustellbarkeitsnachrichten und ihre Bedeutung");
+  },
+
+  condacc() {
+    return svg(262, ""
+      + box(4, 72, 190, 110, ["Anmeldung", "Wer meldet sich an?", "Von wo? Welches Gerät?", "Welche App?"], "primary")
+      + arrow(197, 127, 222, 127)
+      + box(225, 72, 190, 110, ["Conditional Access", "prüft die Regeln", "der Firma bei", "jeder Anmeldung"])
+      + arrow(418, 120, 437, 42) + arrow(418, 127, 437, 127) + arrow(418, 134, 437, 212)
+      + box(440, 8, 196, 68, ["Zulassen", "alles passt"], "good")
+      + box(440, 94, 196, 68, ["MFA verlangen", "zweiter Nachweis nötig"], "warn")
+      + box(440, 180, 196, 68, ["Blockieren", "z. B. unbekanntes Land"], "bad"),
+    "Conditional Access prüft bei der Anmeldung und entscheidet: zulassen, MFA verlangen oder blockieren");
+  },
+
+  servicearten() {
+    const w = 142;
+    const xs = [4, 166, 328, 490];
+    const items = [
+      [["Incident", "Etwas geht nicht.", "Ziel: schnell wieder", "arbeiten können."], "warn"],
+      [["Service Request", "Etwas Normales wird", "bestellt, z. B. Zugriff", "auf einen Ordner."], "primary"],
+      [["Change", "Geplante Änderung,", "vorher freigegeben", "und abgestimmt."], "accent"],
+      [["Problem", "Die Ursache hinter", "vielen Incidents wird", "gesucht und behoben."], "good"],
+    ];
+    let inner = "";
+    items.forEach(([lines, cls], index) => { inner += box(xs[index], 12, w, 124, lines, cls); });
+    inner += box(4, 156, 628, 56, ["Merksatz", "Incident: das Feuer löschen · Problem: die Brandursache beseitigen"]);
+    return svg(226, inner, "Vier Arten von IT-Vorgängen: Incident, Service Request, Change und Problem");
+  },
+
+  fernzugriff() {
+    const w = 204;
+    return svg(236, ""
+      + box(4, 12, w, 124, ["VPN", "verschlüsselter Tunnel", "ins Firmennetz", "Rechner arbeitet, als", "wäre er im Büro"], "primary")
+      + box(218, 12, w, 124, ["Remotedesktop (RDP)", "eigene Sitzung auf einem", "anderen Rechner", "am Arbeitsplatz-PC wird", "die lokale Sitzung getrennt"], "accent")
+      + box(432, 12, w, 124, ["Remoteunterstützung", "du siehst den Bildschirm", "des Benutzers mit", "er muss zustimmen,", "ihr arbeitet gemeinsam"], "good")
+      + box(4, 156, 632, 66, ["Vorher immer", "Zustimmung einholen, Verfahren des Betriebs beachten, Zugriff im Ticket notieren"], "warn"),
+    "Drei Arten von Fernzugriff: VPN, Remotedesktop und Remoteunterstützung");
+  },
+
+  drucken() {
+    const w = 108;
+    const xs = [2, 134, 266, 398, 530];
+    const items = [
+      ["Programm", "schickt den", "Auftrag"],
+      ["Treiber", "übersetzt für", "das Modell"],
+      ["Spooler", "Warteschlange", "sammelt Aufträge"],
+      ["Netzwerk", "Druckserver oder", "direkte IP"],
+      ["Drucker", "Papier, Toner,", "Anzeige"],
+    ];
+    let inner = "";
+    items.forEach((lines, index) => {
+      inner += box(xs[index], 14, w, 96, lines, index === 2 ? "accent" : "");
+      if (index < 4) inner += arrow(xs[index] + w + 3, 62, xs[index + 1] - 3, 62);
+    });
+    inner += box(2, 130, 636, 62, ["Eingrenzen", "Anderes Programm? Anderer Drucker? Andere Person? So findest du das Glied."], "primary");
+    return svg(206, inner, "Weg eines Druckauftrags: Programm, Treiber, Spooler, Netzwerk, Drucker");
+  },
 };
 
 /** Liefert das SVG zu einem Schluessel oder einen leeren String. */
