@@ -109,3 +109,65 @@ test('edit forms send the opened version and retain drafts after conflicts; remi
     window.__app?.notificationCenter.stop();window.close();
   }
 });
+
+async function loadApp(exports) {
+  const { build } = await import('esbuild');
+  const source = await readFile('public/app.js','utf8');
+  const compiled = await build({stdin:{contents:source+`\nglobalThis.__app={${exports}};`,resolveDir:process.cwd()+'/public'},bundle:true,format:'iife',write:false});
+  const dom=new JSDOM(html,{url:'https://test.invalid/',runScripts:'outside-only',pretendToBeVisual:true});
+  const {window}=dom;
+  window.HTMLCanvasElement.prototype.getContext=()=>new Proxy({}, {get:(_,key)=>key==='measureText'?()=>({width:0}):()=>({addColorStop(){}})});
+  window.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
+  window.HTMLDialogElement.prototype.close=function(){if(!this.hasAttribute('open'))return;this.removeAttribute('open');this.dispatchEvent(new window.Event('close'));};
+  window.fetch=async(path)=>new Response(JSON.stringify(path==='/api/auth/me'?{user:null}:{reminders:[]}));
+  window.eval(compiled.outputFiles[0].text);await settle();
+  return {window,app:window.__app};
+}
+
+test('placeholders skip PowerShell syntax; filling copies values, remembers them per case, cancel copies nothing', async () => {
+  const {window,app}=await loadApp('state,copyText,findPlaceholders,notificationCenter');
+  const written=[];
+  Object.defineProperty(window.navigator,'clipboard',{value:{writeText:async text=>{written.push(text);}}});
+  try {
+    assert.deepEqual(
+      [...app.findPlaceholders('Hallo [USERNAME], [ICH] $a[0] [math]::Round [PC-NAME] [USERNAME]')],
+      ['USERNAME','PC-NAME']);
+    app.state.user={id:1,role:'employee',displayName:'Test Person'};
+    app.state.cases=[{id:5,status:'open',ticket_ref:'INC-1'}];
+
+    const first=app.copyText('Ticket [TICKET-NR] für [USERNAME], Gruß [ICH]');
+    const inputs=[...window.document.querySelectorAll('#fill-fields input')];
+    assert.equal(inputs.find(i=>i.dataset.fillName==='TICKET-NR').value,'INC-1');
+    inputs.find(i=>i.dataset.fillName==='USERNAME').value='mmueller';
+    window.document.querySelector('#fill-form').dispatchEvent(new window.Event('submit',{cancelable:true}));
+    assert.equal(await first,true);
+    assert.deepEqual(written,['Ticket INC-1 für mmueller, Gruß Test Person']);
+
+    const second=app.copyText('Hallo [USERNAME]');
+    assert.equal(window.document.querySelector('[data-fill-name="USERNAME"]').value,'mmueller');
+    window.document.querySelector('#fill-dialog').close();
+    assert.equal(await second,false);
+    assert.equal(written.length,1);
+
+    assert.equal(await app.copyText('Ohne [Platzhalter] $x[0]'),true);
+    assert.equal(written[1],'Ohne [Platzhalter] $x[0]');
+  } finally {app.notificationCenter.stop();window.close();}
+});
+
+test('routes map to views and respect roles', async () => {
+  const {window,app}=await loadApp('state,viewFromLocation,notificationCenter');
+  try {
+    app.state.user={id:1,role:'employee',displayName:'Test'};
+    window.location.hash='#/befehle';
+    assert.equal(app.viewFromLocation(),'commands');
+    window.location.hash='#/administration';
+    assert.equal(app.viewFromLocation(),'start');
+    window.location.hash='#/freigaben';
+    assert.equal(app.viewFromLocation(),'start');
+    window.location.hash='#/unbekannt';
+    assert.equal(app.viewFromLocation(),'start');
+    app.state.user.role='admin';
+    window.location.hash='#/administration';
+    assert.equal(app.viewFromLocation(),'admin');
+  } finally {app.notificationCenter.stop();window.close();}
+});

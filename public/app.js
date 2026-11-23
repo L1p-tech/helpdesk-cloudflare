@@ -19,7 +19,7 @@ const state = {
     favorites: { templates: [], commands: [] },
     preferences: { theme: "cyan" },
   },
-  activeView: "templates",
+  activeView: "start",
   recentItems: [],
 };
 
@@ -495,7 +495,7 @@ function applyTheme(theme) {
   const resolvedTheme = THEMES[theme] ? theme : LEGACY_THEMES[theme] || "cyan";
   document.documentElement.dataset.theme = resolvedTheme;
   $("#theme-select").value = resolvedTheme;
-  $("#theme-button").textContent = `Theme: ${THEMES[resolvedTheme].label}`;
+  $("#theme-button").title = `Theme: ${THEMES[resolvedTheme].label} – klicken zum Wechseln`;
 }
 
 async function cycleTheme() {
@@ -789,6 +789,7 @@ function updateCaseIndicator() {
   if (!anzeige) return;
 
   const offen = state.cases.find((item) => item.status === "open");
+  setNavBadge("#nav-badge-cases", state.cases.filter((item) => item.status === "open").length);
   anzeige.classList.toggle("hidden", !offen);
   if (offen) {
     anzeige.textContent = `● ${offen.ticket_ref}`;
@@ -888,7 +889,7 @@ async function buildCaseDocumentation(caseId) {
   }
 
   zeilen.push("", `Bearbeitet von: ${state.user.displayName}`);
-  await copyText(zeilen.join("\n"));
+  await copyText(zeilen.join("\n"), { fill: false });
 }
 
 /**
@@ -999,6 +1000,7 @@ function openEscalationDialog(level = null) {
    ============================================================ */
 async function loadHandovers() {
   const data = await api("/api/handovers");
+  updateHandoverBadge(data.handovers);
 
   $("#handover-list").innerHTML = data.handovers.length
     ? data.handovers.map((item) => `
@@ -1531,9 +1533,7 @@ async function usePaletteItem(index) {
   const item = paletteState.items[index];
   if (!item) return;
 
-  await copyText(item.copy);
-  addRecentItem(item.kind === "solution" ? "solution" : item.kind, item.id, item.title);
-  if (item.kind !== "template") countContentUsage(item.kind, item.id);
+  if (!(await copyByRef(item.kind, item.id))) return;
   $("#palette-dialog").close();
 }
 
@@ -1897,7 +1897,11 @@ async function loadBootstrap() {
   const role = roleLabel(state.user.role);
   const showRole = role.toLowerCase() !== state.user.displayName.trim().toLowerCase();
   $("#current-user").innerHTML = `<strong>${escapeHtml(state.user.displayName)}</strong>`
-    + (showRole ? `<br>${escapeHtml(role)}` : "");
+    + (showRole ? `<span>${escapeHtml(role)}</span>` : "");
+  const chipAvatar = $("#current-user-avatar");
+  chipAvatar.dataset.avatarName = state.user.displayName;
+  delete chipAvatar.dataset.avatarDrawn;
+  hydrateAvatars(chipAvatar.parentElement);
   $("#signature-name").value = state.settings.signatureName;
   $("#theme-select").value = state.settings.preferences.theme;
   populateCategories();
@@ -1912,6 +1916,9 @@ async function loadBootstrap() {
     // Faelle sind Beiwerk beim Start -- ein Fehler darf den Aufbau nicht stoppen.
   });
   loadReminders().catch(() => {});
+  refreshApprovalCount().catch(() => {});
+  api("/api/handovers").then((data) => updateHandoverBadge(data.handovers)).catch(() => {});
+  if (state.activeView === "start") renderStartQuick();
 }
 
 function populateCategories() {
@@ -1961,9 +1968,149 @@ function replacePersonalPlaceholders(text) {
  * Vorlagenliste, Loesung oder Schnellsuche. Bei Texten ohne Platzhalter
  * bleibt der Aufruf wirkungslos.
  */
-async function copyText(text) {
-  await navigator.clipboard.writeText(replacePersonalPlaceholders(text));
+async function copyText(text, { fill = true, title = "" } = {}) {
+  let output = replacePersonalPlaceholders(text);
+
+  // Offene Platzhalter wie [USERNAME] vorher abfragen. Abbrechen heisst: es
+  // wird nichts kopiert, und die Aufrufer zaehlen auch keine Nutzung.
+  if (fill && findPlaceholders(output).length) {
+    const filled = await askPlaceholders(output, title);
+    if (filled === null) return false;
+    output = filled;
+  }
+
+  await navigator.clipboard.writeText(output);
   showToast("In Zwischenablage kopiert.");
+  return true;
+}
+
+/* ============================================================
+   Platzhalter ausfuellen
+   ============================================================
+   Fast jede Vorlage enthaelt [USERNAME], viele Befehle [HOSTNAME] oder
+   [DRUCKERNAME]. Bisher wurden sie nach dem Einfuegen im Ticketsystem von
+   Hand ersetzt -- und dabei regelmaessig vergessen. Jetzt fragt ein kleiner
+   Dialog vor dem Kopieren danach.
+
+   Als Platzhalter gilt nur Text in eckigen Klammern aus Grossbuchstaben,
+   Ziffern und wenigen Trennzeichen. So bleiben PowerShell-Ausdruecke wie
+   [math]::Round oder $liste[0] unangetastet.
+*/
+const PLACEHOLDER_PATTERN = /\[(?=[^\]]*[A-ZÄÖÜ])([A-ZÄÖÜ0-9][A-ZÄÖÜ0-9 _/.\-]{0,40})\]/g;
+
+/** Platzhalter, deren Wert aus dem offenen Fall stammt. */
+const TICKET_PLACEHOLDERS = new Set([
+  "TICKET", "TICKET-NR", "TICKETNR", "TICKETNUMMER", "TICKET-NUMMER", "HP-TICKETNUMMER",
+]);
+
+function findPlaceholders(text) {
+  const seen = new Set();
+  for (const match of String(text).matchAll(PLACEHOLDER_PATTERN)) {
+    if (match[1] !== "ICH") seen.add(match[1]);
+  }
+  return [...seen];
+}
+
+function fillPlaceholders(text, values) {
+  return String(text).replace(PLACEHOLDER_PATTERN, (whole, name) => {
+    const value = values[name];
+    return value ? value : whole;
+  });
+}
+
+/**
+ * Gemerkte Werte gelten pro offenem Fall, ohne Fall fuer die Browsersitzung.
+ * sessionStorage statt Datenbank: Benutzernamen und Geraetenamen aus Tickets
+ * gehoeren nicht dauerhaft gespeichert.
+ */
+function fillMemoryKey() {
+  const offen = state.cases.find((item) => item.status === "open");
+  return `helpdesk_fill_${state.user?.id ?? "x"}_${offen ? `case${offen.id}` : "frei"}`;
+}
+
+function loadFillMemory() {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(fillMemoryKey()) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveFillMemory(values) {
+  try {
+    sessionStorage.setItem(fillMemoryKey(), JSON.stringify(values));
+  } catch {
+    // Ohne Speicher wird beim naechsten Mal eben neu gefragt.
+  }
+}
+
+let fillResolver = null;
+
+function askPlaceholders(text, title) {
+  const names = findPlaceholders(text);
+  const memory = loadFillMemory();
+  const offen = state.cases.find((item) => item.status === "open");
+
+  $("#fill-subtitle").textContent = [
+    title,
+    offen ? `Werte werden für ${offen.ticket_ref} gemerkt` : "Werte werden bis zum Schließen des Tabs gemerkt",
+  ].filter(Boolean).join(" · ");
+
+  $("#fill-fields").innerHTML = names.map((name, index) => {
+    const preset = memory[name]
+      || (TICKET_PLACEHOLDERS.has(name) && offen ? offen.ticket_ref : "");
+    return `
+      <label>${escapeHtml(name)}
+        <input data-fill-name="${escapeHtml(name)}" value="${escapeHtml(preset)}"
+               autocomplete="off" ${index === 0 ? "autofocus" : ""}>
+      </label>`;
+  }).join("");
+
+  const dialog = $("#fill-dialog");
+  dialog.dataset.source = text;
+  renderFillPreview();
+  dialog.showModal();
+
+  // Erstes leeres Feld fokussieren -- bereits gemerkte Werte ueberspringen.
+  const inputs = $$("#fill-fields input");
+  (inputs.find((input) => !input.value) || inputs[0])?.focus();
+
+  return new Promise((resolve) => {
+    fillResolver = resolve;
+  });
+}
+
+function currentFillValues() {
+  const values = {};
+  $$("#fill-fields input").forEach((input) => {
+    values[input.dataset.fillName] = input.value.trim();
+  });
+  return values;
+}
+
+function renderFillPreview() {
+  const source = $("#fill-dialog").dataset.source || "";
+  const values = currentFillValues();
+  // Vorschau mit markierten Restplatzhaltern: man sieht sofort, was fehlt.
+  const html = escapeHtml(source).replace(
+    /\[(?=[^\]]*[A-ZÄÖÜ])([A-ZÄÖÜ0-9][A-ZÄÖÜ0-9 _/.\-]{0,40})\]/g,
+    (whole, name) => {
+      const decoded = name.replace(/&amp;/g, "&");
+      return values[decoded]
+        ? `<mark class="fill-done">${escapeHtml(values[decoded])}</mark>`
+        : `<span class="placeholder">${whole}</span>`;
+    },
+  );
+  $("#fill-preview").innerHTML = html;
+}
+
+function finishFill(result) {
+  const resolve = fillResolver;
+  fillResolver = null;
+  const dialog = $("#fill-dialog");
+  if (dialog.open) dialog.close();
+  resolve?.(result);
 }
 
 /**
@@ -1974,7 +2121,7 @@ async function copyText(text) {
  * scheitern, dass die Statistik nicht geschrieben werden konnte.
  */
 async function copyTemplate(template) {
-  await copyText(template.body);
+  if (!(await copyText(template.body, { title: template.title }))) return false;
   addRecentItem("template", template.id, template.title);
   trackInCase("template", template.id, template.title);
 
@@ -1983,6 +2130,56 @@ async function copyTemplate(template) {
 
   api(`/api/templates/${template.id}/use`, { method: "POST", body: "{}" })
     .catch(() => {});
+  return true;
+}
+
+/**
+ * Kopiert einen Befehl samt Nutzung, Verlauf und Fall-Rueckfrage. Alle
+ * Kopierwege (Liste, Schnellsuche, Start, Schnellleiste) laufen hier durch,
+ * damit keiner die Risiko-Rueckfrage oder die Statistik auslaesst.
+ */
+async function copyCommand(command) {
+  if (command.risk_level === "high"
+    && !confirm("Dieser Befehl ist als hohes Risiko markiert. Wirklich kopieren?")) return false;
+  if (!(await copyText(command.command, { title: command.name }))) return false;
+  addRecentItem("command", command.id, command.name);
+  countContentUsage("command", command.id);
+  trackInCase("command", command.id, command.name, command.command);
+  return true;
+}
+
+async function copySolution(solution, { helpful = false, detail = null } = {}) {
+  if (!(await copyText(solution.solution, { title: solution.title }))) return false;
+  addRecentItem("solution", solution.id, solution.title);
+  countContentUsage("solution", solution.id, helpful);
+  trackInCase("solution", solution.id, solution.title, detail);
+  return true;
+}
+
+/** Kopiert einen Eintrag anhand von Art und ID -- fuer Start und Schnellleiste. */
+async function copyByRef(type, id) {
+  if (type === "template") {
+    const template = state.templates.find((item) => item.id === id);
+    return template ? copyTemplate(template) : false;
+  }
+  if (type === "solution") {
+    const solution = state.solutions.find((item) => item.id === id);
+    return solution ? copySolution(solution) : false;
+  }
+  const command = state.commands.find((item) => item.id === id);
+  return command ? copyCommand(command) : false;
+}
+
+/**
+ * Kopierknopf direkt in der zugeklappten Zeile. Wer die Vorlage kennt, muss
+ * sie nicht erst aufklappen -- ein Klick statt zwei, viele Male am Tag.
+ */
+function rowCopyButton(attribute, id, label) {
+  return `
+    <button class="row-copy" type="button" ${attribute}="${Number(id)}"
+            title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">
+      <svg class="ico"><use href="#i-copy"/></svg><span>Kopieren</span>
+    </button>`;
 }
 
 function templateCard(template) {
@@ -2015,6 +2212,7 @@ function templateCard(template) {
         <span class="summary-meta">
           ${template.use_count > 0 ? `<span class="usage-badge" title="So oft hast du diese Vorlage kopiert">${template.use_count}× benutzt</span> · ` : ""}${submittedBy}${updatedAt ? `Aktualisiert am ${updatedAt} · ` : ""}Version ${template.version}
         </span>
+        ${rowCopyButton("data-copy-template", template.id, "Vorlage kopieren")}
       </summary>
       <div class="card-content">
         <div class="template-body">${highlightPlaceholders(template.body)}</div>
@@ -2179,6 +2377,7 @@ function commandCard(command) {
           <span class="badge shell-badge">${escapeHtml(command.shell)}</span>
           <span class="badge risk-badge risk-${escapeHtml(command.risk_level)}">${warning}</span>
         </span>
+        ${rowCopyButton("data-copy-command", command.id, "Befehl kopieren")}
       </summary>
       <div class="card-content">
         <p class="muted">${escapeHtml(command.description)}</p>
@@ -2299,6 +2498,7 @@ function solutionCard(solution) {
         <span class="summary-meta">
           <span class="badge risk-badge risk-${escapeHtml(solution.severity)}">${severity}</span>
         </span>
+        ${rowCopyButton("data-copy-solution", solution.id, "Lösungsweg kopieren")}
       </summary>
       <div class="card-content">
         <div class="solution-block">
@@ -2683,7 +2883,7 @@ async function loadProposals(view) {
 
   if (view === "approvals") {
     const open = state.proposals.length + state.contentProposals.length;
-    $("#approval-count").textContent = open ? `(${open})` : "";
+    setNavBadge("#approval-count", open);
   }
 }
 
@@ -2907,20 +3107,68 @@ async function deleteCommand(commandId) {
   await loadBootstrap();
 }
 
-async function switchView(view) {
+/*
+ * Adressen pro Bereich (#/befehle). Damit funktionieren Neuladen, die
+ * Zurueck-Taste des Browsers und Links, die man Kollegen in den Chat schickt.
+ */
+const VIEW_ROUTES = {
+  start: "start",
+  templates: "vorlagen",
+  commands: "befehle",
+  solutions: "loesungen",
+  assistant: "assistent",
+  cases: "faelle",
+  escalation: "eskalation",
+  diagnose: "diagnose",
+  generator: "ticket-generator",
+  handover: "uebergabe",
+  stats: "statistik",
+  news: "meldungen",
+  proposals: "vorschlaege",
+  approvals: "freigaben",
+  feedback: "verbesserungen",
+  history: "versionen",
+  game: "pause",
+  admin: "administration",
+  settings: "einstellungen",
+};
+
+/** Liest den Bereich aus der Adresse; unbekannte oder gesperrte -> Start. */
+function viewFromLocation() {
+  const slug = location.hash.replace(/^#\/?/, "");
+  const view = Object.keys(VIEW_ROUTES).find((key) => VIEW_ROUTES[key] === slug);
+  if (!view) return "start";
+  if (view === "admin" && !isAdmin()) return "start";
+  if (view === "approvals" && !canReview()) return "start";
+  return view;
+}
+
+async function switchView(view, { updateUrl = true } = {}) {
+  if (!VIEW_ROUTES[view]) view = "start";
   state.activeView = view;
   $$(".view").forEach((element) => element.classList.add("hidden"));
   $(`#view-${view}`).classList.remove("hidden");
-  $$("#main-nav button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
-
-  // Die Gruppe des aktiven Reiters hervorheben, damit sichtbar bleibt, wo man
-  // sich befindet -- im zugeklappten Menue ist der Reiter selbst unsichtbar.
-  $$(".nav-group").forEach((group) => {
-    const holdsActive = Boolean(group.querySelector(`[data-view="${view}"]`));
-    group.classList.toggle("holds-active", holdsActive);
+  $$("#main-nav [data-view]").forEach((button) => {
+    const active = button.dataset.view === view;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
   });
 
+  if (updateUrl) {
+    const target = `#/${VIEW_ROUTES[view]}`;
+    if (location.hash !== target) history.pushState(null, "", target);
+  }
+  setSidebarOpen(false);
+  window.scrollTo({ top: 0 });
+
   const config = {
+    start: [
+      "Mein Tag",
+      `${greeting()}, ${firstName()}`,
+      new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long" })
+        .format(new Date()),
+    ],
     templates: [
       "Gemeinsame Inhalte",
       "Ticket-Vorlagen",
@@ -3016,6 +3264,8 @@ async function switchView(view) {
   $("#view-eyebrow").textContent = config[0];
   $("#view-title").textContent = config[1];
   $("#view-description").textContent = config[2];
+  $("#view-description").classList.toggle("hidden", !config[2]);
+  document.title = view === "start" ? "Helpdesk-Helper" : `${config[1]} · Helpdesk-Helper`;
   // Je Reiter der passende Knopf in der Kopfzeile -- die Beschriftung setzen
   // renderCommands und renderSolutions anhand der Rolle.
   $("#new-proposal-button").classList.toggle("hidden", view !== "templates");
@@ -3025,11 +3275,15 @@ async function switchView(view) {
   // Die Schnellleiste bleibt auf jedem Reiter erreichbar.
   updateQuickbarVisibility();
 
+  if (view === "start") await renderStart();
   if (view === "solutions") renderSolutions();
   if (view === "assistant") renderAssistant();
   if (view === "cases") await loadCases();
   if (view === "escalation") await loadEscalation();
-  if (view === "handover") await loadHandovers();
+  if (view === "handover") {
+    if (!$("#handover-shift").value) $("#handover-shift").value = suggestShiftLabel();
+    await loadHandovers();
+  }
   if (view === "stats") await loadStats();
   if (view === "settings") renderAvatarEditor();
   if (view === "proposals" || view === "approvals") await loadProposals(view);
@@ -4631,6 +4885,14 @@ async function initialize() {
   $("#app-view").classList.remove("hidden");
   await loadBootstrap();
   initializeChat();
+  await enterView();
+}
+
+/** Oeffnet den Bereich aus der Adresse und schreibt sie in Normalform zurueck. */
+async function enterView() {
+  const view = viewFromLocation();
+  history.replaceState(null, "", `#/${VIEW_ROUTES[view]}`);
+  await switchView(view, { updateUrl: false });
 }
 
 $("#login-form").addEventListener("submit", async (event) => {
@@ -4650,6 +4912,7 @@ $("#login-form").addEventListener("submit", async (event) => {
     $("#app-view").classList.remove("hidden");
     await loadBootstrap();
     initializeChat();
+    await enterView();
   } catch (error) {
     $("#login-message").textContent = error.message;
   }
@@ -4748,34 +5011,14 @@ $("#logout-button").addEventListener("click", async () => {
 });
 
 $("#main-nav").addEventListener("click", (event) => {
-  // Gruppenkopf: Menue auf- und zuklappen, andere Gruppen schliessen.
-  const groupButton = event.target.closest(".nav-group-button");
-  if (groupButton) {
-    const group = groupButton.closest(".nav-group");
-    const wasOpen = group.classList.contains("open");
-    closeNavGroups();
-    group.classList.toggle("open", !wasOpen);
-    groupButton.setAttribute("aria-expanded", String(!wasOpen));
-    return;
-  }
-
   const button = event.target.closest("[data-view]");
-  if (button) {
-    closeNavGroups();
-    switchView(button.dataset.view);
-  }
+  if (button) switchView(button.dataset.view).catch((error) => showToast(error.message));
 });
 
-function closeNavGroups() {
-  $$(".nav-group").forEach((group) => {
-    group.classList.remove("open");
-    group.querySelector(".nav-group-button")?.setAttribute("aria-expanded", "false");
-  });
-}
-
-// Klick ausserhalb schliesst offene Menues -- sonst bleiben sie stehen.
-document.addEventListener("click", (event) => {
-  if (!event.target.closest(".nav-group")) closeNavGroups();
+// Zurueck/Vor im Browser wechselt den Bereich, ohne neuen Verlaufseintrag.
+window.addEventListener("popstate", () => {
+  if ($("#app-view").classList.contains("hidden")) return;
+  switchView(viewFromLocation(), { updateUrl: false }).catch(() => {});
 });
 
 $$("dialog").forEach((dialog) => {
@@ -4866,8 +5109,10 @@ $("#templates-list").addEventListener("click", (event) => {
 
   const copyButton = event.target.closest("[data-copy-template]");
   if (copyButton) {
+    if (copyButton.closest("summary")) event.preventDefault();
     const template = state.templates.find((item) => item.id === Number(copyButton.dataset.copyTemplate));
-    if (template) copyTemplate(template);
+    if (template) copyTemplate(template).catch((error) => alert(error.message));
+    return;
   }
 
   const editButton = event.target.closest("[data-edit-template]");
@@ -4902,14 +5147,10 @@ $("#commands-list").addEventListener("click", (event) => {
 
   const button = event.target.closest("[data-copy-command]");
   if (!button) return;
+  // Kopierknopf in der zugeklappten Zeile: nicht zusaetzlich aufklappen.
+  if (button.closest("summary")) event.preventDefault();
   const command = state.commands.find((item) => item.id === Number(button.dataset.copyCommand));
-  if (!command) return;
-
-  if (command.risk_level === "high" && !confirm("Dieser Befehl ist als hohes Risiko markiert. Wirklich kopieren?")) return;
-  copyText(command.command);
-  addRecentItem("command", command.id, command.name);
-  countContentUsage("command", command.id);
-  trackInCase("command", command.id, command.name, command.command);
+  if (command) copyCommand(command).catch((error) => alert(error.message));
 });
 
 $("#approvals-list").addEventListener("click", (event) => {
@@ -4991,29 +5232,8 @@ $("#quickbar-items").addEventListener("click", (event) => {
   const button = event.target.closest("[data-recent-type]");
   if (!button) return;
 
-  const id = Number(button.dataset.recentId);
-  if (button.dataset.recentType === "template") {
-    const template = state.templates.find((item) => item.id === id);
-    if (template) copyTemplate(template);
-    return;
-  }
-
-  if (button.dataset.recentType === "solution") {
-    const solution = state.solutions.find((item) => item.id === id);
-    if (solution) {
-      copyText(solution.solution);
-      addRecentItem("solution", solution.id, solution.title);
-      countContentUsage("solution", solution.id);
-    }
-    return;
-  }
-
-  const command = state.commands.find((item) => item.id === id);
-  if (command) {
-    copyText(command.command);
-    addRecentItem("command", command.id, command.name);
-    countContentUsage("command", command.id);
-  }
+  copyByRef(button.dataset.recentType, Number(button.dataset.recentId))
+    .catch((error) => alert(error.message));
 });
 
 $("#diag-type").addEventListener("change", renderDiagnosticChecklist);
@@ -5021,14 +5241,14 @@ $("#diag-generate-button").addEventListener("click", generateDiagnosticText);
 $("#diag-reset-button").addEventListener("click", resetDiagnostics);
 $("#diag-copy-button").addEventListener("click", () => {
   const output = $("#diag-output").textContent;
-  if (output && output !== "Noch kein Text erzeugt.") copyText(output);
+  if (output && output !== "Noch kein Text erzeugt.") copyText(output, { fill: false });
 });
 
 $("#gen-create-button").addEventListener("click", generateTicketText);
 $("#gen-clear-button").addEventListener("click", clearGenerator);
 $("#gen-copy-button").addEventListener("click", () => {
   const output = $("#gen-output").textContent;
-  if (output && output !== "Noch kein Text erzeugt.") copyText(output);
+  if (output && output !== "Noch kein Text erzeugt.") copyText(output, { fill: false });
 });
 
 $("#history-refresh-button").addEventListener("click", () => {
@@ -5148,14 +5368,10 @@ $("#solutions-list").addEventListener("click", (event) => {
 
   const copyButton = event.target.closest("[data-copy-solution]");
   if (copyButton) {
+    if (copyButton.closest("summary")) event.preventDefault();
     const solution = state.solutions.find(
       (item) => item.id === Number(copyButton.dataset.copySolution));
-    if (solution) {
-      copyText(solution.solution);
-      addRecentItem("solution", solution.id, solution.title);
-      countContentUsage("solution", solution.id);
-      trackInCase("solution", solution.id, solution.title);
-    }
+    if (solution) copySolution(solution).catch((error) => alert(error.message));
     return;
   }
 
@@ -5434,10 +5650,8 @@ $("#assistant-body").addEventListener("click", (event) => {
     const id = Number(hit.dataset.assistantSolution);
     const solution = state.solutions.find((item) => item.id === id);
     if (solution) {
-      copyText(solution.solution);
-      countContentUsage("solution", id, true);
-      addRecentItem("solution", id, solution.title);
-      trackInCase("solution", id, solution.title, "Über den Assistenten gefunden");
+      copySolution(solution, { helpful: true, detail: "Über den Assistenten gefunden" })
+        .catch((error) => alert(error.message));
     }
   }
 });
@@ -5583,6 +5797,36 @@ $("#escalation-form").addEventListener("submit", async (event) => {
 });
 
 // --- Dienstuebergabe ------------------------------------------------------
+/** Schlaegt eine Schichtbezeichnung vor, z. B. "Spätschicht 23.11.". */
+function suggestShiftLabel() {
+  const now = new Date();
+  const hour = now.getHours();
+  const shift = hour < 13 ? "Frühschicht" : hour < 21 ? "Spätschicht" : "Nachtschicht";
+  const day = `${String(now.getDate()).padStart(2, "0")}.${String(now.getMonth() + 1).padStart(2, "0")}.`;
+  return `${shift} ${day}`;
+}
+
+// Offene Faelle stehen schon in der Anwendung -- nicht noch einmal abtippen.
+$("#handover-fill-cases").addEventListener("click", async () => {
+  try {
+    await loadCases();
+  } catch {
+    // Mit dem bekannten Stand weitermachen.
+  }
+  const open = state.cases.filter((item) => item.status === "open");
+  if (!open.length) {
+    showToast("Du hast keine offenen Fälle.");
+    return;
+  }
+  const field = $("#handover-cases");
+  const lines = open
+    .filter((item) => !field.value.includes(item.ticket_ref))
+    .map((item) => `${item.ticket_ref} ${item.title}: `);
+  field.value = [field.value.trim(), ...lines].filter(Boolean).join("\n");
+  field.focus();
+  field.setSelectionRange(field.value.length, field.value.length);
+});
+
 $("#handover-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
@@ -5667,6 +5911,484 @@ $("#reminder-list").addEventListener("click", async (event) => {
   } catch (error) {
     alert(error.message);
   }
+});
+
+/* ============================================================
+   Start: der Ueberblick zu Schichtbeginn
+   ============================================================
+   Alles, wofuer man sonst fuenf Reiter oeffnet: was die letzte Schicht
+   hinterlassen hat, die eigenen offenen Faelle und Erinnerungen, die
+   Lieblingsvorlagen zum Sofort-Kopieren, was auf Freigabe wartet und welche
+   Sicherheitsmeldungen neu sind. Jede Karte laedt fuer sich -- eine langsame
+   Nachrichtenquelle haelt die uebrigen nicht auf.
+*/
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 11) return "Guten Morgen";
+  if (hour < 17) return "Hallo";
+  return "Guten Abend";
+}
+
+function firstName() {
+  const name = state.settings.signatureName || state.user?.displayName || "";
+  return name.trim().split(/\s+/)[0] || "zusammen";
+}
+
+function startCard(key, title, { wide = false, action = "" } = {}) {
+  return `
+    <section class="start-card ${wide ? "start-card-wide" : ""}" data-start-card="${key}">
+      <header class="start-card-head">
+        <h3>${title}</h3>
+        ${action}
+      </header>
+      <div class="start-card-body"><p class="muted">Wird geladen…</p></div>
+    </section>`;
+}
+
+function fillStartCard(key, html) {
+  const body = document.querySelector(`[data-start-card="${key}"] .start-card-body`);
+  if (body) body.innerHTML = html;
+}
+
+function relativeTime(value) {
+  const date = new Date(String(value).includes("T") ? value : `${String(value).replace(" ", "T")}Z`);
+  const minutes = Math.round((Date.now() - date.getTime()) / 60000);
+  if (!Number.isFinite(minutes)) return "";
+  if (minutes < 1) return "gerade eben";
+  if (minutes < 60) return `vor ${minutes} Min.`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `vor ${hours} Std.`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? "gestern" : `vor ${days} Tagen`;
+}
+
+let startGeneration = 0;
+
+async function renderStart() {
+  const generation = ++startGeneration;
+  const goLink = (view, label) =>
+    `<button class="btn-link" type="button" data-start-go="${view}">${label}</button>`;
+
+  $("#start-grid").innerHTML = [
+    startCard("handover", "Übergabe der letzten Schicht", { wide: true, action: goLink("handover", "Alle Übergaben") }),
+    startCard("cases", "Meine offenen Fälle", { action: goLink("cases", "Alle Fälle") }),
+    startCard("reminders", "Erinnerungen", {
+      action: '<button class="btn-link" type="button" data-start-new-reminder>+ Neu</button>',
+    }),
+    startCard("quick", "Favoriten &amp; zuletzt benutzt", { action: goLink("templates", "Alle Vorlagen") }),
+    startCard("waiting", canReview() ? "Wartet auf dich" : "Meine Vorschläge"),
+    startCard("news", "Neue IT-Meldungen", { wide: true, action: goLink("news", "Alle Meldungen") }),
+  ].join("");
+
+  // Lokale Daten sofort, Serverdaten je Karte, sobald sie da sind.
+  renderStartQuick();
+  const stillCurrent = () => generation === startGeneration && state.activeView === "start";
+
+  loadCases().then(() => stillCurrent() && renderStartCases())
+    .catch(() => fillStartCard("cases", '<p class="muted">Fälle konnten nicht geladen werden.</p>'));
+  loadReminders().then(() => stillCurrent() && renderStartReminders())
+    .catch(() => fillStartCard("reminders", '<p class="muted">Erinnerungen konnten nicht geladen werden.</p>'));
+
+  api("/api/handovers").then((data) => {
+    updateHandoverBadge(data.handovers);
+    if (stillCurrent()) renderStartHandover(data.handovers);
+  }).catch(() => fillStartCard("handover", '<p class="muted">Übergaben konnten nicht geladen werden.</p>'));
+
+  loadStartWaiting().then((html) => stillCurrent() && fillStartCard("waiting", html))
+    .catch(() => fillStartCard("waiting", '<p class="muted">Konnte nicht geladen werden.</p>'));
+
+  api("/api/news").then((data) => stillCurrent() && renderStartNews(data.items || []))
+    .catch(() => fillStartCard("news", '<p class="muted">Meldungen konnten nicht geladen werden.</p>'));
+}
+
+function renderStartHandover(handovers) {
+  const latest = handovers[0];
+  if (!latest) {
+    fillStartCard("handover", `
+      <p class="muted">Noch keine Übergabe vorhanden.</p>
+      <button class="btn-tool" type="button" data-start-go="handover">Erste Übergabe schreiben</button>`);
+    return;
+  }
+
+  const section = (label, text) => text
+    ? `<div class="start-handover-part"><span class="solution-label">${label}</span><p>${escapeHtml(text)}</p></div>`
+    : "";
+
+  fillStartCard("handover", `
+    <div class="start-handover-meta">
+      ${avatarTag(latest.created_by_name, 22)}
+      <strong>${escapeHtml(latest.shift_label)}</strong>
+      <span class="muted">von ${escapeHtml(latest.created_by_name)} · ${relativeTime(latest.created_at)}</span>
+      ${latest.acknowledged_at
+        ? `<span class="badge">Übernommen von ${escapeHtml(latest.acknowledged_by_name || "")}</span>`
+        : '<span class="badge risk-badge risk-medium">Noch nicht übernommen</span>'}
+    </div>
+    <div class="start-handover-grid">
+      ${section("Offene Fälle", latest.open_cases)}
+      ${section("Auffälligkeiten", latest.incidents)}
+      ${section("Notizen", latest.notes)}
+    </div>
+    ${latest.acknowledged_at ? "" : `
+      <div class="card-actions">
+        <button class="primary" type="button" data-start-ack="${latest.id}">Übernahme bestätigen</button>
+      </div>`}`);
+  hydrateAvatars($("#start-grid"));
+}
+
+function renderStartCases() {
+  const open = state.cases.filter((item) => item.status === "open");
+  const list = open.length
+    ? `<ul class="start-list">${open.map((item) => `
+        <li>
+          <button class="start-row" type="button" data-start-go="cases">
+            <span class="badge">${escapeHtml(item.ticket_ref)}</span>
+            <span class="start-row-title">${escapeHtml(item.title)}</span>
+          </button>
+        </li>`).join("")}</ul>`
+    : '<p class="muted">Kein offener Fall. Ein Fall schreibt mit, was du kopierst – daraus entsteht die Ticket-Doku.</p>';
+
+  fillStartCard("cases", `
+    ${list}
+    <form class="start-inline-form" data-start-case-form>
+      <input name="ticket" required placeholder="Ticket, z. B. INC-4711" aria-label="Ticketnummer">
+      <input name="title" required placeholder="Worum geht es?" aria-label="Kurzbeschreibung">
+      <button class="btn-primary" type="submit">Starten</button>
+    </form>`);
+}
+
+function renderStartReminders() {
+  const items = [...state.reminders]
+    .sort((a, b) => Date.parse(a.due_at) - Date.parse(b.due_at))
+    .slice(0, 6);
+
+  fillStartCard("reminders", items.length
+    ? `<ul class="start-list">${items.map((item) => `
+        <li class="start-reminder ${Date.parse(item.due_at) <= Date.now() ? "due" : ""}">
+          <div>
+            <strong>${escapeHtml(item.message)}</strong>
+            <span class="muted">${item.ticket_ref ? `${escapeHtml(item.ticket_ref)} · ` : ""}${formatDateTime(item.due_at)}</span>
+          </div>
+          <button class="btn-link" type="button" data-start-reminder-done="${item.id}">Erledigt</button>
+        </li>`).join("")}</ul>`
+    : '<p class="muted">Keine offenen Erinnerungen.</p>');
+}
+
+function renderStartQuick() {
+  const favorites = [
+    ...state.templates.filter((item) => isFavorite("template", item.id))
+      .map((item) => ({ type: "template", id: item.id, label: item.title })),
+    ...state.commands.filter((item) => isFavorite("command", item.id))
+      .map((item) => ({ type: "command", id: item.id, label: item.name })),
+  ];
+  // Ohne Favoriten die meistgenutzten Vorlagen anbieten -- so ist die Karte
+  // auch am ersten Tag nuetzlich.
+  const top = favorites.length ? [] : [...state.templates]
+    .filter((item) => item.use_count > 0)
+    .sort((a, b) => b.use_count - a.use_count)
+    .slice(0, 6)
+    .map((item) => ({ type: "template", id: item.id, label: item.title }));
+
+  const chip = (item) => `
+    <button class="start-chip" type="button" data-start-copy-type="${escapeHtml(item.type)}"
+            data-start-copy-id="${Number(item.id)}" title="Klicken zum Kopieren">
+      <span class="palette-kind palette-kind-${escapeHtml(item.type)}">${PALETTE_KIND_LABELS[item.type] || ""}</span>
+      ${escapeHtml(item.label)}
+    </button>`;
+
+  const group = (label, items) => items.length
+    ? `<span class="quickbar-label">${label}</span><div class="start-chips">${items.map(chip).join("")}</div>`
+    : "";
+
+  const html = group("Favoriten", favorites)
+    + group("Meistgenutzt", top)
+    + group("Zuletzt kopiert", state.recentItems.slice(0, 6));
+
+  fillStartCard("quick", html || `
+    <p class="muted">Markiere Vorlagen und Befehle mit ★ – sie erscheinen hier zum Kopieren mit einem Klick.</p>`);
+}
+
+async function loadStartWaiting() {
+  if (canReview()) {
+    const [open, mine, mineContent] = await Promise.all([
+      refreshApprovalCount(),
+      api("/api/proposals?scope=mine"),
+      api("/api/content-proposals?scope=mine"),
+    ]);
+    const rework = [...mine.proposals, ...mineContent.proposals]
+      .filter((item) => item.status === "changes_requested").length;
+    return `
+      <div class="start-stat-row">
+        <button class="start-stat ${open ? "alert" : ""}" type="button" data-start-go="approvals">
+          <strong>${open}</strong><span>Freigaben offen</span>
+        </button>
+        <button class="start-stat ${rework ? "alert" : ""}" type="button" data-start-go="proposals">
+          <strong>${rework}</strong><span>Eigene zur Überarbeitung</span>
+        </button>
+      </div>`;
+  }
+
+  const [templates, content] = await Promise.all([
+    api("/api/proposals?scope=mine"),
+    api("/api/content-proposals?scope=mine"),
+  ]);
+  const all = [...templates.proposals, ...content.proposals];
+  const pending = all.filter((item) => item.status === "pending").length;
+  const rework = all.filter((item) => item.status === "changes_requested").length;
+  return `
+    <div class="start-stat-row">
+      <button class="start-stat" type="button" data-start-go="proposals">
+        <strong>${pending}</strong><span>In Prüfung</span>
+      </button>
+      <button class="start-stat ${rework ? "alert" : ""}" type="button" data-start-go="proposals">
+        <strong>${rework}</strong><span>Zur Überarbeitung</span>
+      </button>
+    </div>
+    <p class="muted">Fehlt dir eine Vorlage? Schlag sie vor – das Team profitiert.</p>`;
+}
+
+function renderStartNews(items) {
+  fillStartCard("news", items.length
+    ? `<ul class="start-news">${items.slice(0, 6).map((item) => `
+        <li>
+          <a href="${escapeAttribute(item.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a>
+          <span class="muted">${escapeHtml(item.feed_name)}${item.published_at ? ` · ${relativeTime(item.published_at)}` : ""}</span>
+        </li>`).join("")}</ul>`
+    : '<p class="muted">Keine Meldungen. Quellen pflegen Admins unter Administration.</p>');
+}
+
+$("#view-start").addEventListener("click", async (event) => {
+  const go = event.target.closest("[data-start-go]");
+  if (go) {
+    await switchView(go.dataset.startGo);
+    if (go.dataset.startGo === "cases") $("#case-ticket")?.focus();
+    return;
+  }
+
+  const copy = event.target.closest("[data-start-copy-type]");
+  if (copy) {
+    copyByRef(copy.dataset.startCopyType, Number(copy.dataset.startCopyId))
+      .then(() => renderStartQuick())
+      .catch((error) => alert(error.message));
+    return;
+  }
+
+  if (event.target.closest("[data-start-new-reminder]")) {
+    $("#reminder-button").click();
+    return;
+  }
+
+  const done = event.target.closest("[data-start-reminder-done]");
+  if (done) {
+    try {
+      await api(`/api/reminders/${done.dataset.startReminderDone}`, { method: "DELETE" });
+      await loadReminders();
+      renderStartReminders();
+    } catch (error) {
+      alert(error.message);
+    }
+    return;
+  }
+
+  const ack = event.target.closest("[data-start-ack]");
+  if (ack) {
+    try {
+      await api(`/api/handovers/${ack.dataset.startAck}/acknowledge`, { method: "POST", body: "{}" });
+      showToast("Übernahme bestätigt.");
+      const data = await api("/api/handovers");
+      updateHandoverBadge(data.handovers);
+      renderStartHandover(data.handovers);
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+});
+
+$("#view-start").addEventListener("submit", async (event) => {
+  const form = event.target.closest("[data-start-case-form]");
+  if (!form) return;
+  event.preventDefault();
+  try {
+    await api("/api/cases", {
+      method: "POST",
+      body: JSON.stringify({ ticketRef: form.ticket.value, title: form.title.value }),
+    });
+    showToast("Fall angelegt. Ab jetzt wird mitgeschrieben.");
+    await loadCases();
+    renderStartCases();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+/* ============================================================
+   Zaehler in der Seitenleiste
+   ============================================================ */
+function setNavBadge(selector, count) {
+  const badge = $(selector);
+  if (!badge) return;
+  badge.textContent = count > 99 ? "99+" : String(count || "");
+  badge.classList.toggle("hidden", !count);
+}
+
+/** Unbestaetigte Uebergaben -- die naechste Schicht soll sie nicht uebersehen. */
+function updateHandoverBadge(handovers) {
+  setNavBadge("#nav-badge-handover", handovers.filter((item) => !item.acknowledged_at).length);
+}
+
+async function refreshApprovalCount() {
+  if (!canReview()) return 0;
+  const [templates, content] = await Promise.all([
+    api("/api/proposals"),
+    api("/api/content-proposals"),
+  ]);
+  const open = templates.proposals.length + content.proposals.length;
+  setNavBadge("#approval-count", open);
+  return open;
+}
+
+/* ============================================================
+   Seitenleiste: einklappen (Desktop) und Schublade (Mobil)
+   ============================================================ */
+const SIDEBAR_KEY = "helpdesk_sidebar_collapsed";
+
+function setSidebarCollapsed(collapsed) {
+  document.body.classList.toggle("sidebar-collapsed", collapsed);
+  $("#sidebar-collapse").setAttribute("aria-pressed", String(collapsed));
+  $("#sidebar-collapse").title = collapsed ? "Seitenleiste ausklappen" : "Seitenleiste einklappen";
+  try {
+    localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0");
+  } catch {
+    // Ohne Speicher gilt die Einstellung eben nur bis zum Neuladen.
+  }
+}
+
+function setSidebarOpen(open) {
+  document.body.classList.toggle("sidebar-open", open);
+  $("#nav-toggle").setAttribute("aria-expanded", String(open));
+}
+
+try {
+  if (localStorage.getItem(SIDEBAR_KEY) === "1") document.body.classList.add("sidebar-collapsed");
+} catch {
+  // Kein Speicher -- Leiste bleibt ausgeklappt.
+}
+
+$("#sidebar-collapse").addEventListener("click", () => {
+  setSidebarCollapsed(!document.body.classList.contains("sidebar-collapsed"));
+});
+$("#nav-toggle").addEventListener("click", () => {
+  setSidebarOpen(!document.body.classList.contains("sidebar-open"));
+});
+$("#sidebar-backdrop").addEventListener("click", () => setSidebarOpen(false));
+$("#shortcut-button").addEventListener("click", () => $("#shortcut-dialog").showModal());
+
+/* ============================================================
+   Tastenkuerzel
+   ============================================================
+   "g" und danach ein Buchstabe springt in einen Bereich, "/" ins Suchfeld der
+   aktuellen Seite. Greift nie, solange man in einem Feld tippt oder ein
+   Dialog offen ist.
+*/
+const GOTO_KEYS = {
+  s: "start", v: "templates", b: "commands", l: "solutions", a: "assistant",
+  f: "cases", t: "generator", d: "diagnose", e: "escalation", u: "handover", m: "news",
+};
+
+const VIEW_SEARCH_FIELDS = {
+  templates: "#template-search",
+  commands: "#command-search",
+  solutions: "#solution-search",
+  news: "#news-search",
+};
+
+let gotoPending = false;
+let gotoTimer = null;
+
+function isTyping(target) {
+  return target instanceof HTMLElement
+    && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+}
+
+document.addEventListener("keydown", (event) => {
+  if ($("#app-view").classList.contains("hidden")) return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (isTyping(event.target) || document.querySelector("dialog[open]")) return;
+  // Waehrend des Runners gehoeren die Tasten dem Spiel.
+  if (state.activeView === "game") return;
+
+  if (gotoPending) {
+    gotoPending = false;
+    clearTimeout(gotoTimer);
+    const view = GOTO_KEYS[event.key.toLowerCase()];
+    if (view) {
+      event.preventDefault();
+      switchView(view).catch(() => {});
+    }
+    return;
+  }
+
+  if (event.key === "g") {
+    gotoPending = true;
+    gotoTimer = setTimeout(() => { gotoPending = false; }, 1200);
+    return;
+  }
+
+  if (event.key === "/") {
+    event.preventDefault();
+    const field = VIEW_SEARCH_FIELDS[state.activeView];
+    if (field) {
+      $(field).focus();
+      $(field).select();
+    } else {
+      openPalette();
+    }
+    return;
+  }
+
+  if (event.key === "?") {
+    event.preventDefault();
+    $("#shortcut-dialog").showModal();
+  }
+});
+
+// Esc im Suchfeld einer Liste leert es -- schneller als markieren und loeschen.
+Object.values(VIEW_SEARCH_FIELDS).forEach((selector) => {
+  document.querySelector(selector)?.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !event.target.value) return;
+    event.target.value = "";
+    event.target.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+});
+
+/* ============================================================
+   Platzhalter-Dialog: Verdrahtung
+   ============================================================ */
+$("#fill-fields").addEventListener("input", renderFillPreview);
+
+$("#fill-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const values = currentFillValues();
+  const memory = loadFillMemory();
+  Object.entries(values).forEach(([name, value]) => {
+    if (value) memory[name] = value;
+  });
+  saveFillMemory(memory);
+  finishFill(fillPlaceholders($("#fill-dialog").dataset.source || "", values));
+});
+
+$("#fill-raw").addEventListener("click", () => finishFill($("#fill-dialog").dataset.source || ""));
+
+$("#fill-forget").addEventListener("click", () => {
+  saveFillMemory({});
+  $$("#fill-fields input").forEach((input) => { input.value = ""; });
+  renderFillPreview();
+  $("#fill-fields input")?.focus();
+  showToast("Gemerkte Werte gelöscht.");
+});
+
+// Esc, Klick daneben oder ✕: abbrechen, nichts kopieren.
+$("#fill-dialog").addEventListener("close", () => {
+  if (fillResolver) finishFill(null);
 });
 
 initializeDiagnostics();

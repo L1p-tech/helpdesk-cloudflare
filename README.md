@@ -12,6 +12,13 @@
   in eine Vorlage, einen Befehl oder eine Lösung überführen
 - Versionsschutz bei gleichzeitigen Änderungen
 - persönliche Speicherung von `[ICH]`
+- Platzhalter wie `[USERNAME]` oder `[HOSTNAME]` werden beim Kopieren
+  abgefragt; die Werte bleiben für den offenen Fall gemerkt, die Ticketnummer
+  wird vorbelegt (nur im Browser-Tab, nicht in der Datenbank)
+- Startseite „Mein Tag“: letzte Übergabe, offene Fälle, Erinnerungen,
+  Favoriten, wartende Freigaben und neue IT-Meldungen
+- Seitenleiste mit Zählern, eigene Adresse je Bereich (`#/befehle`),
+  Tastenkürzel (`Strg+K`, `/`, `g` + Buchstabe, `?` für die Übersicht)
 - Pixel-Avatare: jeder baut seine Figur, sie erscheint neben dem Namen
 - Benutzer- und Kategorienverwaltung
 - Benachrichtigungen mit Ungelesen-Zähler und Lesestatus
@@ -166,4 +173,8 @@ Danach im Cloudflare-Dashboard:
 
 ## Design
 
-Die Oberfläche verwendet wieder das kompakte dunkle Karten- und Tab-Design der lokalen Helpdesk-Datei. Die Cloudflare-Funktionen und API-Endpunkte bleiben unverändert.
+Dunkles Neon-Design in vier Farbvarianten. Die Navigation sitzt als
+Seitenleiste links (einklappbar, auf dem Handy als Schublade), darüber eine
+schmale Kopfzeile mit Schnellsuche, offenem Fall, Erinnerungen und
+Benachrichtigungen. Listen sind bewusst kompakt, jede Zeile hat einen eigenen
+Kopierknopf.
