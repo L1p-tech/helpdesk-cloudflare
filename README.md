@@ -15,6 +15,11 @@
 - Platzhalter wie `[USERNAME]` oder `[HOSTNAME]` werden beim Kopieren
   abgefragt; die Werte bleiben für den offenen Fall gemerkt, die Ticketnummer
   wird vorbelegt (nur im Browser-Tab, nicht in der Datenbank)
+- Symptom-Assistent: erkennt Probleme aus einer Beschreibung in eigenen
+  Worten (Synonyme, Wortformen) oder führt Schritt für Schritt durch 15
+  Bereiche zu 76 Leitfäden mit Rückfragen, abhakbaren Schritten, passenden
+  Befehlen und Lösungen; Ergebnis geht in Ticket-Generator oder Fall.
+  Wissen ergänzen in `public/assistant-data.js`
 - Startseite „Mein Tag“: letzte Übergabe, offene Fälle, Erinnerungen,
   Favoriten, wartende Freigaben und neue IT-Meldungen
 - Seitenleiste mit Zählern, eigene Adresse je Bereich (`#/befehle`),

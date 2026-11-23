@@ -2942,3 +2942,127 @@ details.card:hover .row-copy,
   font-size: 13px;
   font-weight: 700;
 }
+
+/* ============================================================
+   Symptom-Assistent: Freitext und Leitfaeden
+   ============================================================ */
+.assistant-free {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.assistant-free label { display: block; }
+.assistant-free input { padding: 12px 14px; font-size: 15px; border-radius: 12px; }
+.assistant-matches { display: flex; flex-direction: column; gap: 6px; }
+.assistant-matches:empty { display: none; }
+.assistant-match {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-weight: 600;
+  text-align: left;
+}
+.assistant-match:first-child { border-color: var(--border-strong); }
+.assistant-match:hover { border-color: var(--primary); box-shadow: 0 0 16px -8px var(--primary); }
+.assistant-kind {
+  flex-shrink: 0;
+  min-width: 74px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.assistant-kind.solution { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
+.assistant-kind.urgent { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger); }
+.assistant-or {
+  margin: 0 0 10px;
+  color: var(--muted-dark);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 700;
+}
+.assistant-options .assistant-option { padding: 10px 14px; border-radius: 12px; font-size: 13.5px; }
+.assistant-nav { display: flex; gap: 16px; margin-top: 6px; }
+
+.assistant-guide-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.assistant-guide-head .assistant-question { margin: 0; font-size: 19px; }
+.assistant-section { margin-top: 16px; }
+.assistant-section h5 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.assistant-questions { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13.5px; }
+.assistant-steps { gap: 6px; }
+.assistant-steps .checklist-item:has(input:checked) span {
+  color: var(--muted-dark);
+  text-decoration: line-through;
+}
+.assistant-hit .ico { margin-left: auto; color: var(--muted); }
+.assistant-commands { display: grid; gap: 6px; }
+.assistant-command {
+  display: grid;
+  grid-template-columns: minmax(160px, 240px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+.assistant-command:hover { border-color: var(--primary); }
+.assistant-command-name { font-weight: 700; font-size: 13px; }
+.assistant-command code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--code-text);
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .assistant-command { grid-template-columns: 1fr; gap: 4px; }
+}
+.assistant-escalation-hint { margin: 16px 0 0; color: var(--muted); font-size: 13px; }
+.assistant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.notice.success {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  color: var(--text);
+}
+.danger-notice,
+.notice.danger-notice {
+  margin-top: 10px;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.assistant-body .notice, #assistant-body .notice { margin-top: 16px; }
+#assistant-body .notice .card-actions { margin-top: 10px; }
+
+/* Beim Springen zum Leitfaden nicht unter der festen Kopfzeile verschwinden. */
+#assistant-body { scroll-margin-top: calc(var(--topbar-h) + 16px); }

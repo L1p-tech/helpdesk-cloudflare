@@ -171,3 +171,78 @@ test('routes map to views and respect roles', async () => {
     assert.equal(app.viewFromLocation(),'admin');
   } finally {app.notificationCenter.stop();window.close();}
 });
+
+test('assistant free text recognises typical user descriptions', async () => {
+  const {window,app}=await loadApp('state,matchAssistant,notificationCenter');
+  const cases = {
+    'Outlook fragt ständig nach dem Passwort': 'outlook-kennwort',
+    'Konto gesperrt': 'konto-gesperrt',
+    'kann mich nicht anmelden, Account gesperrt': 'konto-gesperrt',
+    'Drucker druckt nicht': 'druck-warteschlange',
+    'Drucker druckt nur leere Seiten': 'druck-qualitaet',
+    'Teams kein Ton': 'teams-audio',
+    'die anderen hören mich im Meeting nicht': 'teams-audio',
+    'Teams startet nicht': 'teams-cache',
+    'WLAN bricht ständig ab': 'wlan-abbrueche',
+    'VPN verbindet nicht': 'vpn-verbindet-nicht',
+    'Rechner ist total langsam': 'rechner-langsam',
+    'PC friert ein': 'rechner-friert',
+    'Bluescreen': 'bluescreen',
+    'zweiter Monitor wird nicht erkannt': 'dockingstation',
+    'Zugriff verweigert auf Ordner': 'zugriff-ordner',
+    'OneDrive synchronisiert nicht': 'onedrive',
+    'Datei gelöscht': 'datei-wiederherstellen',
+    'auf Link in Phishing Mail geklickt': 'phishing-geklickt',
+    'Handy verloren': 'geraet-verloren',
+    'Postfach voll': 'postfach-voll',
+    'Authenticator Code wird nicht akzeptiert': 'mfa',
+    'Festplatte voll': 'speicherplatz',
+    'Excel stürzt ab': 'office-reparatur',
+    'Zertifikatsfehler im Browser': 'zertifikat',
+    'kein Internet': 'kein-internet',
+    'Laptop Akku lädt nicht': 'akku',
+    'Scanner schickt keine Mail': 'scanner',
+    'Passwort abgelaufen im Homeoffice': 'passwort-abgelaufen',
+    'Netzlaufwerk fehlt': 'netzlaufwerke',
+    'Webcam geht nicht': 'webcam',
+    'Ich komme nicht mehr in mein Konto rein': 'konto-gesperrt',
+    'Mein Rechner startet ständig neu': 'bluescreen',
+    'Ausdruck kommt nicht raus': 'druck-warteschlange',
+    'Excel hängt sich auf': 'office-reparatur',
+    'Laufwerk H ist weg': 'netzlaufwerke',
+    'neuer Kollege fängt Montag an': 'onboarding',
+    'wifi verbindet sich nicht': 'wlan-verbindet-nicht',
+    'Windows Update hängt bei 30 Prozent': 'update-fehler',
+    'im Homeoffice komme ich nicht auf die Laufwerke': 'vpn-nichts-erreichbar',
+  };
+  try {
+    app.state.solutions=[];
+    const misses=[];
+    for (const [text, expected] of Object.entries(cases)) {
+      const top=[...app.matchAssistant(text,3)].map(hit=>hit.id);
+      if(!top.includes(expected)) misses.push(`${text} -> ${top.join(', ') || '(nichts)'}`);
+    }
+    assert.deepEqual(misses,[]);
+    // Sicherheitsvorfall: der dringende Leitfaden steht vor jeder Loesung.
+    app.state.solutions=[{id:1,title:'Auf Phishing-Link geklickt oder Zugangsdaten eingegeben',symptom:'Link geklickt, Passwort eingegeben',category:'Sicherheit'}];
+    assert.equal(app.matchAssistant('auf Link geklickt und Passwort eingegeben',3)[0].id,'phishing-geklickt');
+  } finally {app.notificationCenter.stop();window.close();}
+});
+
+test('assistant tree only links existing nodes and guides, and every guide is reachable', async () => {
+  const { ASSISTANT_TREE, ASSISTANT_GUIDES } = await import('../public/assistant-data.js');
+  const reachable = new Set();
+  for (const [key, node] of Object.entries(ASSISTANT_TREE)) {
+    for (const option of node.optionen) {
+      if (option.ziel) assert.ok(ASSISTANT_TREE[option.ziel], `${key} -> ${option.ziel}`);
+      else {
+        assert.ok(ASSISTANT_GUIDES[option.leitfaden], `${key} -> ${option.leitfaden}`);
+        reachable.add(option.leitfaden);
+      }
+    }
+  }
+  for (const [id, guide] of Object.entries(ASSISTANT_GUIDES)) {
+    assert.ok(reachable.has(id), `Leitfaden ${id} ist im Baum nicht erreichbar`);
+    assert.ok(guide.titel && guide.schritte.length && guide.stichworte.length, id);
+  }
+});
