@@ -1326,13 +1326,17 @@ function matchAssistant(text, limit = 6) {
   return treffer.sort((a, b) => b.punkte - a.punkte).slice(0, limit);
 }
 
-/** Findet Loesungen zu den Suchwoertern eines Leitfadens. */
+/**
+ * Findet Loesungen zu den Suchwoertern eines Leitfadens -- nur im Titel.
+ * Mit Symptom und Kategorie kamen fachfremde Treffer durch: "office" fand
+ * "Passwort im Homeoffice", "passwort" die Phishing-Loesung.
+ */
 function solutionsForGuide(guide) {
   if (!guide.suche?.length) return [];
   const woerter = guide.suche.map(foldText);
   return state.solutions
     .map((solution) => {
-      const text = foldText(`${solution.title} ${solution.symptom} ${solution.category}`);
+      const text = foldText(solution.title);
       return { solution, punkte: woerter.filter((wort) => text.includes(wort)).length };
     })
     .filter((item) => item.punkte)
@@ -1622,6 +1626,10 @@ async function assistantToGenerator(mode) {
   const schritte = assistantCheckedSteps();
   const offen = state.cases.find((item) => item.status === "open");
   const beschreibung = [assistantState.text.trim(), guide.titel].filter(Boolean);
+
+  // Angefangenen Text im Generator nicht stillschweigend ueberschreiben.
+  const vorhanden = $("#gen-issue").value.trim() || $("#gen-steps").value.trim();
+  if (vorhanden && !confirm("Im Ticket-Generator steht schon Text. Fehlerbild und Schritte ersetzen?")) return;
 
   $("#gen-mode").value = mode;
   $("#gen-issue").value = [...new Set(beschreibung)].join("\n");

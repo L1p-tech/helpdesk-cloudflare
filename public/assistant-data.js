@@ -11,8 +11,14 @@
  *    meinen. Der erste Eintrag einer Gruppe ist der Oberbegriff.
  *
  * Loesungen und Befehle werden ueber Woerter gesucht, nicht ueber IDs. So
- * bleibt der Assistent gueltig, wenn das Team Eintraege umbenennt oder neue
- * dazukommen -- und neue Eintraege tauchen automatisch hier auf.
+ * bleibt der Assistent gueltig, wenn neue Eintraege dazukommen -- sie tauchen
+ * automatisch hier auf.
+ *
+ * `suche` wird nur mit dem LOESUNGSTITEL verglichen (Teilwort, ohne
+ * Gross-/Kleinschreibung, Umlaute als ae/oe/ue). Begriffe deshalb gezielt
+ * waehlen: "office" traefe auch "Homeoffice", "passwort" auch die
+ * Phishing-Loesung. Lieber zwei genaue Begriffe als ein breiter.
+ * `befehle` wird mit dem Befehlsnamen verglichen.
  *
  * Neuer Leitfaden: Eintrag in ASSISTANT_GUIDES anlegen und an passender
  * Stelle im Baum mit `{ text, leitfaden: "id" }` verlinken. `stichworte`
@@ -29,6 +35,7 @@ export const ASSISTANT_TREE = {
       { text: "Netzwerk / Internet", ziel: "netzwerk" },
       { text: "WLAN", ziel: "wlan" },
       { text: "VPN / Homeoffice", ziel: "vpn" },
+      { text: "Remotedesktop / Terminalserver", ziel: "remote" },
       { text: "Drucker / Scanner", ziel: "drucker" },
       { text: "Dateien, Laufwerke, OneDrive", ziel: "dateien" },
       { text: "Rechner langsam, Absturz, Updates", ziel: "rechner" },
@@ -51,6 +58,9 @@ export const ASSISTANT_TREE = {
       { text: "Neues Handy, MFA umziehen", leitfaden: "mfa-neues-handy" },
       { text: "„Vertrauensstellung“ / Domäne nicht erreichbar", leitfaden: "vertrauensstellung" },
       { text: "Anmeldung dauert ewig / Profil fehlt", leitfaden: "profil-temporaer" },
+      { text: "PIN / Windows Hello geht nicht", leitfaden: "windows-hello" },
+      { text: "BitLocker fragt nach Wiederherstellungsschlüssel", leitfaden: "bitlocker" },
+      { text: "Name geändert (z. B. Heirat)", leitfaden: "namensaenderung" },
       { text: "Etwas anderes", leitfaden: "konto-sonstiges" },
     ],
   },
@@ -64,6 +74,10 @@ export const ASSISTANT_TREE = {
       { text: "Postfach voll", leitfaden: "postfach-voll" },
       { text: "Freigegebenes Postfach / Kalender fehlt", leitfaden: "postfach-freigegeben" },
       { text: "Suche in Outlook findet nichts", leitfaden: "outlook-suche" },
+      { text: "Abwesenheitsnotiz einrichten", leitfaden: "abwesenheit" },
+      { text: "Signatur fehlt oder falsch", leitfaden: "signatur" },
+      { text: "Anhang zu groß", leitfaden: "anhang-gross" },
+      { text: "Kalender freigeben / Stellvertretung", leitfaden: "kalender-freigabe" },
       { text: "Etwas anderes", leitfaden: "mail-sonstiges" },
     ],
   },
@@ -74,6 +88,7 @@ export const ASSISTANT_TREE = {
       { text: "Teams startet nicht / hängt / weißes Fenster", leitfaden: "teams-cache" },
       { text: "Bildschirm teilen geht nicht", leitfaden: "teams-teilen" },
       { text: "Telefonie: keine Anrufe / Rufnummer fehlt", leitfaden: "teams-telefonie" },
+      { text: "Status falsch / keine Benachrichtigungen", leitfaden: "teams-status" },
       { text: "Etwas anderes", leitfaden: "teams-sonstiges" },
     ],
   },
@@ -111,6 +126,14 @@ export const ASSISTANT_TREE = {
       { text: "Passwort im Homeoffice abgelaufen", leitfaden: "passwort-abgelaufen" },
     ],
   },
+  remote: {
+    frage: "Was passiert bei der Remoteverbindung?",
+    optionen: [
+      { text: "Verbindung kommt nicht zustande", leitfaden: "rdp-verbindet-nicht" },
+      { text: "Sitzung hängt / schwarzer Bildschirm", leitfaden: "rdp-sitzung" },
+      { text: "Drucker oder Laufwerke fehlen in der Sitzung", leitfaden: "rdp-umleitung" },
+    ],
+  },
   drucker: {
     frage: "Was passiert beim Drucken?",
     optionen: [
@@ -130,6 +153,8 @@ export const ASSISTANT_TREE = {
       { text: "Datei versehentlich gelöscht / überschrieben", leitfaden: "datei-wiederherstellen" },
       { text: "Datei ist gesperrt / „wird verwendet“", leitfaden: "datei-gesperrt" },
       { text: "SharePoint / Teams-Dateien", leitfaden: "sharepoint" },
+      { text: "Office-Datei nicht gespeichert / abgestürzt", leitfaden: "office-autorecover" },
+      { text: "USB-Stick / externe Festplatte", leitfaden: "usb-geraet" },
     ],
   },
   rechner: {
@@ -141,6 +166,8 @@ export const ASSISTANT_TREE = {
       { text: "Startet gar nicht", leitfaden: "startet-nicht" },
       { text: "Update schlägt fehl", leitfaden: "update-fehler" },
       { text: "Kein Speicherplatz", leitfaden: "speicherplatz" },
+      { text: "Startmenü, Taskleiste oder Suche reagiert nicht", leitfaden: "startmenue" },
+      { text: "Uhrzeit oder Datum falsch", leitfaden: "uhrzeit" },
       { text: "Etwas anderes", leitfaden: "rechner-sonstiges" },
     ],
   },
@@ -152,6 +179,7 @@ export const ASSISTANT_TREE = {
       { text: "Lizenz / „Produkt nicht aktiviert“", leitfaden: "lizenz" },
       { text: "Office-Programm (Word, Excel) macht Probleme", leitfaden: "office-reparatur" },
       { text: "Fachanwendung / Branchensoftware", leitfaden: "fachanwendung" },
+      { text: "Datei öffnet mit falschem Programm / PDF", leitfaden: "standardprogramm" },
     ],
   },
   hardware: {
@@ -160,9 +188,12 @@ export const ASSISTANT_TREE = {
       { text: "Bildschirm schwarz / kein Bild", leitfaden: "monitor-kein-bild" },
       { text: "Zweiter Monitor / Dockingstation", leitfaden: "dockingstation" },
       { text: "Maus oder Tastatur", leitfaden: "maus-tastatur" },
+      { text: "Tastatur schreibt falsche Zeichen (Y/Z, @)", leitfaden: "tastatur-layout" },
+      { text: "Bild unscharf / Schrift zu groß oder klein", leitfaden: "skalierung" },
       { text: "Headset / Lautsprecher", leitfaden: "headset" },
       { text: "Webcam", leitfaden: "webcam" },
       { text: "Laptop-Akku / lädt nicht", leitfaden: "akku" },
+      { text: "USB-Stick / externe Festplatte", leitfaden: "usb-geraet" },
       { text: "Gerät defekt / Austausch", leitfaden: "hardware-defekt" },
     ],
   },
@@ -221,7 +252,7 @@ export const ASSISTANT_GUIDES = {
       "Wird es sofort wieder gesperrt: Quelle der Fehlversuche suchen (Handy-Mail, gespeicherte Zugangsdaten, gemappte Laufwerke)",
       "Gespeicherte Windows-Anmeldeinformationen beim Benutzer bereinigen",
     ],
-    suche: ["gesperrt", "konto"],
+    suche: ["gesperrt"],
     befehle: ["Gespeicherte Zugangsdaten", "Anmeldeserver"],
     eskalation: "Bei wiederholter Sperre ohne erkennbare Quelle: an das AD-/Identity-Team, ggf. Sicherheitsprüfung.",
   },
@@ -236,7 +267,6 @@ export const ASSISTANT_GUIDES = {
       "Temporäres Passwort nur auf sicherem Weg übermitteln",
       "Hinweis: Handy-Mail und gespeicherte Zugangsdaten danach aktualisieren, sonst droht Sperre",
     ],
-    suche: ["passwort"],
   },
   "passwort-abgelaufen": {
     titel: "Passwort abgelaufen (auch im Homeoffice)",
@@ -248,12 +278,12 @@ export const ASSISTANT_GUIDES = {
       "Nach der Änderung bei verbundenem VPN sperren und neu entsperren, damit das neue Passwort zwischengespeichert wird",
       "Passwort auf Handy, Outlook und gespeicherten Zugangsdaten aktualisieren",
     ],
-    suche: ["passwort", "abgelaufen"],
+    suche: ["passwort im homeoffice", "passwort abgelaufen"],
     befehle: ["Kerberos-Tickets zurücksetzen", "Gruppenrichtlinien aktualisieren"],
   },
   mfa: {
     titel: "Zweiter Faktor (MFA) schlägt fehl",
-    stichworte: ["mfa", "zweiter faktor", "authenticator", "code ungueltig", "push kommt nicht", "zwei faktor", "2fa", "otp"],
+    stichworte: ["mfa", "zweiter faktor", "authenticator", "code ungueltig", "push kommt nicht", "zwei faktor", "2fa", "otp", "sms code"],
     fragen: ["Kommt keine Push-Benachrichtigung, oder wird der Code abgelehnt?", "Hat der Benutzer ein neues Handy?"],
     schritte: [
       "Uhrzeit am Handy auf automatisch stellen (Codes sind zeitbasiert)",
@@ -273,7 +303,7 @@ export const ASSISTANT_GUIDES = {
       "Firmenportal / MDM-App auf dem neuen Gerät installieren und Gerät registrieren",
       "Altes Gerät aus der Geräteverwaltung entfernen bzw. zurücksetzen",
     ],
-    suche: ["authenticator", "telefonnummer", "mfa"],
+    suche: ["zweitem faktor", "authenticator"],
   },
   vertrauensstellung: {
     titel: "Vertrauensstellung zur Domäne verloren",
@@ -282,9 +312,10 @@ export const ASSISTANT_GUIDES = {
     schritte: [
       "Mit lokalem Administratorkonto anmelden",
       "Netzwerkverbindung zum Domänencontroller prüfen",
-      "Vertrauensstellung reparieren (Test-ComputerSecureChannel -Repair) oder Rechner aus der Domäne nehmen und neu aufnehmen",
+      "In Windows PowerShell als Admin: Test-ComputerSecureChannel -Repair -Credential DOMÄNE\\Admin – sonst Rechner aus der Domäne nehmen und neu aufnehmen",
       "Danach neu starten und mit Domänenkonto testen",
     ],
+    suche: ["vertrauensstellung"],
     befehle: ["Domänenverbindung prüfen", "Anmeldeserver", "Erreichbarkeit"],
     eskalation: "Betrifft es mehrere Rechner, an das Server-/AD-Team eskalieren.",
   },
@@ -298,7 +329,7 @@ export const ASSISTANT_GUIDES = {
       "Bei temporärem Profil: Registry-Eintrag unter ProfileList (.bak) prüfen",
       "Profil sichern und neu anlegen lassen, falls beschädigt",
     ],
-    suche: ["profil", "langsam"],
+    suche: ["temporaeres profil", "startet sehr langsam"],
     befehle: ["Speicherplatz aller Laufwerke", "Systemfehler", "Gespeicherte Gruppenrichtlinien"],
     eskalation: "Profilreparatur mit Datenverlustrisiko: vorher sichern oder an 3rd Level geben.",
   },
@@ -311,6 +342,7 @@ export const ASSISTANT_GUIDES = {
       "Konto im AD prüfen: aktiv, nicht gesperrt, Passwort nicht abgelaufen",
       "An einem anderen Rechner testen lassen",
     ],
+    suche: ["gesperrt", "zweitem faktor"],
     befehle: ["Angemeldeten Benutzer", "Gruppenmitgliedschaften"],
   },
 
@@ -323,7 +355,7 @@ export const ASSISTANT_GUIDES = {
       "In Office unter Datei → Konto abmelden und neu anmelden",
       "Outlook-Profil neu anlegen, falls weiterhin",
     ],
-    suche: ["kennwort", "outlook"],
+    suche: ["kennwort"],
     befehle: ["Gespeicherte Zugangsdaten"],
   },
   "outlook-startet-nicht": {
@@ -336,7 +368,7 @@ export const ASSISTANT_GUIDES = {
       "Office-Schnellreparatur über Apps & Features",
       "Neues Outlook-Profil anlegen",
     ],
-    suche: ["outlook", "startet nicht"],
+    suche: ["outlook startet nicht"],
     befehle: ["Prozess beenden", "Aktuelle Prozesse"],
   },
   "mail-zustellung": {
@@ -349,7 +381,7 @@ export const ASSISTANT_GUIDES = {
       "Nachrichtenablaufverfolgung im Exchange Admin Center prüfen",
       "Bei eingehenden Mails: Quarantäne und Junk-Ordner prüfen",
     ],
-    suche: ["mail", "quarantaene", "zustell"],
+    suche: ["mails landen", "zustell", "quarantaene"],
     eskalation: "Betrifft es viele Benutzer oder externe Domänen: an das Mail-/M365-Team.",
   },
   "mail-spam": {
@@ -360,7 +392,7 @@ export const ASSISTANT_GUIDES = {
       "Quarantäne prüfen und Nachricht freigeben",
       "Bei ausgehenden Mails: Signatur, Links und Anhänge prüfen",
     ],
-    suche: ["spam", "quarantaene"],
+    suche: ["spam"],
   },
   "postfach-voll": {
     titel: "Postfach voll",
@@ -371,7 +403,7 @@ export const ASSISTANT_GUIDES = {
       "Online-Archiv aktivieren bzw. Archivierungsrichtlinie anwenden",
       "Kontingent nur nach Freigabe erhöhen",
     ],
-    suche: ["postfach", "speicher"],
+    suche: ["postfach ist voll", "postfach voll"],
   },
   "postfach-freigegeben": {
     titel: "Freigegebenes Postfach oder Kalender fehlt",
@@ -382,7 +414,7 @@ export const ASSISTANT_GUIDES = {
       "Automatische Einbindung kann bis zu 60 Minuten dauern – Outlook neu starten",
       "Sonst manuell über Kontoeinstellungen → Weitere Postfächer hinzufügen",
     ],
-    suche: ["postfach", "freigabe"],
+    suche: ["freigegebenes postfach"],
   },
   "outlook-suche": {
     titel: "Outlook-Suche findet nichts",
@@ -402,7 +434,7 @@ export const ASSISTANT_GUIDES = {
       "Outlook im abgesicherten Modus starten",
       "Office-Updates prüfen",
     ],
-    suche: ["outlook", "mail"],
+    suche: ["outlook"],
   },
 
   /* ---------- Teams & Telefonie ---------- */
@@ -416,7 +448,7 @@ export const ASSISTANT_GUIDES = {
       "Stummschaltung am Headset/Kabel prüfen, anderen USB-Port testen",
       "Teams komplett beenden und neu starten",
     ],
-    suche: ["teams", "headset", "mikrofon"],
+    suche: ["kein ton", "headset"],
     befehle: ["Geräte-Manager"],
   },
   "teams-cache": {
@@ -424,12 +456,12 @@ export const ASSISTANT_GUIDES = {
     stichworte: ["teams startet nicht", "teams haengt", "teams weiss", "teams laedt nicht", "teams cache", "teams absturz"],
     schritte: [
       "Teams vollständig beenden (auch im Infobereich)",
-      "Teams-Cache leeren (Ordner unter %LocalAppData%\\Packages\\MSTeams_* bzw. %AppData%\\Microsoft\\Teams)",
+      "Neues Teams: Einstellungen → Apps → Microsoft Teams → Erweiterte Optionen → Zurücksetzen; klassisches Teams: Ordner %AppData%\\Microsoft\\Teams leeren",
       "Teams neu starten und anmelden",
       "Testen, ob Teams im Browser funktioniert",
       "Teams über Apps & Features zurücksetzen oder neu installieren",
     ],
-    suche: ["teams"],
+    suche: ["teams startet"],
     befehle: ["Prozess beenden"],
   },
   "teams-teilen": {
@@ -441,7 +473,6 @@ export const ASSISTANT_GUIDES = {
       "Bei macOS: Bildschirmaufnahme-Berechtigung erteilen",
       "Hardwarebeschleunigung in Teams testweise deaktivieren",
     ],
-    suche: ["teams"],
   },
   "teams-telefonie": {
     titel: "Teams-Telefonie: keine Anrufe oder Rufnummer fehlt",
@@ -547,7 +578,7 @@ export const ASSISTANT_GUIDES = {
       "Signalstärke am Platz prüfen, anderen Ort testen",
       "WLAN-Bericht auswerten",
     ],
-    suche: ["wlan"],
+    suche: ["wlan bricht"],
     befehle: ["WLAN-Adapter-Bericht", "Energieeinstellungen-Bericht"],
   },
   "wlan-nicht-sichtbar": {
@@ -618,7 +649,6 @@ export const ASSISTANT_GUIDES = {
       "Netzwerkdrucker über den Druckserver neu verbinden",
       "Gruppenrichtlinien aktualisieren, falls Drucker per GPO verteilt",
     ],
-    suche: ["drucker"],
     befehle: ["Installierte Drucker", "Netzwerkdrucker verbinden", "Gruppenrichtlinien aktualisieren"],
   },
   "druck-qualitaet": {
@@ -629,7 +659,7 @@ export const ASSISTANT_GUIDES = {
       "Testseite direkt am Gerät drucken (trennt Gerät von Treiber)",
       "Bei falschen Zeichen: Druckertreiber neu installieren",
     ],
-    suche: ["leere seiten", "drucker"],
+    suche: ["leere seiten"],
   },
   "drucker-fehler": {
     titel: "Drucker meldet Fehler oder Papierstau",
@@ -639,7 +669,6 @@ export const ASSISTANT_GUIDES = {
       "Papierstau nach Anleitung entfernen, alle Klappen prüfen",
       "Gerät aus- und einschalten",
     ],
-    suche: ["papierstau", "drucker"],
     eskalation: "Hardwaredefekt: Servicetechniker / Wartungsvertrag beauftragen.",
   },
   scanner: {
@@ -663,7 +692,7 @@ export const ASSISTANT_GUIDES = {
       "Laufwerk manuell verbinden",
       "Bei VPN: erst VPN verbinden, dann Laufwerke",
     ],
-    suche: ["netzlaufwerke"],
+    suche: ["netzlaufwerk"],
     befehle: ["Netzlaufwerke anzeigen", "Netzlaufwerk verbinden", "Gruppenrichtlinien aktualisieren"],
   },
   "zugriff-ordner": {
@@ -675,7 +704,7 @@ export const ASSISTANT_GUIDES = {
       "Neue Gruppen wirken erst nach Ab-/Anmeldung oder Kerberos-Ticket-Reset",
       "Berechtigung nur nach Freigabe des Verantwortlichen beantragen/vergeben",
     ],
-    suche: ["zugriff", "berechtigung"],
+    suche: ["zugriff verweigert"],
     befehle: ["Gruppenmitgliedschaften", "Kerberos-Tickets zurücksetzen"],
   },
   onedrive: {
@@ -685,7 +714,7 @@ export const ASSISTANT_GUIDES = {
       "OneDrive-Symbol prüfen: angemeldet? Pausiert? Fehlermeldung?",
       "Dateinamen mit ungültigen Zeichen oder zu langen Pfaden suchen",
       "Speicherplatz lokal und in OneDrive prüfen",
-      "OneDrive zurücksetzen (onedrive.exe /reset)",
+      "OneDrive zurücksetzen: %LocalAppData%\\Microsoft\\OneDrive\\onedrive.exe /reset, danach OneDrive neu starten",
     ],
     suche: ["onedrive"],
   },
@@ -699,6 +728,7 @@ export const ASSISTANT_GUIDES = {
       "OneDrive/SharePoint: Versionsverlauf der Datei",
       "Sonst Wiederherstellung aus dem Backup beantragen",
     ],
+    suche: ["geloescht", "ueberschrieben"],
     eskalation: "Restore aus Backup: an das Backup-/Server-Team mit Pfad und Zeitpunkt.",
   },
   "datei-gesperrt": {
@@ -746,7 +776,7 @@ export const ASSISTANT_GUIDES = {
       "Systemfehler der letzten 24 Stunden prüfen",
       "Systemdateien prüfen",
     ],
-    suche: ["friert", "haengt"],
+    suche: ["friert"],
     befehle: ["Explorer neu starten", "Systemfehler", "Windows-Systemdateien prüfen", "Speicherfresser"],
   },
   bluescreen: {
@@ -760,7 +790,7 @@ export const ASSISTANT_GUIDES = {
       "Systemdateien und Windows-Abbild reparieren",
       "Datenträger auf Fehler prüfen",
     ],
-    suche: ["bluescreen", "neustart"],
+    suche: ["bluescreen"],
     befehle: ["Unerwartete Neustarts", "Systemfehler", "Windows-Systemdateien", "Windows-Abbild reparieren", "Datenträger auf Fehler"],
     eskalation: "Wiederholt mit Hardware-Stoppcode (Speicher, Festplatte): Gerätetausch über 3rd Level.",
   },
@@ -784,7 +814,7 @@ export const ASSISTANT_GUIDES = {
       "Windows Update zurücksetzen",
       "Systemdateien und Abbild reparieren",
     ],
-    suche: ["update"],
+    suche: ["update schlaegt"],
     befehle: ["Windows Update zurücksetzen", "Installierte Updates", "Windows-Abbild reparieren", "Speicherplatz"],
   },
   speicherplatz: {
@@ -820,7 +850,7 @@ export const ASSISTANT_GUIDES = {
       "Programm reparieren oder neu installieren",
       "Mit anderem Benutzer testen (Profilproblem?)",
     ],
-    suche: ["anwendung startet nicht", "absturz"],
+    suche: ["anwendung startet nicht", "stuerzt ab"],
     befehle: ["Systemfehler", "Installierte Programme", "Aktuelle Prozesse"],
   },
   "software-installation": {
@@ -833,7 +863,6 @@ export const ASSISTANT_GUIDES = {
       "Installation über Verteilung oder mit Adminrechten durchführen",
       "Funktionstest mit dem Benutzer",
     ],
-    suche: ["software", "installation"],
   },
   lizenz: {
     titel: "Lizenz- oder Aktivierungsproblem",
@@ -855,7 +884,7 @@ export const ASSISTANT_GUIDES = {
       "Office-Schnellreparatur, danach Onlinereparatur",
       "Office-Updates installieren",
     ],
-    suche: ["office", "word", "excel"],
+    suche: ["word oder excel"],
   },
   fachanwendung: {
     titel: "Fachanwendung macht Probleme",
@@ -867,7 +896,7 @@ export const ASSISTANT_GUIDES = {
       "Anmeldung/Passwort der Anwendung prüfen",
       "Cache / lokale Konfiguration nach Anleitung zurücksetzen",
     ],
-    suche: ["fachanwendung", "as400", "remoteapp"],
+    suche: ["fachanwendung"],
     eskalation: "An den Anwendungsbetreuer / Hersteller mit Fehlermeldung, Zeitpunkt und Reproduktionsschritten.",
   },
 
@@ -881,7 +910,7 @@ export const ASSISTANT_GUIDES = {
       "Win+Strg+Umschalt+B setzt den Grafiktreiber zurück",
       "Anderes Kabel / anderen Anschluss testen",
     ],
-    suche: ["schwarz", "bildschirm"],
+    suche: ["bildschirm bleibt", "externer monitor"],
     befehle: ["Monitore anzeigen"],
   },
   dockingstation: {
@@ -893,6 +922,7 @@ export const ASSISTANT_GUIDES = {
       "Treiber/Firmware der Dockingstation aktualisieren",
       "Anzeigeeinstellungen: Bildschirme erweitern",
     ],
+    suche: ["dockingstation"],
     befehle: ["Monitore anzeigen", "Geräte-Manager"],
   },
   "maus-tastatur": {
@@ -915,7 +945,7 @@ export const ASSISTANT_GUIDES = {
       "In Teams das Gerät unter Einstellungen → Geräte auswählen",
       "Ersatzgerät testen",
     ],
-    suche: ["headset", "ton"],
+    suche: ["headset", "kein ton"],
     befehle: ["Geräte-Manager"],
   },
   webcam: {
@@ -962,7 +992,7 @@ export const ASSISTANT_GUIDES = {
       "Gruppenmitgliedschaft prüfen bzw. nach Freigabe setzen",
       "Ab- und neu anmelden",
     ],
-    suche: ["berechtigung"],
+    suche: ["zugriff verweigert"],
     befehle: ["Gruppenmitgliedschaften", "Kerberos-Tickets zurücksetzen"],
   },
   onboarding: {
@@ -998,7 +1028,7 @@ export const ASSISTANT_GUIDES = {
       "Browser-Cache und Cookies leeren",
       "Anderen Browser testen",
     ],
-    suche: ["browser", "cache"],
+    suche: ["webseite"],
   },
   zertifikat: {
     titel: "Zertifikatsfehler im Browser",
@@ -1020,7 +1050,7 @@ export const ASSISTANT_GUIDES = {
       "Richtiges Konto verwenden (privat vs. Firma)",
       "Konto und MFA-Status prüfen",
     ],
-    suche: ["browser", "anmeldung"],
+    suche: ["webseite"],
   },
   "browser-adware": {
     titel: "Pop-ups, Werbung, fremde Startseite",
@@ -1043,7 +1073,6 @@ export const ASSISTANT_GUIDES = {
       "Passwort kürzlich geändert? Neu anmelden",
       "Gerät im Firmenportal konform?",
     ],
-    suche: ["handy", "mail"],
   },
   "handy-mdm": {
     titel: "Firmen-App fehlt / Gerät nicht konform",
@@ -1053,6 +1082,206 @@ export const ASSISTANT_GUIDES = {
       "Betriebssystem aktualisieren, Bildschirmsperre setzen",
       "Gerät im Portal synchronisieren",
     ],
+  },
+
+
+  /* ---------- Ergaenzungen ---------- */
+  "windows-hello": {
+    titel: "PIN / Windows Hello funktioniert nicht",
+    stichworte: ["pin", "windows hello", "pin geht nicht", "fingerabdruck", "gesichtserkennung", "pin vergessen"],
+    fragen: ["Kommt eine Fehlermeldung oder wird die PIN nur abgelehnt?", "Klappt die Anmeldung mit dem normalen Passwort?"],
+    schritte: [
+      "Mit dem Passwort anmelden (Anmeldeoptionen unter dem PIN-Feld)",
+      "Einstellungen → Konten → Anmeldeoptionen → PIN: „Ich habe meine PIN vergessen“ bzw. PIN entfernen und neu einrichten",
+      "Ohne Netz zum Unternehmen kann eine neue PIN oft nicht eingerichtet werden – VPN oder Büro",
+      "Bei Fehlern rund um TPM: Gerät neu starten, TPM-Status in tpm.msc prüfen",
+    ],
+    befehle: ["Systeminformationen"],
+  },
+  bitlocker: {
+    titel: "BitLocker fragt nach dem Wiederherstellungsschlüssel",
+    stichworte: ["bitlocker", "wiederherstellungsschluessel", "recovery key", "blauer bildschirm schluessel", "schluessel eingeben"],
+    fragen: ["Welche Schlüssel-ID (die ersten 8 Zeichen) zeigt der Bildschirm?", "Wurde kürzlich ein BIOS-Update gemacht, Hardware getauscht oder die Dockingstation gewechselt?"],
+    schritte: [
+      "Identität des Anrufers sicher prüfen – der Schlüssel entsperrt das ganze Gerät",
+      "Schlüssel-ID notieren und in Entra ID / Intune bzw. Active Directory beim Computerobjekt nachschlagen",
+      "Schlüssel nur dem Gerätebesitzer telefonisch durchgeben, nicht per Mail",
+      "Nach der Anmeldung Ursache klären (BIOS-/Firmware-Update, TPM, Bootreihenfolge)",
+      "Tritt es wiederholt auf: Schlüssel nach Gebrauch rotieren lassen",
+    ],
+    eskalation: "Kein Schlüssel hinterlegt: an 3rd Level / Endpoint-Team – ohne Schlüssel sind die Daten nicht wiederherstellbar.",
+  },
+  namensaenderung: {
+    titel: "Namensänderung (z. B. nach Heirat)",
+    stichworte: ["namensaenderung", "name geaendert", "heirat", "nachname", "neuer name"],
+    fragen: ["Liegt die Änderungsmitteilung der Personalabteilung vor?"],
+    schritte: [
+      "Freigabe/Mitteilung der Personalabteilung abwarten",
+      "Anzeigename, Nachname und ggf. Mailadresse im AD/Entra ID anpassen, alte Adresse als Alias behalten",
+      "Anmeldename nur ändern, wenn Richtlinie es vorsieht – betrifft Profile und Anwendungen",
+      "Signatur, Telefonbuch und Fachanwendungen nachziehen",
+    ],
+  },
+  abwesenheit: {
+    titel: "Abwesenheitsnotiz einrichten",
+    stichworte: ["abwesenheitsnotiz", "abwesenheit", "urlaub", "out of office", "automatische antwort", "abwesend"],
+    fragen: ["Ist der Benutzer selbst noch erreichbar oder soll es stellvertretend eingerichtet werden?"],
+    schritte: [
+      "Klassisches Outlook: Datei → Automatische Antworten; neues Outlook und Web: Einstellungen → Konten → Automatische Antworten",
+      "Zeitraum setzen, getrennte Texte für intern und extern",
+      "Stellvertretend nur mit Freigabe (Vorgesetzte/r) – über Exchange Admin Center",
+    ],
+  },
+  signatur: {
+    titel: "Signatur fehlt oder ist falsch",
+    stichworte: ["signatur", "unterschrift mail", "signatur fehlt", "signatur falsch"],
+    schritte: [
+      "Werden Signaturen zentral verteilt? Dann Daten im AD (Titel, Telefon, Abteilung) prüfen",
+      "Sonst: Datei → Optionen → E-Mail → Signaturen, Standard für neue Mails und Antworten setzen",
+      "Outlook im Web hat eine eigene Signatur – dort ggf. separat einrichten",
+    ],
+  },
+  "anhang-gross": {
+    titel: "Anhang zu groß",
+    stichworte: ["anhang zu gross", "anhang", "datei zu gross", "mail zu gross", "grosse datei verschicken"],
+    schritte: [
+      "Datei in OneDrive/SharePoint ablegen und als Link teilen",
+      "Für Externe: Freigabelink mit Ablaufdatum bzw. vorgesehenen Dateiaustausch nutzen",
+      "Grenze ist meist 25–35 MB inklusive Kodierung – Empfänger können noch kleinere Grenzen haben",
+    ],
+  },
+  "kalender-freigabe": {
+    titel: "Kalender freigeben / Stellvertretung",
+    stichworte: ["kalender", "kalender freigeben", "stellvertretung", "termine sehen", "kalenderberechtigung"],
+    schritte: [
+      "Outlook: Kalender → Freigeben → Person hinzufügen, Berechtigungsstufe wählen",
+      "Stellvertretung (Termine im Namen annehmen): Datei → Kontoeinstellungen → Zugriffsrechte für Stellvertretung",
+      "Ohne Zugriff des Besitzers nur mit dessen Freigabe über das Exchange Admin Center",
+    ],
+  },
+  "teams-status": {
+    titel: "Teams-Status falsch / keine Benachrichtigungen",
+    stichworte: ["teams status", "status falsch", "abwesend obwohl", "benachrichtigungen", "keine benachrichtigung"],
+    schritte: [
+      "Status manuell setzen und „Status zurücksetzen“ wählen",
+      "Teams-Einstellungen → Benachrichtigungen prüfen, Windows-Fokus/Nicht stören prüfen",
+      "Kalender: Ein laufender Termin setzt automatisch „Beschäftigt“",
+      "Ab- und neu anmelden",
+    ],
+  },
+  "rdp-verbindet-nicht": {
+    titel: "Remotedesktop verbindet nicht",
+    stichworte: ["remotedesktop", "rdp", "terminalserver", "citrix", "remoteverbindung", "mstsc", "verbindung nicht moeglich"],
+    fragen: ["Welche Fehlermeldung erscheint?", "Im Büro oder über VPN?"],
+    schritte: [
+      "VPN verbunden? Zielrechner erreichbar und eingeschaltet?",
+      "Port 3389 bzw. Gateway erreichbar prüfen",
+      "Benutzer in der Gruppe „Remotedesktopbenutzer“ bzw. der Zugriffsgruppe?",
+      "Gespeicherte RDP-Anmeldedaten löschen und neu anmelden",
+    ],
+    befehle: ["Erreichbarkeit", "Port-Erreichbarkeit", "Gespeicherte Zugangsdaten", "Gruppenmitgliedschaften"],
+    eskalation: "Server oder Gateway nicht erreichbar: an das Server-/Citrix-Team.",
+  },
+  "rdp-sitzung": {
+    titel: "Remotesitzung hängt / schwarzer Bildschirm",
+    stichworte: ["sitzung haengt", "terminalserver haengt", "rdp schwarz", "citrix haengt", "sitzung abmelden"],
+    schritte: [
+      "In der Sitzung Strg+Alt+Ende drücken (entspricht Strg+Alt+Entf) und den Task-Manager öffnen",
+      "Hängende Sitzung serverseitig abmelden (Remotedesktopsitzungen anzeigen / Task-Manager → Benutzer)",
+      "Neu verbinden",
+      "Tritt es bei mehreren Benutzern auf: Server-Auslastung prüfen lassen",
+    ],
+    befehle: ["Remotedesktop-Sitzungen", "Aktuelle Prozesse"],
+    eskalation: "Mehrere Benutzer betroffen: Server-Team.",
+  },
+  "rdp-umleitung": {
+    titel: "Drucker oder Laufwerke fehlen in der Remotesitzung",
+    stichworte: ["drucker in sitzung", "laufwerk in sitzung", "umleitung", "lokale drucker terminalserver"],
+    schritte: [
+      "Im RDP-Client unter „Lokale Ressourcen“ Drucker und Laufwerke aktivieren",
+      "Neu verbinden – Umleitung greift nur beim Verbindungsaufbau",
+      "Treiber des lokalen Druckers muss auf dem Server unterstützt sein",
+    ],
+    befehle: ["Netzlaufwerke anzeigen", "Installierte Drucker"],
+  },
+  "office-autorecover": {
+    titel: "Office-Datei nicht gespeichert oder nach Absturz weg",
+    stichworte: ["nicht gespeichert", "ungespeichert", "autowiederherstellung", "absturz datei weg", "word abgestuerzt datei", "excel nicht gespeichert"],
+    schritte: [
+      "Programm neu öffnen – links erscheint oft der Bereich „Dokumentwiederherstellung“",
+      "Datei → Informationen → Dokument verwalten → Nicht gespeicherte Dokumente wiederherstellen",
+      "Bei OneDrive/SharePoint-Dateien: Versionsverlauf prüfen",
+      "Für die Zukunft: AutoSpeichern bzw. Speicherintervall der AutoWiederherstellung prüfen",
+    ],
+    suche: ["geloescht", "word oder excel"],
+  },
+  "usb-geraet": {
+    titel: "USB-Stick oder externe Festplatte wird nicht erkannt",
+    stichworte: ["usb stick", "usb", "externe festplatte", "stick wird nicht erkannt", "usb gesperrt", "speicherstick"],
+    fragen: ["Erscheint eine Meldung, dass Wechseldatenträger gesperrt sind?"],
+    schritte: [
+      "Anderen USB-Port direkt am Rechner testen (nicht über Hub/Dock)",
+      "Datenträgerverwaltung: Wird das Laufwerk angezeigt, nur ohne Buchstaben?",
+      "Wechseldatenträger per Richtlinie gesperrt? Dann nur mit freigegebener Ausnahme",
+      "Am anderen Rechner testen – defekt oder unformatiert?",
+    ],
+    befehle: ["Lokale Laufwerke", "Geräte-Manager"],
+  },
+  startmenue: {
+    titel: "Startmenü, Taskleiste oder Suche reagiert nicht",
+    stichworte: ["startmenue", "taskleiste", "windows suche", "startknopf", "suche geht nicht"],
+    schritte: [
+      "Windows-Explorer neu starten",
+      "Abmelden und neu anmelden",
+      "Systemdateien prüfen",
+      "Ausstehende Updates installieren und neu starten",
+    ],
+    suche: ["friert"],
+    befehle: ["Explorer neu starten", "Windows-Systemdateien", "Windows-Abbild reparieren"],
+  },
+  uhrzeit: {
+    titel: "Uhrzeit oder Datum falsch",
+    stichworte: ["uhrzeit falsch", "uhr geht falsch", "datum falsch", "zeitzone", "zeit falsch"],
+    schritte: [
+      "Zeitzone in den Einstellungen prüfen",
+      "Zeit mit dem Domänencontroller synchronisieren (w32tm /resync)",
+      "Hinweis: Falsche Zeit verursacht auch Anmelde-, Zertifikats- und MFA-Fehler",
+      "Geht die Uhr nach jedem Neustart falsch: CMOS-Batterie (Hardware)",
+    ],
+    befehle: ["Anmeldeserver"],
+  },
+  standardprogramm: {
+    titel: "Datei öffnet mit falschem Programm / PDF öffnet nicht",
+    stichworte: ["pdf", "standardprogramm", "oeffnet mit falschem programm", "acrobat", "dateizuordnung", "pdf oeffnet nicht"],
+    schritte: [
+      "Rechtsklick auf die Datei → Öffnen mit → Andere App auswählen → „Immer“",
+      "Einstellungen → Apps → Standard-Apps nach Dateityp prüfen",
+      "Wird die Zuordnung zentral gesetzt, nach Anmeldung erneut zurückgesetzt? Dann Richtlinie prüfen",
+      "PDF-Programm reparieren oder neu installieren",
+    ],
+    befehle: ["Gruppenrichtlinien aktualisieren", "Installierte Programme"],
+  },
+  "tastatur-layout": {
+    titel: "Tastatur schreibt falsche Zeichen",
+    stichworte: ["falsche zeichen", "y und z vertauscht", "tastaturlayout", "sonderzeichen", "at zeichen", "englische tastatur"],
+    schritte: [
+      "Sprachleiste prüfen: ENG statt DEU? Mit Windows+Leertaste zurückschalten – häufigste Ursache ist versehentliches Alt+Umschalt",
+      "Ungewollte Tastaturlayouts unter Einstellungen → Zeit und Sprache entfernen",
+      "Num-Taste prüfen, falls Zahlen statt Buchstaben kommen (Laptops)",
+      "In Remotesitzungen das Layout der Sitzung prüfen",
+    ],
+  },
+  skalierung: {
+    titel: "Bild unscharf / Schrift zu groß oder zu klein",
+    stichworte: ["unscharf", "aufloesung", "schrift zu gross", "schrift zu klein", "skalierung", "verschwommen"],
+    schritte: [
+      "Einstellungen → Anzeige: empfohlene Auflösung und Skalierung wählen",
+      "Bei mehreren Bildschirmen jeden einzeln einstellen",
+      "Nach Wechsel an der Dockingstation einmal ab- und anmelden",
+      "Grafiktreiber aktualisieren",
+    ],
+    suche: ["externer monitor"],
+    befehle: ["Monitore anzeigen"],
   },
 
   /* ---------- Sicherheit ---------- */
@@ -1112,6 +1341,7 @@ export const ASSISTANT_GUIDES = {
       "MFA-Methoden prüfen und fremde entfernen",
       "Sicherheitsteam informieren",
     ],
+    suche: ["phishing"],
     eskalation: "Sicherheitsvorfall: sofort an das Sicherheitsteam.",
     dringend: true,
   },
@@ -1123,7 +1353,21 @@ export const ASSISTANT_GUIDES = {
  * Buchstaben treffen auch als Wortanfang: "druck" findet "druckt", "drucken".
  */
 export const ASSISTANT_SYNONYMS = [
-  ["passwort", "kennwort", "pw", "passwd", "password", "pin"],
+  ["passwort", "kennwort", "pw", "passwd", "password"],
+  ["hello", "pin", "fingerabdruck", "gesichtserkennung"],
+  ["bitlocker", "wiederherstellungsschluessel", "recovery", "schluessel"],
+  ["remotedesktop", "rdp", "terminalserver", "citrix", "rds", "mstsc", "remotesitzung", "sitzung"],
+  ["abwesenheit", "abwesenheitsnotiz", "urlaub", "abwesend", "ooo"],
+  ["signatur", "unterschrift", "signature"],
+  ["anhang", "anhaenge", "attachment"],
+  ["kalender", "termin", "termine"],
+  ["usb", "stick", "usb-stick", "speicherstick", "wechseldatentraeger"],
+  ["startmenue", "taskleiste", "startknopf"],
+  ["uhrzeit", "uhr", "datum", "zeitzone"],
+  ["pdf", "acrobat", "standardprogramm", "dateizuordnung"],
+  ["skalierung", "unscharf", "aufloesung", "verschwommen"],
+  ["layout", "tastaturlayout", "vertauscht", "sonderzeichen"],
+  ["namensaenderung", "nachname", "heirat", "geheiratet", "verheiratet", "namen", "name"],
   ["gesperrt", "sperre", "locked", "lockout", "sperrt"],
   ["anmeldung", "anmelden", "login", "einloggen", "logon", "signin", "anmeldet"],
   ["mfa", "authenticator", "2fa", "otp", "push", "faktor"],
@@ -1186,4 +1430,5 @@ export const ASSISTANT_STOPWORDS = new Set([
   "beim", "zum", "zur", "ueber", "nach", "vor", "aus", "als", "um", "alle", "alles",
   "ab", "total", "ganz", "gar", "staendig", "dauernd", "einfach", "irgendwie",
   "komme", "kommt", "kommen", "rein", "raus", "mehr", "sich", "bleibt", "mich", "mir",
+  "einrichten", "richte", "eingerichtet", "einstellen", "brauche", "braucht", "soll", "sollen",
 ]);

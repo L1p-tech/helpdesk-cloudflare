@@ -16,8 +16,8 @@
   abgefragt; die Werte bleiben für den offenen Fall gemerkt, die Ticketnummer
   wird vorbelegt (nur im Browser-Tab, nicht in der Datenbank)
 - Symptom-Assistent: erkennt Probleme aus einer Beschreibung in eigenen
-  Worten (Synonyme, Wortformen) oder führt Schritt für Schritt durch 15
-  Bereiche zu 76 Leitfäden mit Rückfragen, abhakbaren Schritten, passenden
+  Worten (Synonyme, Wortformen) oder führt Schritt für Schritt durch 16
+  Bereiche zu 94 Leitfäden mit Rückfragen, abhakbaren Schritten, passenden
   Befehlen und Lösungen; Ergebnis geht in Ticket-Generator oder Fall.
   Wissen ergänzen in `public/assistant-data.js`
 - Startseite „Mein Tag“: letzte Übergabe, offene Fälle, Erinnerungen,
