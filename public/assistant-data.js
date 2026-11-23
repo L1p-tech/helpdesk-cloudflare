@@ -253,7 +253,15 @@ export const ASSISTANT_GUIDES = {
       "Gespeicherte Windows-Anmeldeinformationen beim Benutzer bereinigen",
     ],
     suche: ["gesperrt"],
-    befehle: ["Gespeicherte Zugangsdaten", "Anmeldeserver"],
+    befehle: [
+      "Benutzerkonto im Active Directory anzeigen",
+      "Gesperrte Konten finden",
+      "Sperrquelle eines Kontos finden",
+      "Konto entsperren",
+      "Gespeicherte Zugangsdaten anzeigen",
+      "Gespeicherte Zugangsdaten löschen",
+      "Anmeldeserver anzeigen",
+    ],
     eskalation: "Bei wiederholter Sperre ohne erkennbare Quelle: an das AD-/Identity-Team, ggf. Sicherheitsprüfung.",
   },
   "passwort-vergessen": {
@@ -267,6 +275,7 @@ export const ASSISTANT_GUIDES = {
       "Temporäres Passwort nur auf sicherem Weg übermitteln",
       "Hinweis: Handy-Mail und gespeicherte Zugangsdaten danach aktualisieren, sonst droht Sperre",
     ],
+    befehle: ["Benutzerkonto im Active Directory anzeigen"],
   },
   "passwort-abgelaufen": {
     titel: "Passwort abgelaufen (auch im Homeoffice)",
@@ -279,7 +288,13 @@ export const ASSISTANT_GUIDES = {
       "Passwort auf Handy, Outlook und gespeicherten Zugangsdaten aktualisieren",
     ],
     suche: ["passwort im homeoffice", "passwort abgelaufen"],
-    befehle: ["Kerberos-Tickets zurücksetzen", "Gruppenrichtlinien aktualisieren"],
+    befehle: [
+      "Passwortablauf eines Benutzers anzeigen",
+      "Eigenes Domänenkonto anzeigen",
+      "Passwortrichtlinie der Domäne anzeigen",
+      "Kerberos-Tickets zurücksetzen",
+      "Gruppenrichtlinien aktualisieren",
+    ],
   },
   mfa: {
     titel: "Zweiter Faktor (MFA) schlägt fehl",
@@ -292,6 +307,7 @@ export const ASSISTANT_GUIDES = {
       "Wenn nichts hilft: Authentifizierungsmethoden zurücksetzen und neu registrieren lassen",
     ],
     suche: ["zweitem faktor", "authenticator", "mfa"],
+    befehle: ["MFA-Methoden anzeigen"],
   },
   "mfa-neues-handy": {
     titel: "Neues Handy: MFA und Apps umziehen",
@@ -304,6 +320,7 @@ export const ASSISTANT_GUIDES = {
       "Altes Gerät aus der Geräteverwaltung entfernen bzw. zurücksetzen",
     ],
     suche: ["zweitem faktor", "authenticator"],
+    befehle: ["MFA-Methoden anzeigen"],
   },
   vertrauensstellung: {
     titel: "Vertrauensstellung zur Domäne verloren",
@@ -316,7 +333,15 @@ export const ASSISTANT_GUIDES = {
       "Danach neu starten und mit Domänenkonto testen",
     ],
     suche: ["vertrauensstellung"],
-    befehle: ["Domänenverbindung prüfen", "Anmeldeserver", "Erreichbarkeit"],
+    befehle: [
+      "Domänenverbindung prüfen",
+      "Vertrauensstellung reparieren",
+      "Rechnerkonto in der Domäne anzeigen",
+      "Domänencontroller der Domäne anzeigen",
+      "Zeitdienst-Status anzeigen",
+      "Anmeldeserver anzeigen",
+      "Erreichbarkeit prüfen",
+    ],
     eskalation: "Betrifft es mehrere Rechner, an das Server-/AD-Team eskalieren.",
   },
   "profil-temporaer": {
@@ -330,7 +355,12 @@ export const ASSISTANT_GUIDES = {
       "Profil sichern und neu anlegen lassen, falls beschädigt",
     ],
     suche: ["temporaeres profil", "startet sehr langsam"],
-    befehle: ["Speicherplatz aller Laufwerke", "Systemfehler", "Gespeicherte Gruppenrichtlinien"],
+    befehle: [
+      "Benutzerprofile anzeigen",
+      "Speicherplatz aller Laufwerke",
+      "Systemfehler der letzten 24 Stunden",
+      "Gespeicherte Gruppenrichtlinien anzeigen",
+    ],
     eskalation: "Profilreparatur mit Datenverlustrisiko: vorher sichern oder an 3rd Level geben.",
   },
   "konto-sonstiges": {
@@ -343,7 +373,12 @@ export const ASSISTANT_GUIDES = {
       "An einem anderen Rechner testen lassen",
     ],
     suche: ["gesperrt", "zweitem faktor"],
-    befehle: ["Angemeldeten Benutzer", "Gruppenmitgliedschaften"],
+    befehle: [
+      "Angemeldeten Benutzer anzeigen",
+      "Gruppenmitgliedschaften anzeigen",
+      "Eigenes Domänenkonto anzeigen",
+      "Domänenkonto eines Benutzers anzeigen",
+    ],
   },
 
   /* ---------- E-Mail ---------- */
@@ -356,7 +391,11 @@ export const ASSISTANT_GUIDES = {
       "Outlook-Profil neu anlegen, falls weiterhin",
     ],
     suche: ["kennwort"],
-    befehle: ["Gespeicherte Zugangsdaten"],
+    befehle: [
+      "Gespeicherte Zugangsdaten anzeigen",
+      "Gespeicherte Zugangsdaten löschen",
+      "Anmeldeinformationsverwaltung öffnen",
+    ],
   },
   "outlook-startet-nicht": {
     titel: "Outlook startet nicht oder hängt",
@@ -369,7 +408,14 @@ export const ASSISTANT_GUIDES = {
       "Neues Outlook-Profil anlegen",
     ],
     suche: ["outlook startet nicht"],
-    befehle: ["Prozess beenden", "Aktuelle Prozesse"],
+    befehle: [
+      "Outlook im abgesicherten Modus starten",
+      "Outlook beenden",
+      "OST-Dateien anzeigen",
+      "Outlook-Profilauswahl anzeigen",
+      "Mail-Profile öffnen",
+      "Aktuelle Prozesse anzeigen",
+    ],
   },
   "mail-zustellung": {
     titel: "Mails kommen nicht an oder gehen nicht raus",
@@ -382,6 +428,11 @@ export const ASSISTANT_GUIDES = {
       "Bei eingehenden Mails: Quarantäne und Junk-Ordner prüfen",
     ],
     suche: ["mails landen", "zustell", "quarantaene"],
+    befehle: [
+      "Nachrichtenverfolgung",
+      "Weiterleitungsregeln eines Postfachs prüfen",
+      "Postfachgröße anzeigen",
+    ],
     eskalation: "Betrifft es viele Benutzer oder externe Domänen: an das Mail-/M365-Team.",
   },
   "mail-spam": {
@@ -404,6 +455,7 @@ export const ASSISTANT_GUIDES = {
       "Kontingent nur nach Freigabe erhöhen",
     ],
     suche: ["postfach ist voll", "postfach voll"],
+    befehle: ["Postfachgröße anzeigen", "OST-Dateien anzeigen"],
   },
   "postfach-freigegeben": {
     titel: "Freigegebenes Postfach oder Kalender fehlt",
@@ -415,6 +467,7 @@ export const ASSISTANT_GUIDES = {
       "Sonst manuell über Kontoeinstellungen → Weitere Postfächer hinzufügen",
     ],
     suche: ["freigegebenes postfach"],
+    befehle: ["Postfachberechtigungen anzeigen"],
   },
   "outlook-suche": {
     titel: "Outlook-Suche findet nichts",
@@ -424,7 +477,11 @@ export const ASSISTANT_GUIDES = {
       "Windows-Suchdienst prüfen und ggf. neu starten",
       "Index in den Indizierungsoptionen neu erstellen",
     ],
-    befehle: ["Dienststatus", "Dienst neu starten"],
+    befehle: [
+      "Dienststatus prüfen",
+      "Dienst neu starten",
+      "Outlook-Profilauswahl anzeigen",
+    ],
   },
   "mail-sonstiges": {
     titel: "E-Mail-Problem allgemein",
@@ -435,6 +492,11 @@ export const ASSISTANT_GUIDES = {
       "Office-Updates prüfen",
     ],
     suche: ["outlook"],
+    befehle: [
+      "Outlook im abgesicherten Modus starten",
+      "Outlook-Navigationsbereich zurücksetzen",
+      "Office-Version anzeigen",
+    ],
   },
 
   /* ---------- Teams & Telefonie ---------- */
@@ -449,7 +511,13 @@ export const ASSISTANT_GUIDES = {
       "Teams komplett beenden und neu starten",
     ],
     suche: ["kein ton", "headset"],
-    befehle: ["Geräte-Manager"],
+    befehle: [
+      "Audiogeräte anzeigen",
+      "Sound-Einstellungen öffnen",
+      "Mikrofon-Datenschutz öffnen",
+      "Kameras anzeigen",
+      "Geräte-Manager öffnen",
+    ],
   },
   "teams-cache": {
     titel: "Teams startet nicht oder hängt",
@@ -462,7 +530,11 @@ export const ASSISTANT_GUIDES = {
       "Teams über Apps & Features zurücksetzen oder neu installieren",
     ],
     suche: ["teams startet"],
-    befehle: ["Prozess beenden"],
+    befehle: [
+      "Teams beenden",
+      "Teams-Cache leeren (neues Teams)",
+      "Teams-Cache leeren (klassisch)",
+    ],
   },
   "teams-teilen": {
     titel: "Teams: Bildschirm teilen geht nicht",
@@ -472,6 +544,11 @@ export const ASSISTANT_GUIDES = {
       "Einzelnes Fenster statt ganzen Bildschirm teilen testen",
       "Bei macOS: Bildschirmaufnahme-Berechtigung erteilen",
       "Hardwarebeschleunigung in Teams testweise deaktivieren",
+    ],
+    befehle: [
+      "Grafikkarte und Auflösung anzeigen",
+      "Anzeige-Einstellungen öffnen",
+      "Teams beenden",
     ],
   },
   "teams-telefonie": {
@@ -483,6 +560,7 @@ export const ASSISTANT_GUIDES = {
       "Rufumleitung / Nicht stören im Teams-Status prüfen",
       "Ab- und neu anmelden – Änderungen brauchen bis zu 24 Stunden",
     ],
+    befehle: ["Audiogeräte anzeigen", "Teams beenden"],
     eskalation: "Nummernzuweisung und Voice-Routing: an das Telefonie-/UC-Team.",
   },
   "teams-sonstiges": {
@@ -494,6 +572,7 @@ export const ASSISTANT_GUIDES = {
       "Cache leeren und Teams aktualisieren",
     ],
     suche: ["teams"],
+    befehle: ["Teams beenden", "Teams-Cache leeren (neues Teams)"],
   },
 
   /* ---------- Netzwerk ---------- */
@@ -505,10 +584,20 @@ export const ASSISTANT_GUIDES = {
       "DNS-Cache leeren und IP neu beziehen",
       "Erreichbarkeit von Gateway und DNS prüfen",
       "Proxy-Einstellungen prüfen",
-      "Netzwerkstack zurücksetzen und neu starten",
+      "Hilft nichts: Fall mit den Prüfergebnissen an den 3rd Level geben – ein Zurücksetzen des Netzwerkstacks verändert Netzwerk- und VPN-Einstellungen und gehört nicht in den Alltag",
     ],
     suche: ["kein internet"],
-    befehle: ["DNS-Zwischenspeicher leeren", "Neue IP-Adresse", "DNS-Auflösung", "Netzwerkstack zurücksetzen"],
+    befehle: [
+      "Netzwerkkonfiguration anzeigen",
+      "IP-Konfiguration kompakt anzeigen",
+      "Standardgateway anzeigen",
+      "DNS-Server anzeigen",
+      "DNS-Zwischenspeicher leeren",
+      "Neue IP-Adresse anfordern",
+      "DNS-Auflösung prüfen",
+      "Proxy-Einstellungen des Systems anzeigen",
+      "Hosts-Datei anzeigen",
+    ],
   },
   "lan-keine-verbindung": {
     titel: "Keine Netzwerkverbindung über Kabel",
@@ -519,7 +608,13 @@ export const ASSISTANT_GUIDES = {
       "Adapter im Geräte-Manager prüfen (deaktiviert? Treiberfehler?)",
       "Bei Dockingstation: direkt am Laptop testen",
     ],
-    befehle: ["Netzwerkkonfiguration anzeigen", "Geräte-Manager"],
+    befehle: [
+      "Netzwerkadapter anzeigen",
+      "Netzwerkkonfiguration anzeigen",
+      "Netzwerkadapter neu starten",
+      "Geräte-Manager öffnen",
+      "Hardware neu einlesen",
+    ],
     eskalation: "Dose tot: an Netzwerk-/Haustechnik zum Patchen.",
   },
   "netz-langsam": {
@@ -531,7 +626,14 @@ export const ASSISTANT_GUIDES = {
       "Hintergrund-Downloads und Updates prüfen",
       "Treiber des Netzwerkadapters aktualisieren",
     ],
-    befehle: ["Netzwerkweg prüfen", "Erreichbarkeit", "Aktive Verbindungen"],
+    befehle: [
+      "Erreichbarkeit prüfen",
+      "Dauerhaft pingen",
+      "Netzwerkweg prüfen",
+      "Verbindungsqualität prüfen",
+      "Aktive Verbindungen anzeigen",
+      "Netzwerkadapter anzeigen",
+    ],
   },
   "netz-stoerung": {
     titel: "Störung bei mehreren Benutzern",
@@ -542,6 +644,13 @@ export const ASSISTANT_GUIDES = {
       "IT-Meldungen und bekannte Störungen prüfen",
       "Kollegen informieren, Störungsmeldung (Major Incident) anlegen",
       "Betroffenen eine Rückmeldung mit Zeitpunkt der nächsten Info geben",
+    ],
+    befehle: [
+      "Erreichbarkeit prüfen",
+      "Port-Erreichbarkeit prüfen",
+      "DNS-Auflösung prüfen",
+      "Dienststatus prüfen",
+      "Gestoppte Automatik-Dienste anzeigen",
     ],
     eskalation: "Infrastrukturstörung: sofort an die nächste Stufe / Bereitschaft eskalieren statt einzeln zu prüfen.",
     dringend: true,
@@ -554,7 +663,14 @@ export const ASSISTANT_GUIDES = {
       "Erreichbarkeit und Port prüfen",
       "Von einem anderen Rechner testen",
     ],
-    befehle: ["DNS-Auflösung", "Erreichbarkeit", "Port-Erreichbarkeit"],
+    befehle: [
+      "DNS-Auflösung prüfen",
+      "Erreichbarkeit prüfen",
+      "Port-Erreichbarkeit prüfen",
+      "Netzwerkweg prüfen",
+      "Hosts-Datei anzeigen",
+      "Proxy-Einstellungen des Systems anzeigen",
+    ],
     eskalation: "Server antwortet nicht: an den Betreiber des Dienstes.",
   },
   "wlan-verbindet-nicht": {
@@ -567,7 +683,14 @@ export const ASSISTANT_GUIDES = {
       "WLAN-Bericht erstellen und auswerten",
     ],
     suche: ["wlan"],
-    befehle: ["WLAN-Profile", "WLAN-Adapter-Bericht"],
+    befehle: [
+      "Aktuelles WLAN anzeigen",
+      "Verfügbare WLAN-Netze anzeigen",
+      "WLAN-Profile anzeigen",
+      "WLAN-Profil löschen",
+      "WLAN-Ereignisse anzeigen",
+      "WLAN-Adapter-Bericht erstellen",
+    ],
   },
   "wlan-abbrueche": {
     titel: "WLAN bricht ständig ab",
@@ -579,7 +702,14 @@ export const ASSISTANT_GUIDES = {
       "WLAN-Bericht auswerten",
     ],
     suche: ["wlan bricht"],
-    befehle: ["WLAN-Adapter-Bericht", "Energieeinstellungen-Bericht"],
+    befehle: [
+      "Aktuelles WLAN anzeigen",
+      "WLAN-Ereignisse anzeigen",
+      "WLAN-Adapter-Bericht erstellen",
+      "Energieeinstellungen-Bericht erstellen",
+      "Netzwerkadapter neu starten",
+      "Treiberversion eines Geräts anzeigen",
+    ],
   },
   "wlan-nicht-sichtbar": {
     titel: "WLAN-Netz wird nicht angezeigt",
@@ -589,7 +719,13 @@ export const ASSISTANT_GUIDES = {
       "Sehen andere Geräte das Netz?",
       "Treiber neu installieren",
     ],
-    befehle: ["Geräte-Manager", "WLAN-Profile"],
+    befehle: [
+      "Netzwerkadapter anzeigen",
+      "Verfügbare WLAN-Netze anzeigen",
+      "Geräte-Manager öffnen",
+      "WLAN-Profile anzeigen",
+      "Fehlerhafte Geräte anzeigen",
+    ],
   },
 
   /* ---------- VPN ---------- */
@@ -604,6 +740,13 @@ export const ASSISTANT_GUIDES = {
       "Anderes Netz testen (Handy-Hotspot) – manche Router blockieren VPN",
     ],
     suche: ["vpn"],
+    befehle: [
+      "VPN-Verbindungen anzeigen",
+      "Erreichbarkeit prüfen",
+      "Netzwerkkonfiguration anzeigen",
+      "Proxy-Einstellungen des Systems anzeigen",
+      "VPN-Verbindung trennen",
+    ],
   },
   "vpn-nichts-erreichbar": {
     titel: "VPN verbunden, intern nichts erreichbar",
@@ -614,7 +757,14 @@ export const ASSISTANT_GUIDES = {
       "VPN trennen, DNS-Cache leeren, neu verbinden",
     ],
     suche: ["vpn"],
-    befehle: ["DNS-Auflösung", "Netzwerkkonfiguration", "DNS-Zwischenspeicher"],
+    befehle: [
+      "DNS-Auflösung prüfen",
+      "Netzwerkkonfiguration anzeigen",
+      "Standardgateway anzeigen",
+      "Routing-Tabelle anzeigen",
+      "DNS-Server anzeigen",
+      "DNS-Zwischenspeicher leeren",
+    ],
   },
   "vpn-instabil": {
     titel: "VPN bricht ab oder ist langsam",
@@ -625,7 +775,13 @@ export const ASSISTANT_GUIDES = {
       "Energiesparoptionen des Netzwerkadapters prüfen",
     ],
     suche: ["vpn"],
-    befehle: ["Netzwerkweg prüfen", "Erreichbarkeit"],
+    befehle: [
+      "Netzwerkweg prüfen",
+      "Verbindungsqualität prüfen",
+      "Dauerhaft pingen",
+      "Erreichbarkeit prüfen",
+      "Netzwerkadapter anzeigen",
+    ],
   },
 
   /* ---------- Drucker ---------- */
@@ -639,7 +795,13 @@ export const ASSISTANT_GUIDES = {
       "Testseite drucken",
     ],
     suche: ["warteschlange"],
-    befehle: ["Druckaufträge", "Druckwarteschlange leeren"],
+    befehle: [
+      "Druckaufträge anzeigen",
+      "Druckauftrag löschen",
+      "Druckwarteschlange leeren",
+      "Druckspooler-Dienst neu starten",
+      "Testseite drucken",
+    ],
   },
   "drucker-fehlt": {
     titel: "Drucker nicht gefunden",
@@ -649,7 +811,14 @@ export const ASSISTANT_GUIDES = {
       "Netzwerkdrucker über den Druckserver neu verbinden",
       "Gruppenrichtlinien aktualisieren, falls Drucker per GPO verteilt",
     ],
-    befehle: ["Installierte Drucker", "Netzwerkdrucker verbinden", "Gruppenrichtlinien aktualisieren"],
+    befehle: [
+      "Installierte Drucker anzeigen",
+      "Druckerports anzeigen",
+      "Netzwerkdrucker verbinden",
+      "Standarddrucker setzen",
+      "Drucker entfernen",
+      "Gruppenrichtlinien aktualisieren",
+    ],
   },
   "druck-qualitaet": {
     titel: "Druckt leere, streifige oder falsche Seiten",
@@ -660,6 +829,11 @@ export const ASSISTANT_GUIDES = {
       "Bei falschen Zeichen: Druckertreiber neu installieren",
     ],
     suche: ["leere seiten"],
+    befehle: [
+      "Testseite drucken",
+      "Druckertreiber anzeigen",
+      "Installierte Drucker anzeigen",
+    ],
   },
   "drucker-fehler": {
     titel: "Drucker meldet Fehler oder Papierstau",
@@ -668,6 +842,12 @@ export const ASSISTANT_GUIDES = {
       "Fehlercode am Display notieren",
       "Papierstau nach Anleitung entfernen, alle Klappen prüfen",
       "Gerät aus- und einschalten",
+    ],
+    befehle: [
+      "Druckerports anzeigen",
+      "Erreichbarkeit prüfen",
+      "Druckertreiber anzeigen",
+      "Testseite drucken",
     ],
     eskalation: "Hardwaredefekt: Servicetechniker / Wartungsvertrag beauftragen.",
   },
@@ -678,6 +858,11 @@ export const ASSISTANT_GUIDES = {
       "Zielordner / Zieladresse am Gerät prüfen",
       "Bei Scan-to-Mail: SMTP-Zugang und Größenlimit prüfen",
       "Bei Scan-to-Folder: Freigabe-Berechtigung und Passwort des Scan-Kontos prüfen",
+    ],
+    befehle: [
+      "Erreichbarkeit prüfen",
+      "Port-Erreichbarkeit prüfen",
+      "DNS-Auflösung prüfen",
     ],
     eskalation: "Gerätekonfiguration: an Druckerbetreuung / Dienstleister.",
   },
@@ -693,7 +878,13 @@ export const ASSISTANT_GUIDES = {
       "Bei VPN: erst VPN verbinden, dann Laufwerke",
     ],
     suche: ["netzlaufwerk"],
-    befehle: ["Netzlaufwerke anzeigen", "Netzlaufwerk verbinden", "Gruppenrichtlinien aktualisieren"],
+    befehle: [
+      "Netzlaufwerke anzeigen",
+      "Verbundene Netzlaufwerke mit Status anzeigen",
+      "Netzlaufwerk verbinden",
+      "Netzlaufwerk trennen",
+      "Gruppenrichtlinien aktualisieren",
+    ],
   },
   "zugriff-ordner": {
     titel: "Zugriff verweigert auf Ordner",
@@ -705,7 +896,14 @@ export const ASSISTANT_GUIDES = {
       "Berechtigung nur nach Freigabe des Verantwortlichen beantragen/vergeben",
     ],
     suche: ["zugriff verweigert"],
-    befehle: ["Gruppenmitgliedschaften", "Kerberos-Tickets zurücksetzen"],
+    befehle: [
+      "Ordnerrechte anzeigen",
+      "Eigentümer eines Ordners anzeigen",
+      "Gruppenmitgliedschaften anzeigen",
+      "AD-Gruppen eines Benutzers anzeigen",
+      "Mitglieder einer Gruppe anzeigen",
+      "Kerberos-Tickets zurücksetzen",
+    ],
   },
   onedrive: {
     titel: "OneDrive synchronisiert nicht",
@@ -717,6 +915,11 @@ export const ASSISTANT_GUIDES = {
       "OneDrive zurücksetzen: %LocalAppData%\\Microsoft\\OneDrive\\onedrive.exe /reset, danach OneDrive neu starten",
     ],
     suche: ["onedrive"],
+    befehle: [
+      "OneDrive zurücksetzen",
+      "Ordnergröße berechnen",
+      "Speicherplatz aller Laufwerke",
+    ],
   },
   "datei-wiederherstellen": {
     titel: "Datei gelöscht oder überschrieben",
@@ -729,6 +932,7 @@ export const ASSISTANT_GUIDES = {
       "Sonst Wiederherstellung aus dem Backup beantragen",
     ],
     suche: ["geloescht", "ueberschrieben"],
+    befehle: ["Schattenkopien anzeigen", "Schattenkopien-Speicher anzeigen"],
     eskalation: "Restore aus Backup: an das Backup-/Server-Team mit Pfad und Zeitpunkt.",
   },
   "datei-gesperrt": {
@@ -736,11 +940,11 @@ export const ASSISTANT_GUIDES = {
     stichworte: ["datei gesperrt", "wird verwendet", "schreibgeschuetzt", "gesperrt von", "bereits geoeffnet"],
     schritte: [
       "Wer hat die Datei offen? Hinweis in Office beachten",
-      "Hängende Office-Prozesse beim Benutzer beenden",
-      "Geöffnete Dateien auf dem Dateiserver prüfen und Sitzung schließen",
+      "Hängende Office-Programme beim Benutzer schließen (vorher speichern lassen)",
+      "Auf dem Dateiserver prüfen, wer die Datei geöffnet hat – die Sperre nur nach Rücksprache mit dem Inhaber oder durch das Server-Team lösen, sonst gehen dessen Änderungen verloren",
       "Versteckte ~$-Sperrdatei im Ordner prüfen",
     ],
-    befehle: ["Prozess beenden", "Aktuelle Prozesse"],
+    befehle: ["Offene Dateien auf dem Server anzeigen", "Aktuelle Prozesse anzeigen"],
   },
   sharepoint: {
     titel: "SharePoint / Teams-Dateien",
@@ -751,6 +955,7 @@ export const ASSISTANT_GUIDES = {
       "Synchronisierte Bibliothek: OneDrive-Status prüfen",
     ],
     suche: ["onedrive", "sharepoint"],
+    befehle: ["OneDrive zurücksetzen", "Proxy-Einstellungen des Benutzers anzeigen"],
   },
 
   /* ---------- Rechner ---------- */
@@ -765,7 +970,18 @@ export const ASSISTANT_GUIDES = {
       "Laufende Updates abwarten",
     ],
     suche: ["langsam"],
-    befehle: ["Systemlaufzeit", "Speicherfresser", "Autostart", "Speicherplatz"],
+    befehle: [
+      "Hochfahrzeit anzeigen",
+      "Systemlaufzeit anzeigen",
+      "CPU-Fresser finden",
+      "Speicherfresser finden",
+      "Autostart-Programme anzeigen",
+      "Prozessor und Auslastung anzeigen",
+      "Arbeitsspeicher anzeigen",
+      "Festplatten-Gesundheit prüfen",
+      "Speicherplatz aller Laufwerke",
+      "Gestoppte Automatik-Dienste anzeigen",
+    ],
   },
   "rechner-friert": {
     titel: "Rechner friert ein",
@@ -777,7 +993,16 @@ export const ASSISTANT_GUIDES = {
       "Systemdateien prüfen",
     ],
     suche: ["friert"],
-    befehle: ["Explorer neu starten", "Systemfehler", "Windows-Systemdateien prüfen", "Speicherfresser"],
+    befehle: [
+      "Explorer neu starten",
+      "Task-Manager öffnen",
+      "Anwendungsabstürze der letzten 24 Stunden anzeigen",
+      "Systemfehler der letzten 24 Stunden",
+      "Zuverlässigkeitsverlauf öffnen",
+      "Windows-Systemdateien prüfen",
+      "Speicherfresser finden",
+      "Arbeitsspeicher prüfen",
+    ],
   },
   bluescreen: {
     titel: "Bluescreen oder unerwartete Neustarts",
@@ -791,7 +1016,18 @@ export const ASSISTANT_GUIDES = {
       "Datenträger auf Fehler prüfen",
     ],
     suche: ["bluescreen"],
-    befehle: ["Unerwartete Neustarts", "Systemfehler", "Windows-Systemdateien", "Windows-Abbild reparieren", "Datenträger auf Fehler"],
+    befehle: [
+      "Bluescreens anzeigen",
+      "Minidumps anzeigen",
+      "Unerwartete Neustarts finden",
+      "Systemfehler der letzten 24 Stunden",
+      "Fehlerhafte Geräte anzeigen",
+      "Arbeitsspeicher prüfen",
+      "Festplatten-Gesundheit prüfen",
+      "Windows-Systemdateien prüfen",
+      "Windows-Abbild reparieren",
+      "Datenträger auf Fehler prüfen",
+    ],
     eskalation: "Wiederholt mit Hardware-Stoppcode (Speicher, Festplatte): Gerätetausch über 3rd Level.",
   },
   "startet-nicht": {
@@ -811,11 +1047,19 @@ export const ASSISTANT_GUIDES = {
     schritte: [
       "Fehlercode notieren",
       "Freien Speicherplatz prüfen",
-      "Windows Update zurücksetzen",
       "Systemdateien und Abbild reparieren",
+      "Bleibt der Fehler: Fall mit Fehlercode an den 3rd Level geben – das Zurücksetzen der Update-Komponenten ist ein Eingriff, der einen Neustart braucht",
     ],
     suche: ["update schlaegt"],
-    befehle: ["Windows Update zurücksetzen", "Installierte Updates", "Windows-Abbild reparieren", "Speicherplatz"],
+    befehle: [
+      "Windows-Update-Fehler anzeigen",
+      "Windows-Update-Dienste prüfen",
+      "Installierte Updates anzeigen",
+      "Windows-Update-Protokoll erzeugen",
+      "Windows-Abbild reparieren",
+      "Speicherplatz aller Laufwerke",
+      "Windows-Update-Einstellungen öffnen",
+    ],
   },
   speicherplatz: {
     titel: "Kein Speicherplatz",
@@ -826,7 +1070,14 @@ export const ASSISTANT_GUIDES = {
       "Datenträgerbereinigung inkl. Systemdateien",
     ],
     suche: ["speicherplatz"],
-    befehle: ["Speicherplatz aller Laufwerke", "Große Dateien finden", "Datenträgerbereinigung"],
+    befehle: [
+      "Speicherplatz aller Laufwerke",
+      "Laufwerke und Dateisysteme anzeigen",
+      "Große Dateien finden",
+      "Ordnergröße berechnen",
+      "Datenträgerbereinigung öffnen",
+      "Schattenkopien-Speicher anzeigen",
+    ],
   },
   "rechner-sonstiges": {
     titel: "Windows-Problem allgemein",
@@ -836,7 +1087,13 @@ export const ASSISTANT_GUIDES = {
       "Neustart (nicht nur Herunterfahren mit Schnellstart)",
       "Ereignisanzeige auf passende Fehler prüfen",
     ],
-    befehle: ["Systemfehler", "Systeminformationen", "Systemlaufzeit"],
+    befehle: [
+      "Systemfehler der letzten 24 Stunden",
+      "Systeminformationen anzeigen",
+      "Windows-Version und Build anzeigen",
+      "Hochfahrzeit anzeigen",
+      "Zuverlässigkeitsverlauf öffnen",
+    ],
   },
 
   /* ---------- Software ---------- */
@@ -851,7 +1108,15 @@ export const ASSISTANT_GUIDES = {
       "Mit anderem Benutzer testen (Profilproblem?)",
     ],
     suche: ["anwendung startet nicht", "stuerzt ab"],
-    befehle: ["Systemfehler", "Installierte Programme", "Aktuelle Prozesse"],
+    befehle: [
+      "Anwendungsabstürze der letzten 24 Stunden anzeigen",
+      "Systemfehler der letzten 24 Stunden",
+      "Installierte Programme auflisten",
+      "Aktuelle Prozesse anzeigen",
+      "Apps und Features öffnen",
+      "Windows Installer neu registrieren",
+      "Zuverlässigkeitsverlauf öffnen",
+    ],
   },
   "software-installation": {
     titel: "Software soll installiert werden",
@@ -863,6 +1128,12 @@ export const ASSISTANT_GUIDES = {
       "Installation über Verteilung oder mit Adminrechten durchführen",
       "Funktionstest mit dem Benutzer",
     ],
+    befehle: [
+      "Windows-Version und Build anzeigen",
+      "Installierte Programme auflisten",
+      "Windows Installer neu registrieren",
+      "Speicherplatz aller Laufwerke",
+    ],
   },
   lizenz: {
     titel: "Lizenz- oder Aktivierungsproblem",
@@ -872,7 +1143,11 @@ export const ASSISTANT_GUIDES = {
       "Lizenzzuweisung des Benutzers prüfen",
       "Windows-Aktivierungsstatus prüfen",
     ],
-    befehle: ["Windows-Aktivierungsstatus"],
+    befehle: [
+      "Windows-Aktivierungsstatus prüfen",
+      "Windows-Lizenzstatus ausführlich anzeigen",
+      "Lizenzen eines Benutzers anzeigen",
+    ],
     eskalation: "Fehlende Lizenz: Bestellung über Lizenzverwaltung.",
   },
   "office-reparatur": {
@@ -885,6 +1160,11 @@ export const ASSISTANT_GUIDES = {
       "Office-Updates installieren",
     ],
     suche: ["word oder excel"],
+    befehle: [
+      "Office-Version anzeigen",
+      "Apps und Features öffnen",
+      "Anwendungsabstürze der letzten 24 Stunden anzeigen",
+    ],
   },
   fachanwendung: {
     titel: "Fachanwendung macht Probleme",
@@ -897,6 +1177,12 @@ export const ASSISTANT_GUIDES = {
       "Cache / lokale Konfiguration nach Anleitung zurücksetzen",
     ],
     suche: ["fachanwendung"],
+    befehle: [
+      "Aktive Verbindungen anzeigen",
+      "Port-Erreichbarkeit prüfen",
+      "Anwendungsabstürze der letzten 24 Stunden anzeigen",
+      "Gespeicherte Zugangsdaten anzeigen",
+    ],
     eskalation: "An den Anwendungsbetreuer / Hersteller mit Fehlermeldung, Zeitpunkt und Reproduktionsschritten.",
   },
 
@@ -911,7 +1197,12 @@ export const ASSISTANT_GUIDES = {
       "Anderes Kabel / anderen Anschluss testen",
     ],
     suche: ["bildschirm bleibt", "externer monitor"],
-    befehle: ["Monitore anzeigen"],
+    befehle: [
+      "Monitore anzeigen",
+      "Grafikkarte und Auflösung anzeigen",
+      "Anzeige-Einstellungen öffnen",
+      "Fehlerhafte Geräte anzeigen",
+    ],
   },
   dockingstation: {
     titel: "Zweiter Monitor oder Dockingstation",
@@ -923,7 +1214,14 @@ export const ASSISTANT_GUIDES = {
       "Anzeigeeinstellungen: Bildschirme erweitern",
     ],
     suche: ["dockingstation"],
-    befehle: ["Monitore anzeigen", "Geräte-Manager"],
+    befehle: [
+      "Monitore anzeigen",
+      "USB-Geräte anzeigen",
+      "Geräte-Manager öffnen",
+      "Fehlerhafte Geräte anzeigen",
+      "Hardware neu einlesen",
+      "Grafikkarte und Auflösung anzeigen",
+    ],
   },
   "maus-tastatur": {
     titel: "Maus oder Tastatur funktioniert nicht",
@@ -934,7 +1232,13 @@ export const ASSISTANT_GUIDES = {
       "Im Geräte-Manager auf Fehler prüfen",
       "Ersatzgerät testen",
     ],
-    befehle: ["Geräte-Manager"],
+    befehle: [
+      "Geräte-Manager öffnen",
+      "USB-Geräte anzeigen",
+      "Bluetooth-Geräte anzeigen",
+      "Fehlerhafte Geräte anzeigen",
+      "Hardware neu einlesen",
+    ],
   },
   headset: {
     titel: "Headset oder Lautsprecher",
@@ -946,7 +1250,12 @@ export const ASSISTANT_GUIDES = {
       "Ersatzgerät testen",
     ],
     suche: ["headset", "kein ton"],
-    befehle: ["Geräte-Manager"],
+    befehle: [
+      "Audiogeräte anzeigen",
+      "Sound-Einstellungen öffnen",
+      "Bluetooth-Geräte anzeigen",
+      "Geräte-Manager öffnen",
+    ],
   },
   webcam: {
     titel: "Webcam funktioniert nicht",
@@ -957,7 +1266,11 @@ export const ASSISTANT_GUIDES = {
       "Nur ein Programm gleichzeitig darf die Kamera nutzen",
       "Im Geräte-Manager prüfen",
     ],
-    befehle: ["Geräte-Manager"],
+    befehle: [
+      "Kameras anzeigen",
+      "Kamera-Datenschutz öffnen",
+      "Geräte-Manager öffnen",
+    ],
   },
   akku: {
     titel: "Laptop-Akku hält nicht oder lädt nicht",
@@ -967,7 +1280,12 @@ export const ASSISTANT_GUIDES = {
       "Akkubericht erstellen und Kapazität prüfen",
       "Energieeinstellungen prüfen",
     ],
-    befehle: ["Akkubericht", "Energieeinstellungen-Bericht", "Seriennummer"],
+    befehle: [
+      "Akku-Zustand anzeigen",
+      "Akkubericht erstellen",
+      "Energieeinstellungen-Bericht erstellen",
+      "Seriennummer auslesen",
+    ],
     eskalation: "Akku verschlissen: Ersatz über Garantie bestellen.",
   },
   "hardware-defekt": {
@@ -979,7 +1297,14 @@ export const ASSISTANT_GUIDES = {
       "Ersatzgerät bereitstellen, Daten sichern",
       "Reparatur / Austausch beauftragen",
     ],
-    befehle: ["Seriennummer", "Modell und Hersteller"],
+    befehle: [
+      "Seriennummer auslesen",
+      "Modell und Hersteller anzeigen",
+      "BIOS-Version anzeigen",
+      "Festplatten-Gesundheit prüfen",
+      "Arbeitsspeicher anzeigen",
+      "Fehlerhafte Geräte anzeigen",
+    ],
     eskalation: "Austausch über Hardware-/Beschaffungsprozess.",
   },
 
@@ -993,7 +1318,12 @@ export const ASSISTANT_GUIDES = {
       "Ab- und neu anmelden",
     ],
     suche: ["zugriff verweigert"],
-    befehle: ["Gruppenmitgliedschaften", "Kerberos-Tickets zurücksetzen"],
+    befehle: [
+      "Gruppenmitgliedschaften anzeigen",
+      "AD-Gruppen eines Benutzers anzeigen",
+      "Mitglieder einer Gruppe anzeigen",
+      "Kerberos-Tickets zurücksetzen",
+    ],
   },
   onboarding: {
     titel: "Neuer Mitarbeiter",
@@ -1005,6 +1335,11 @@ export const ASSISTANT_GUIDES = {
       "Zugänge zu Fachanwendungen beantragen",
     ],
     suche: ["neuer mitarbeiter", "onboarding"],
+    befehle: [
+      "Benutzerkonto im Active Directory anzeigen",
+      "Lizenzen eines Benutzers anzeigen",
+      "Postfachgröße anzeigen",
+    ],
   },
   offboarding: {
     titel: "Mitarbeiter verlässt das Unternehmen",
@@ -1016,6 +1351,12 @@ export const ASSISTANT_GUIDES = {
       "Gruppen und Sonderrechte entfernen",
     ],
     suche: ["offboarding", "austritt"],
+    befehle: [
+      "AD-Gruppen eines Benutzers anzeigen",
+      "Lizenzen eines Benutzers anzeigen",
+      "Postfachberechtigungen anzeigen",
+      "Weiterleitungsregeln eines Postfachs prüfen",
+    ],
   },
 
   /* ---------- Browser ---------- */
@@ -1029,6 +1370,7 @@ export const ASSISTANT_GUIDES = {
       "Anderen Browser testen",
     ],
     suche: ["webseite"],
+    befehle: ["Internetoptionen öffnen", "Proxy-Einstellungen des Benutzers anzeigen"],
   },
   zertifikat: {
     titel: "Zertifikatsfehler im Browser",
@@ -1039,7 +1381,13 @@ export const ASSISTANT_GUIDES = {
       "Gruppenrichtlinien aktualisieren",
       "Bei externen Seiten: Warnung ernst nehmen, nicht übergehen",
     ],
-    befehle: ["Gruppenrichtlinien aktualisieren"],
+    befehle: [
+      "Zertifikate des Benutzers öffnen",
+      "Zertifikate des Computers öffnen",
+      "Zeitdienst-Status anzeigen",
+      "Internetoptionen öffnen",
+      "Gruppenrichtlinien aktualisieren",
+    ],
   },
   "web-anmeldung": {
     titel: "Anmeldung an Webanwendung klappt nicht",
@@ -1051,6 +1399,11 @@ export const ASSISTANT_GUIDES = {
       "Konto und MFA-Status prüfen",
     ],
     suche: ["webseite"],
+    befehle: [
+      "Internetoptionen öffnen",
+      "Proxy-Einstellungen des Benutzers anzeigen",
+      "Zeitdienst-Status anzeigen",
+    ],
   },
   "browser-adware": {
     titel: "Pop-ups, Werbung, fremde Startseite",
@@ -1060,7 +1413,12 @@ export const ASSISTANT_GUIDES = {
       "Browser zurücksetzen",
       "Virenscan durchführen",
     ],
-    befehle: ["Installierte Programme", "Autostart"],
+    befehle: [
+      "Installierte Programme auflisten",
+      "Autostart-Programme anzeigen",
+      "Proxy-Einstellungen des Benutzers anzeigen",
+      "Defender-Schnellscan starten",
+    ],
     eskalation: "Hinweise auf Schadsoftware: Sicherheitsteam informieren.",
   },
 
@@ -1096,7 +1454,11 @@ export const ASSISTANT_GUIDES = {
       "Ohne Netz zum Unternehmen kann eine neue PIN oft nicht eingerichtet werden – VPN oder Büro",
       "Bei Fehlern rund um TPM: Gerät neu starten, TPM-Status in tpm.msc prüfen",
     ],
-    befehle: ["Systeminformationen"],
+    befehle: [
+      "TPM-Status anzeigen",
+      "Anmeldeoptionen öffnen",
+      "Systeminformationen anzeigen",
+    ],
   },
   bitlocker: {
     titel: "BitLocker fragt nach dem Wiederherstellungsschlüssel",
@@ -1108,6 +1470,13 @@ export const ASSISTANT_GUIDES = {
       "Schlüssel nur dem Gerätebesitzer telefonisch durchgeben, nicht per Mail",
       "Nach der Anmeldung Ursache klären (BIOS-/Firmware-Update, TPM, Bootreihenfolge)",
       "Tritt es wiederholt auf: Schlüssel nach Gebrauch rotieren lassen",
+    ],
+    befehle: [
+      "BitLocker-Status anzeigen",
+      "BitLocker-Schlüssel-ID anzeigen",
+      "TPM-Status anzeigen",
+      "BIOS-Version anzeigen",
+      "Systeminformationen anzeigen",
     ],
     eskalation: "Kein Schlüssel hinterlegt: an 3rd Level / Endpoint-Team – ohne Schlüssel sind die Daten nicht wiederherstellbar.",
   },
@@ -1158,6 +1527,7 @@ export const ASSISTANT_GUIDES = {
       "Stellvertretung (Termine im Namen annehmen): Datei → Kontoeinstellungen → Zugriffsrechte für Stellvertretung",
       "Ohne Zugriff des Besitzers nur mit dessen Freigabe über das Exchange Admin Center",
     ],
+    befehle: ["Postfachberechtigungen anzeigen"],
   },
   "teams-status": {
     titel: "Teams-Status falsch / keine Benachrichtigungen",
@@ -1179,7 +1549,14 @@ export const ASSISTANT_GUIDES = {
       "Benutzer in der Gruppe „Remotedesktopbenutzer“ bzw. der Zugriffsgruppe?",
       "Gespeicherte RDP-Anmeldedaten löschen und neu anmelden",
     ],
-    befehle: ["Erreichbarkeit", "Port-Erreichbarkeit", "Gespeicherte Zugangsdaten", "Gruppenmitgliedschaften"],
+    befehle: [
+      "Remotedesktop-Verbindung öffnen",
+      "Erreichbarkeit prüfen",
+      "Port-Erreichbarkeit prüfen",
+      "Remotedesktop-Sitzungen anzeigen",
+      "Gespeicherte Zugangsdaten anzeigen",
+      "Gruppenmitgliedschaften anzeigen",
+    ],
     eskalation: "Server oder Gateway nicht erreichbar: an das Server-/Citrix-Team.",
   },
   "rdp-sitzung": {
@@ -1187,11 +1564,11 @@ export const ASSISTANT_GUIDES = {
     stichworte: ["sitzung haengt", "terminalserver haengt", "rdp schwarz", "citrix haengt", "sitzung abmelden"],
     schritte: [
       "In der Sitzung Strg+Alt+Ende drücken (entspricht Strg+Alt+Entf) und den Task-Manager öffnen",
-      "Hängende Sitzung serverseitig abmelden (Remotedesktopsitzungen anzeigen / Task-Manager → Benutzer)",
+      "Sitzungen auf dem Server ansehen; eine hängende Sitzung abzumelden kostet ungespeicherte Arbeit – nur mit Zustimmung des Benutzers oder durch das Server-Team",
       "Neu verbinden",
       "Tritt es bei mehreren Benutzern auf: Server-Auslastung prüfen lassen",
     ],
-    befehle: ["Remotedesktop-Sitzungen", "Aktuelle Prozesse"],
+    befehle: ["Remotedesktop-Sitzungen anzeigen", "Aktuelle Prozesse anzeigen"],
     eskalation: "Mehrere Benutzer betroffen: Server-Team.",
   },
   "rdp-umleitung": {
@@ -1202,7 +1579,7 @@ export const ASSISTANT_GUIDES = {
       "Neu verbinden – Umleitung greift nur beim Verbindungsaufbau",
       "Treiber des lokalen Druckers muss auf dem Server unterstützt sein",
     ],
-    befehle: ["Netzlaufwerke anzeigen", "Installierte Drucker"],
+    befehle: ["Netzlaufwerke anzeigen", "Installierte Drucker anzeigen"],
   },
   "office-autorecover": {
     titel: "Office-Datei nicht gespeichert oder nach Absturz weg",
@@ -1225,7 +1602,14 @@ export const ASSISTANT_GUIDES = {
       "Wechseldatenträger per Richtlinie gesperrt? Dann nur mit freigegebener Ausnahme",
       "Am anderen Rechner testen – defekt oder unformatiert?",
     ],
-    befehle: ["Lokale Laufwerke", "Geräte-Manager"],
+    befehle: [
+      "USB-Geräte anzeigen",
+      "Laufwerke und Dateisysteme anzeigen",
+      "Datenträgerverwaltung öffnen",
+      "Lokale Laufwerke anzeigen",
+      "Fehlerhafte Geräte anzeigen",
+      "Hardware neu einlesen",
+    ],
   },
   startmenue: {
     titel: "Startmenü, Taskleiste oder Suche reagiert nicht",
@@ -1237,7 +1621,12 @@ export const ASSISTANT_GUIDES = {
       "Ausstehende Updates installieren und neu starten",
     ],
     suche: ["friert"],
-    befehle: ["Explorer neu starten", "Windows-Systemdateien", "Windows-Abbild reparieren"],
+    befehle: [
+      "Explorer neu starten",
+      "Windows-Systemdateien prüfen",
+      "Windows-Abbild reparieren",
+      "Task-Manager öffnen",
+    ],
   },
   uhrzeit: {
     titel: "Uhrzeit oder Datum falsch",
@@ -1248,7 +1637,13 @@ export const ASSISTANT_GUIDES = {
       "Hinweis: Falsche Zeit verursacht auch Anmelde-, Zertifikats- und MFA-Fehler",
       "Geht die Uhr nach jedem Neustart falsch: CMOS-Batterie (Hardware)",
     ],
-    befehle: ["Anmeldeserver"],
+    befehle: [
+      "Zeitdienst-Status anzeigen",
+      "Zeit neu synchronisieren",
+      "Zeitabweichung zur Domäne prüfen",
+      "Datum- und Zeiteinstellungen öffnen",
+      "Anmeldeserver anzeigen",
+    ],
   },
   standardprogramm: {
     titel: "Datei öffnet mit falschem Programm / PDF öffnet nicht",
@@ -1259,7 +1654,11 @@ export const ASSISTANT_GUIDES = {
       "Wird die Zuordnung zentral gesetzt, nach Anmeldung erneut zurückgesetzt? Dann Richtlinie prüfen",
       "PDF-Programm reparieren oder neu installieren",
     ],
-    befehle: ["Gruppenrichtlinien aktualisieren", "Installierte Programme"],
+    befehle: [
+      "Gruppenrichtlinien aktualisieren",
+      "Installierte Programme auflisten",
+      "Apps und Features öffnen",
+    ],
   },
   "tastatur-layout": {
     titel: "Tastatur schreibt falsche Zeichen",
@@ -1270,6 +1669,7 @@ export const ASSISTANT_GUIDES = {
       "Num-Taste prüfen, falls Zahlen statt Buchstaben kommen (Laptops)",
       "In Remotesitzungen das Layout der Sitzung prüfen",
     ],
+    befehle: ["Sprach- und Tastatureinstellungen öffnen"],
   },
   skalierung: {
     titel: "Bild unscharf / Schrift zu groß oder zu klein",
@@ -1281,7 +1681,11 @@ export const ASSISTANT_GUIDES = {
       "Grafiktreiber aktualisieren",
     ],
     suche: ["externer monitor"],
-    befehle: ["Monitore anzeigen"],
+    befehle: [
+      "Anzeige-Einstellungen öffnen",
+      "Monitore anzeigen",
+      "Grafikkarte und Auflösung anzeigen",
+    ],
   },
 
   /* ---------- Sicherheit ---------- */
@@ -1294,6 +1698,7 @@ export const ASSISTANT_GUIDES = {
       "Prüfen, ob weitere Kollegen dieselbe Mail bekommen haben",
     ],
     suche: ["phishing"],
+    befehle: ["Nachrichtenverfolgung"],
   },
   "phishing-geklickt": {
     titel: "Auf Phishing-Link geklickt / Daten eingegeben",
@@ -1306,6 +1711,13 @@ export const ASSISTANT_GUIDES = {
       "Sicherheitsteam sofort informieren",
     ],
     suche: ["phishing"],
+    befehle: [
+      "Sitzungen widerrufen",
+      "MFA-Methoden anzeigen",
+      "Weiterleitungsregeln eines Postfachs prüfen",
+      "Defender-Schnellscan starten",
+      "Aktive Netzwerkverbindungen mit Prozess anzeigen",
+    ],
     eskalation: "Sicherheitsvorfall: sofort an das Sicherheitsteam / CERT, keine eigene Bereinigung.",
     dringend: true,
   },
@@ -1316,6 +1728,13 @@ export const ASSISTANT_GUIDES = {
       "Bei Verschlüsselung/umbenannten Dateien: sofort vom Netz trennen",
       "Meldung des Virenscanners festhalten",
       "Sicherheitsteam informieren",
+    ],
+    befehle: [
+      "Defender-Status anzeigen",
+      "Defender-Schnellscan starten",
+      "Defender-Funde anzeigen",
+      "Aktive Netzwerkverbindungen mit Prozess anzeigen",
+      "Datei-Hash berechnen",
     ],
     eskalation: "Sicherheitsvorfall: sofort an das Sicherheitsteam.",
     dringend: true,
@@ -1328,6 +1747,11 @@ export const ASSISTANT_GUIDES = {
       "Passwort zurücksetzen und Sitzungen beenden",
       "Sicherheitsteam / Datenschutz informieren",
       "Bei Diebstahl: Anzeige durch den Mitarbeiter",
+    ],
+    befehle: [
+      "BitLocker-Status anzeigen",
+      "Sitzungen widerrufen",
+      "Seriennummer auslesen",
     ],
     eskalation: "Meldung an Sicherheit und Datenschutz (mögliche Meldepflicht).",
     dringend: true,
@@ -1342,6 +1766,14 @@ export const ASSISTANT_GUIDES = {
       "Sicherheitsteam informieren",
     ],
     suche: ["phishing"],
+    befehle: [
+      "Sitzungen widerrufen",
+      "MFA-Methoden anzeigen",
+      "Weiterleitungsregeln eines Postfachs prüfen",
+      "Postfach-Weiterleitung prüfen",
+      "Fehlgeschlagene Anmeldungen anzeigen",
+      "Benutzerkonto im Active Directory anzeigen",
+    ],
     eskalation: "Sicherheitsvorfall: sofort an das Sicherheitsteam.",
     dringend: true,
   },

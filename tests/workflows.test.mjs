@@ -224,3 +224,93 @@ test('every command named in the training exists in the command list', async () 
   }
   assert.deepEqual(missing, []);
 });
+
+async function seedCommands() {
+  const { transformSync } = await import('esbuild');
+  const { readFile } = await import('node:fs/promises');
+  const js = transformSync(await readFile('src/seed-data.ts', 'utf8'), { loader: 'ts', format: 'esm' }).code;
+  return (await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'))).DEFAULT_COMMAND_SEEDS;
+}
+
+test('default command seeds are well-formed, unique and all reach the command list', async () => {
+  const seeds = await seedCommands();
+  assert.ok(seeds.length > 200, 'Befehlsbibliothek unerwartet klein: ' + seeds.length);
+  const names = seeds.map(seed => seed.name.toLowerCase());
+  const texts = seeds.map(seed => seed.command.trim());
+  assert.deepEqual(names.filter((name, i) => names.indexOf(name) !== i), [], 'doppelter Name');
+  assert.deepEqual(texts.filter((text, i) => texts.indexOf(text) !== i), [], 'doppelter Befehlstext');
+  const placeholder = /\[(?=[^\]]*[A-ZÄÖÜ])([A-ZÄÖÜ0-9][A-ZÄÖÜ0-9 _/.\-]{0,40})\]/;
+  for (const seed of seeds) {
+    assert.ok(['cmd', 'powershell', 'windows'].includes(seed.shell), seed.name);
+    assert.ok(['low', 'medium', 'high'].includes(seed.riskLevel), seed.name);
+    for (const flag of [seed.requiresAdmin, seed.remoteCapable, seed.restartRequired]) assert.ok(flag === 0 || flag === 1, seed.name);
+    assert.ok(seed.category && seed.name.length <= 80 && seed.description.length > 20 && seed.command.trim(), seed.name);
+    // Ein in Klammern stehendes Grossbuchstabenwort muss als Platzhalter erkannt werden, sonst wird es beim Kopieren nicht abgefragt.
+    for (const match of seed.command.matchAll(/\[([^\]]+)\]/g)) {
+      if (/[A-ZÄÖÜ]/.test(match[1]) && match[1] === match[1].toUpperCase()) assert.match(match[0], placeholder, `${seed.name}: ${match[0]}`);
+    }
+  }
+  // Nach dem Bootstrap muss die komplette Bibliothek in der Datenbank stehen.
+  const { body } = await f.request(employee, '/api/bootstrap');
+  assert.ok(body.commands.length >= seeds.length, `${body.commands.length} von ${seeds.length} Befehlen angekommen`);
+  const dbNames = new Set(body.commands.map(command => command.name.toLowerCase()));
+  assert.deepEqual(names.filter(name => !dbNames.has(name)), []);
+});
+
+test('every command named in training and assistant resolves to exactly one command', async () => {
+  const { TRAINING_MODULES } = await import('../public/training-data.js');
+  const { ASSISTANT_GUIDES } = await import('../public/assistant-data.js');
+  const { foldName } = await import('../public/command-match.js');
+  const { body } = await f.request(employee, '/api/bootstrap');
+  const names = body.commands.map(command => foldName(command.name));
+  const problems = [];
+  const check = (where, wanted) => {
+    const key = foldName(wanted);
+    if (names.includes(key)) return;                         // exakter Name: eindeutig
+    const hits = names.filter(name => name.includes(key));
+    if (hits.length !== 1) problems.push(`${where}: "${wanted}" -> ${hits.length} Treffer`);
+  };
+  for (const module of TRAINING_MODULES) for (const name of module.befehle) check('Modul ' + module.id, name);
+  for (const [id, guide] of Object.entries(ASSISTANT_GUIDES)) for (const name of guide.befehle || []) check('Leitfaden ' + id, name);
+  assert.deepEqual(problems, []);
+});
+
+test('training and assistant never link a high-risk command', async () => {
+  const { TRAINING_MODULES } = await import('../public/training-data.js');
+  const { ASSISTANT_GUIDES } = await import('../public/assistant-data.js');
+  const { findCommand } = await import('../public/command-match.js');
+  const { body } = await f.request(employee, '/api/bootstrap');
+  const risky = [];
+  const check = (where, name) => {
+    const command = findCommand(body.commands, name);
+    if (command && command.risk_level === 'high') risky.push(`${where}: ${command.name}`);
+  };
+  for (const module of TRAINING_MODULES) for (const name of module.befehle) check('Modul ' + module.id, name);
+  for (const [id, guide] of Object.entries(ASSISTANT_GUIDES)) for (const name of guide.befehle || []) check('Leitfaden ' + id, name);
+  assert.deepEqual(risky, [], 'Riskante Befehle gehören nicht in geführte Abläufe');
+});
+
+test('default command library holds no destructive or permission-changing commands', async () => {
+  const seeds = await seedCommands();
+  // Diese drei stammen aus der ersten Bibliothek; sie sind als hohes Risiko markiert
+  // (der Helper fragt vor dem Kopieren nach) und werden nicht aktiv verlinkt.
+  const legacyHighRisk = new Set(['Prozess beenden', 'Netzwerkstack zurücksetzen', 'Windows Update zurücksetzen']);
+  const newHighRisk = seeds.filter(seed => seed.riskLevel === 'high' && !legacyHighRisk.has(seed.name)).map(seed => seed.name);
+  assert.deepEqual(newHighRisk, [], 'Neue Befehle mit hohem Risiko gehören nicht in die Standardbibliothek');
+
+  // Klassen von Befehlen, die bewusst NICHT in der fuer alle sichtbaren Liste stehen.
+  const forbidden = [
+    [/Set-ADAccountPassword|Add-ADGroupMember|Add-MailboxPermission|Add-ADPrincipalGroupMembership/i, 'Passwort-, Gruppen- oder Rechteänderung'],
+    [/Remove-AD|Disable-AD|Remove-Mailbox|Remove-LocalUser|Remove-LocalGroupMember/i, 'Konten löschen oder sperren'],
+    [/Disable-NetAdapter|netsh\s+advfirewall\s+set/i, 'Netz oder Firewall abschalten'],
+    [/Close-SmbOpenFile|\blogoff\b|reset\s+session/i, 'fremde Dateien oder Sitzungen zwangsweise schließen'],
+    [/shutdown\s+\/[rsp]\b|Restart-Computer|Stop-Computer/i, 'Rechner neu starten oder ausschalten'],
+    [/\bformat\s+[a-z]:|Clear-Disk|Remove-Partition|diskpart|cipher\s+\/w/i, 'Datenträger löschen oder formatieren'],
+    [/Remove-Item[^|]*\$env:(TEMP|USERPROFILE|HOMEPATH)|rd\s+\/s|rmdir\s+\/s/i, 'Ordner rekursiv löschen'],
+    [/manage-bde\s+-protectors\s+-get|-RecoveryPassword\b/i, 'BitLocker-Schlüssel im Klartext anzeigen'],
+    [/taskkill\s+\/IM\s+\[|net\s+use\s+\*\s+\/delete\s+\/y/i, 'Beliebige Prozesse oder alle Laufwerke ohne Rückfrage beenden'],
+  ];
+  const hits = [];
+  for (const seed of seeds) for (const [pattern, reason] of forbidden) if (pattern.test(seed.command)) hits.push(`${seed.name} (${reason})`);
+  assert.deepEqual(hits, []);
+});

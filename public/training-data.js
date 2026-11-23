@@ -71,11 +71,15 @@ export const TRAINING_MODULES = [
       },
       {
         titel: "Wissen, das fehlt, wird eingetragen",
-        text: "Findest du nichts, merkt sich der Helper den Suchbegriff als [[Wissenslücke]] – das Team sieht in der Statistik, was fehlt. Noch besser: Hast du die Lösung gefunden, trag sie direkt unter **Lösungen → + Lösung hinzufügen** ein (als Mitarbeiter wird sie als Vorschlag zur Freigabe eingereicht).\n\nKleine Hilfen: **/** springt ins Suchfeld der aktuellen Seite, **g** und dann ein Buchstabe wechselt den Bereich (zum Beispiel **g b** zu den Befehlen), **?** zeigt alle Tastenkürzel.",
+        text: "Findest du nichts, merkt sich der Helper den Suchbegriff als [[Wissenslücke]] – das Team sieht in der Statistik, was fehlt. Noch besser: Hast du die Lösung gefunden, trag sie direkt unter **Lösungen → + Lösung hinzufügen** ein (als Mitarbeiter wird sie als Vorschlag zur Freigabe eingereicht).\n\nUnten findest du drei Befehle mit Platzhaltern wie `[SERVER-ODER-IP]`: Probier sie aus, der Helper fragt beim Kopieren nach den Werten.\n\nKleine Hilfen: **/** springt ins Suchfeld der aktuellen Seite, **g** und dann ein Buchstabe wechselt den Bereich (zum Beispiel **g b** zu den Befehlen), **?** zeigt alle Tastenkürzel.",
         merke: "Wissen, das nur in deinem Kopf steht, hilft dem Team nicht – und dir nicht mehr, sobald du Urlaub hast.",
       },
     ],
-    befehle: [],
+    befehle: [
+      "Erreichbarkeit prüfen",
+      "Dienststatus prüfen",
+      "Port-Erreichbarkeit prüfen",
+    ],
     glossar: ["Fall", "Symptom-Assistent", "Platzhalter", "Wissenslücke", "Vorlage"],
     quiz: [
       {
@@ -164,7 +168,18 @@ export const TRAINING_MODULES = [
         merke: "Gute Dokumentation heißt nicht lang, sondern nachvollziehbar: Versuch → Ergebnis.",
       },
     ],
-    befehle: ["Systemlaufzeit", "Systemfehler der letzten 24 Stunden", "Angemeldeten Benutzer"],
+    befehle: [
+      "Angemeldeten Benutzer anzeigen",
+      "Computername anzeigen",
+      "Hochfahrzeit anzeigen",
+      "Systemlaufzeit anzeigen",
+      "Fehlerhafte Geräte anzeigen",
+      "Systemfehler der letzten 24 Stunden",
+      "Anwendungsabstürze der letzten 24 Stunden anzeigen",
+      "Speicherfresser finden",
+      "Zuverlässigkeitsverlauf öffnen",
+      "Systeminformationen anzeigen",
+    ],
     glossar: ["Eskalation", "Reproduzierbar", "Behelfslösung", "Abgesicherter Modus"],
     quiz: [
       {
@@ -261,7 +276,11 @@ export const TRAINING_MODULES = [
         merke: "Ein Ticket ist erst gelöst, wenn der Benutzer es bestätigt hat – nicht, wenn du es für gelöst hältst.",
       },
     ],
-    befehle: [],
+    befehle: [
+      "Computername anzeigen",
+      "Angemeldeten Benutzer anzeigen",
+      "Remoteunterstützung starten",
+    ],
     glossar: ["Behelfslösung", "Eskalation"],
     quiz: [
       {
@@ -359,7 +378,17 @@ export const TRAINING_MODULES = [
         text: "Der 3rd Level soll nicht von vorn anfangen müssen. Gib mit:\n- Fehlerbild und **Auswirkung** (wer und wie viele sind betroffen?)\n- **Zeitpunkt** und was sich geändert hat\n- **Deine Schritte** und was dabei herauskam\n- **Logs, Screenshots, Fehlercodes**\n- Ob der Fehler [[Reproduzierbar]] ist\n- Wie der Benutzer erreichbar ist\n\nDer **Ticket-Generator** (Textart „Eskalation an 3rd Level“) baut daraus einen fertigen Text. Im Symptom-Assistenten übernimmt „Nicht gelöst → Eskalationstext erstellen“ dein Fehlerbild und die abgehakten Schritte.",
       },
     ],
-    befehle: ["Computername anzeigen", "Windows-Version anzeigen", "Seriennummer auslesen"],
+    befehle: [
+      "Computername anzeigen",
+      "Angemeldeten Benutzer anzeigen",
+      "Windows-Version und Build anzeigen",
+      "Modell und Hersteller anzeigen",
+      "Seriennummer auslesen",
+      "Netzwerkkonfiguration anzeigen",
+      "Systeminformationen anzeigen",
+      "Systemfehler der letzten 24 Stunden",
+      "Anwendungsabstürze der letzten 24 Stunden anzeigen",
+    ],
     glossar: ["Ticket", "1st / 2nd / 3rd Level", "Eskalation", "Major Incident", "Reproduzierbar", "Behelfslösung"],
     quiz: [
       {
@@ -454,7 +483,18 @@ export const TRAINING_MODULES = [
         merke: "Wer schnell meldet, begrenzt den Schaden. Beschuldigen hilft nie – es sorgt nur dafür, dass der Nächste zu spät meldet.",
       },
     ],
-    befehle: ["Angemeldeten Benutzer"],
+    befehle: [
+      "Benutzerkonto im Active Directory anzeigen",
+      "Sitzungen widerrufen",
+      "MFA-Methoden anzeigen",
+      "Weiterleitungsregeln eines Postfachs prüfen",
+      "Defender-Status anzeigen",
+      "Defender-Schnellscan starten",
+      "Defender-Funde anzeigen",
+      "Aktive Netzwerkverbindungen mit Prozess anzeigen",
+      "Datei-Hash berechnen",
+      "Fehlgeschlagene Anmeldungen anzeigen",
+    ],
     glossar: ["Phishing", "MFA", "Authenticator", "Push-Benachrichtigung", "Ransomware / Malware", "Self-Service-Passwortreset"],
     quiz: [
       {
@@ -546,7 +586,24 @@ export const TRAINING_MODULES = [
         text: "Ein [[VPN]] ist ein verschlüsselter Tunnel vom Homeoffice ins Firmennetz. Erst damit sind interne Server, Netzlaufwerke und Fachanwendungen erreichbar.\n\nTypische Fehler: Die Verbindung kommt gar nicht zustande (Zugangsdaten, zweiter Faktor, Router blockiert) oder sie steht, aber nichts ist erreichbar. Dann liegt es oft am **Namen** (interner DNS) oder daran, dass das **Heimnetz denselben Adressbereich** wie das Firmennetz nutzt (zum Beispiel 192.168.0.x) – der Rechner weiß dann nicht, ob das Ziel zu Hause oder im Büro liegt.",
       },
     ],
-    befehle: ["Netzwerkkonfiguration anzeigen", "Erreichbarkeit prüfen", "DNS-Auflösung prüfen", "Netzwerkweg prüfen"],
+    befehle: [
+      "Netzwerkkonfiguration anzeigen",
+      "Netzwerkadapter anzeigen",
+      "IP-Konfiguration kompakt anzeigen",
+      "Standardgateway anzeigen",
+      "Erreichbarkeit prüfen",
+      "DNS-Server anzeigen",
+      "DNS-Auflösung prüfen",
+      "DNS-Zwischenspeicher leeren",
+      "Neue IP-Adresse anfordern",
+      "Netzwerkweg prüfen",
+      "Verbindungsqualität prüfen",
+      "Port-Erreichbarkeit prüfen",
+      "Aktuelles WLAN anzeigen",
+      "Proxy-Einstellungen des Systems anzeigen",
+      "VPN-Verbindungen anzeigen",
+      "Routing-Tabelle anzeigen",
+    ],
     glossar: ["IP-Adresse", "DHCP", "DNS", "Gateway", "Proxy", "VPN", "ipconfig", "ping / tracert", "nslookup", "Port"],
     quiz: [
       {
@@ -623,7 +680,7 @@ export const TRAINING_MODULES = [
         titel: "Der Pförtner und der Besucherausweis",
         diagramm: "anmeldung",
         text: "Stell dir das Firmennetz wie ein Bürogebäude vor. Am Eingang sitzt ein Pförtner: der [[Domänencontroller]]. Er prüft dein Passwort (und gegebenenfalls den zweiten Faktor) und gibt dir einen **Besucherausweis**: das [[Kerberos]]-Ticket.\n\nAuf diesem Ausweis steht, zu welchen **Gruppen** du gehörst. Jeder Türsteher im Haus – zum Beispiel ein Dateiserver – schaut nur auf den Ausweis, nicht mehr auf dein Passwort.",
-        merke: "Das ist der Grund, warum nach einer Rechteänderung oft die Anmeldung neu nötig ist: Der alte Ausweis kennt die neue Gruppe noch nicht.",
+        merke: "Das ist der Grund, warum nach einer Rechteänderung oft die Anmeldung neu nötig ist: Der alte Ausweis kennt die neue Gruppe noch nicht. Der einfachste Weg ist Abmelden und neu Anmelden. `klist purge` leert nur den Ticket-Zwischenspeicher – harmlos, aber meist nicht nötig.",
       },
       {
         titel: "Rechte hängen an Gruppen",
@@ -640,7 +697,22 @@ export const TRAINING_MODULES = [
         merke: "Wenn viele Benutzer gleichzeitig Anmeldeprobleme haben, ist es selten ein Passwortproblem, sondern fast immer ein zentraler Dienst.",
       },
     ],
-    befehle: ["Angemeldeten Benutzer", "Gruppenmitgliedschaften anzeigen", "Kerberos-Tickets zurücksetzen", "Gruppenrichtlinien aktualisieren", "Domänenverbindung prüfen"],
+    befehle: [
+      "Angemeldeten Benutzer anzeigen",
+      "Gruppenmitgliedschaften anzeigen",
+      "Kerberos-Tickets anzeigen",
+      "Kerberos-Tickets zurücksetzen",
+      "Gruppenrichtlinien aktualisieren",
+      "Gruppenrichtlinien-Bericht als HTML erstellen",
+      "Domänenverbindung prüfen",
+      "Domänencontroller der Domäne anzeigen",
+      "Zeitdienst-Status anzeigen",
+      "Zeit neu synchronisieren",
+      "Eigenes Domänenkonto anzeigen",
+      "Benutzerkonto im Active Directory anzeigen",
+      "Konto entsperren",
+      "Vertrauensstellung reparieren",
+    ],
     glossar: ["Active Directory", "Domäne", "Domänencontroller", "Kerberos", "Gruppe / Gruppenmitgliedschaft", "Gruppenrichtlinie", "klist", "gpupdate", "whoami", "Vertrauensstellung"],
     quiz: [
       {
@@ -733,7 +805,21 @@ export const TRAINING_MODULES = [
         merke: "Eine kurze Rückmeldung wie „Microsoft hat aktuell eine Störung bei Teams, wir beobachten es“ erspart allen Beteiligten viel Rätselraten.",
       },
     ],
-    befehle: ["Gespeicherte Zugangsdaten anzeigen", "Aktuelle Prozesse anzeigen"],
+    befehle: [
+      "Outlook im abgesicherten Modus starten",
+      "Outlook beenden",
+      "OST-Dateien anzeigen",
+      "Mail-Profile öffnen",
+      "Gespeicherte Zugangsdaten anzeigen",
+      "Gespeicherte Zugangsdaten löschen",
+      "Teams beenden",
+      "Teams-Cache leeren (neues Teams)",
+      "OneDrive zurücksetzen",
+      "Office-Version anzeigen",
+      "Lizenzen eines Benutzers anzeigen",
+      "Postfachgröße anzeigen",
+      "Nachrichtenverfolgung",
+    ],
     glossar: ["Exchange", "Postfach", "OWA", "OST-Datei", "Outlook-Profil", "OneDrive", "SharePoint", "Entra ID", "Lizenz", "Cache"],
     quiz: [
       {
@@ -814,7 +900,7 @@ export const TRAINING_MODULES = [
       },
       {
         titel: "Fragen zum Einstufen",
-        text: "- **Wie viele** Personen oder Standorte sind betroffen?\n- **Kann die Person weiterarbeiten** – vielleicht mit einer [[Behelfslösung]]?\n- **Gibt es eine Frist?** Zum Beispiel Gehaltsabrechnung, Kundentermin, Prüfung.\n- Gibt es ein **Sicherheitsrisiko**?\n- Betrifft es **Kernsysteme**, an denen andere hängen?\n\nDiese Angaben gehören auch ins Ticket – so kann jeder deine Einstufung nachvollziehen.",
+        text: "- **Wie viele** Personen oder Standorte sind betroffen?\n- **Kann die Person weiterarbeiten** – vielleicht mit einer [[Behelfslösung]]?\n- **Gibt es eine Frist?** Zum Beispiel Gehaltsabrechnung, Kundentermin, Prüfung.\n- Gibt es ein **Sicherheitsrisiko**?\n- Betrifft es **Kernsysteme**, an denen andere hängen?\n\nDiese Angaben gehören auch ins Ticket – so kann jeder deine Einstufung nachvollziehen.\n\nDen **Umfang** klärst du schnell mit den Befehlen unten: gesperrte Konten zählen, Sitzungen auf einem Server ansehen, prüfen, ob ein Dienst oder Port erreichbar ist.",
       },
       {
         titel: "Störung oder Anfrage?",
@@ -826,7 +912,14 @@ export const TRAINING_MODULES = [
         merke: "Die verbindlichen Reaktionszeiten (SLA) deines Betriebs stehen in euren internen Vorgaben. Frag deine Teamleitung, wenn du sie nicht kennst – hier stehen bewusst keine erfundenen Zahlen.",
       },
     ],
-    befehle: [],
+    befehle: [
+      "Gesperrte Konten finden",
+      "Remotedesktop-Sitzungen anzeigen",
+      "Dienststatus prüfen",
+      "Erreichbarkeit prüfen",
+      "Port-Erreichbarkeit prüfen",
+      "Gestoppte Automatik-Dienste anzeigen",
+    ],
     glossar: ["Major Incident", "Behelfslösung", "Eskalation"],
     quiz: [
       {
@@ -911,7 +1004,7 @@ export const TRAINING_MODULES = [
       },
       {
         titel: "Fernzugriff und fremde Postfächer",
-        text: "- **Mitsehen und Fernsteuern nur mit Zustimmung** des Benutzers – und nur, solange es für das Problem nötig ist.\n- **Bildschirm teilen:** Vorher fremde und private Fenster schließen oder nur das benötigte Fenster teilen.\n- **Fremde Postfächer oder Dateien öffnest du nur mit einem Auftrag**, den die dafür berechtigte Stelle freigegeben hat. Eigene Neugier ist kein Grund.\n- **Screenshots** mit Namen oder Inhalten nur teilen, wenn nötig – und nicht in öffentliche Kanäle.",
+        text: "- **Mitsehen und Fernsteuern nur mit Zustimmung** des Benutzers – und nur, solange es für das Problem nötig ist.\n- **Bildschirm teilen:** Vorher fremde und private Fenster schließen oder nur das benötigte Fenster teilen.\n- **Fremde Postfächer oder Dateien öffnest du nur mit einem Auftrag**, den die dafür berechtigte Stelle freigegeben hat. Eigene Neugier ist kein Grund.\n- **Wer Zugriff hat, lässt sich prüfen:** Gruppenmitglieder, Postfach- und Ordnerrechte zeigen die Befehle unten. Zu viele Rechte sind ein Datenschutzrisiko – melde sie.\n- **Screenshots** mit Namen oder Inhalten nur teilen, wenn nötig – und nicht in öffentliche Kanäle.",
       },
       {
         titel: "Wenn etwas schiefgeht",
@@ -919,7 +1012,14 @@ export const TRAINING_MODULES = [
         merke: "Dies ist eine Orientierung, keine Rechtsberatung. Es gelten die Regeln eures Unternehmens – frag die oder den Datenschutzbeauftragten.",
       },
     ],
-    befehle: [],
+    befehle: [
+      "Mitglieder einer Gruppe anzeigen",
+      "Postfachberechtigungen anzeigen",
+      "Ordnerrechte anzeigen",
+      "Lokale Administratoren anzeigen",
+      "Angemeldete Benutzer am Rechner anzeigen",
+      "BitLocker-Status anzeigen",
+    ],
     glossar: ["Phishing", "Remoteunterstützung", "Eskalation"],
     quiz: [
       {

@@ -20,6 +20,14 @@
   Bereiche zu 94 Leitfäden mit Rückfragen, abhakbaren Schritten, passenden
   Befehlen und Lösungen; Ergebnis geht in Ticket-Generator oder Fall.
   Wissen ergänzen in `public/assistant-data.js`
+- Befehlsbibliothek mit rund 215 Befehlen in 19 Bereichen (u. a. Active
+  Directory, Sicherheit/Defender/BitLocker, Netzwerk/WLAN/VPN, Drucker,
+  Outlook/Teams, Microsoft 365, Dateien, Remote, Ereignisse), jeweils mit
+  Admin- und Risikohinweis. Bewusst nicht enthalten: Befehle, die Daten
+  löschen, fremde Arbeit beenden, Passwörter/Rechte/Gruppen ändern oder
+  Rechner vom Netz nehmen bzw. neu starten (ein Test sichert das ab).
+  Neue Standardbefehle in `src/seed-data.ts`; sie werden beim nächsten
+  Seitenaufruf automatisch ergänzt, ohne Migration
 - Glossar mit rund 100 Fachwörtern aus Vorlagen, Befehlen und Lösungen,
   jeweils mit Beispiel und Querverweisen; auch über die Schnellsuche
   erreichbar. Begriffe ergänzen in `public/glossary-data.js`

@@ -16,6 +16,7 @@ import {
   TRAINING_MODULES,
 } from "./training-data.js";
 import { diagram } from "./training-diagrams.js";
+import { findCommands, renderCommandRows } from "./command-match.js";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
@@ -271,10 +272,7 @@ export function createTraining({
   }
 
   function resolveCommands(module) {
-    const commands = getCommands();
-    return module.befehle
-      .map((name) => commands.find((command) => command.name.toLowerCase().includes(name.toLowerCase())))
-      .filter(Boolean);
+    return findCommands(getCommands(), module.befehle);
   }
 
   function renderTry(module) {
@@ -282,15 +280,11 @@ export function createTraining({
     if (!commands.length) return "";
     return `
       <section class="tr-block" data-training-section="try">
-        <h3 class="tr-block-title"><span>Zum Ausprobieren</span></h3>
-        <p class="muted">Diese Befehle aus eurer Befehlsliste gehören zum Thema. Ein Klick kopiert sie – am besten gleich auf einem Testrechner ausprobieren.</p>
-        <div class="assistant-commands">
-          ${commands.map((command) => `
-            <button class="assistant-command" type="button" data-training-copy="${command.id}" title="Befehl kopieren">
-              <span class="assistant-command-name">${escapeHtml(command.name)}</span>
-              <code>${escapeHtml(command.command)}</code>
-            </button>`).join("")}
-        </div>
+        <h3 class="tr-block-title"><span>Befehle zum Thema (${commands.length})</span></h3>
+        <p class="muted">Diese Befehle aus eurer Befehlsliste gehören zum Thema. Ein Klick kopiert sie. „Admin“ heißt: braucht Administratorrechte. Bei „Risiko“ fragt der Helper vor dem Kopieren nach. Probier die harmlosen am besten gleich an einem Testrechner aus.</p>
+        ${renderCommandRows({
+          commands, attribute: "data-training-copy", escapeHtml, limit: 8,
+        })}
       </section>`;
   }
 

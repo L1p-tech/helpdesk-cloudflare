@@ -3685,3 +3685,29 @@ details.card:hover .row-copy,
   .tr-steps button { flex-shrink: 0; white-space: nowrap; }
 }
 
+/* Admin- und Risiko-Hinweis an Befehlen (Assistent und Schulung). */
+.cmd-flag {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.cmd-flag.admin { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 50%, transparent); }
+.cmd-flag.risk { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 55%, transparent); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.cmd-flag.care { color: #fbbf24; border-color: color-mix(in srgb, #fbbf24 50%, transparent); }
+.assistant-more { margin-top: 8px; }
+.assistant-more summary {
+  cursor: pointer;
+  padding: 4px 2px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+.assistant-more[open] summary { margin-bottom: 8px; }
+

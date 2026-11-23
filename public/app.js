@@ -4,6 +4,7 @@ import {
 } from "./assistant-data.js";
 import { GLOSSARY, GLOSSARY_CATEGORIES } from "./glossary-data.js";
 import { createTraining } from "./training.js";
+import { findCommands, renderCommandRows } from "./command-match.js";
 
 const state = {
   user: null,
@@ -1368,14 +1369,8 @@ function solutionsForGuide(guide) {
 
 /** Findet Befehle, deren Name mit einem der Stichworte beginnt oder es enthaelt. */
 function commandsForGuide(guide) {
-  if (!guide.befehle?.length) return [];
-  const gefunden = [];
-  guide.befehle.forEach((name) => {
-    const gesucht = foldText(name);
-    const command = state.commands.find((item) => foldText(item.name).includes(gesucht));
-    if (command && !gefunden.includes(command)) gefunden.push(command);
-  });
-  return gefunden;
+  // Exakter Name zuerst, dann Teilstueck -- siehe command-match.js.
+  return findCommands(state.commands, guide.befehle);
 }
 
 /* ---------- Darstellung ---------- */
@@ -1514,11 +1509,9 @@ function renderAssistantGuide() {
       ? `<div class="assistant-solutions">${loesungen.map(assistantSolutionCard).join("")}</div>`
       : "")}
     ${liste("Hilfreiche Befehle", befehle.length
-      ? `<div class="assistant-commands">${befehle.map((command) => `
-          <button class="assistant-command" type="button" data-assistant-command="${command.id}" title="Befehl kopieren">
-            <span class="assistant-command-name">${escapeHtml(command.name)}</span>
-            <code>${escapeHtml(command.command)}</code>
-          </button>`).join("")}</div>`
+      ? renderCommandRows({
+        commands: befehle, attribute: "data-assistant-command", escapeHtml, limit: 6,
+      })
       : "")}
     ${!guide.dringend && guide.eskalation && assistantState.ausgang !== "offen"
       ? `<p class="assistant-escalation-hint"><strong>Eskalation:</strong> ${escapeHtml(guide.eskalation)}</p>`
@@ -2642,6 +2635,10 @@ function renderTemplates() {
 
 /** Feste Farben fuer bekannte Bereiche -- passend zu den Kategorien der Vorlagen. */
 const COMMAND_CATEGORY_COLORS = {
+  "active directory": "#6d7ae0",
+  teams: "#6264a7",
+  dateien: "#c9a227",
+  "microsoft 365": "#e0612c",
   netzwerk: "#42a7c6",
   windows: "#4a7cff",
   benutzer: "#5b8def",

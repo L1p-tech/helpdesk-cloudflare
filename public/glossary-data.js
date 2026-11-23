@@ -645,7 +645,7 @@ export const GLOSSARY = [
     begriff: "netsh",
     kategorie: "Befehle",
     auch: ["Winsock", "netsh winsock reset"],
-    text: "Werkzeug für Netzwerkeinstellungen. netsh winsock reset und netsh int ip reset setzen den Netzwerkstack zurück; netsh wlan show wlanreport erstellt einen WLAN-Bericht.",
+    text: "Werkzeug für Netzwerkeinstellungen. netsh wlan show wlanreport erstellt einen WLAN-Bericht. Die Befehle „winsock reset“ und „int ip reset“ setzen dagegen den ganzen Netzwerkstack zurück und verändern auch VPN- und IP-Einstellungen – das ist ein Eingriff für den 3rd Level, nicht für den Alltag.",
     siehe: ["LAN / WLAN"],
   },
   {
@@ -665,7 +665,7 @@ export const GLOSSARY = [
     begriff: "klist",
     kategorie: "Befehle",
     auch: ["klist purge"],
-    text: "Zeigt die Kerberos-Tickets an; klist purge löscht sie, damit neue Gruppenmitgliedschaften ohne Abmelden wirken.",
+    text: "Zeigt die Kerberos-Tickets an; klist purge leert sie. Das löscht keine Daten – Windows holt sich neue Tickets automatisch, und neue Gruppenmitgliedschaften wirken für Netzwerkressourcen ohne Abmelden. Meist reicht aber einfach Abmelden und neu Anmelden. Ohne Verbindung zur Domäne (zum Beispiel Homeoffice ohne VPN) kommen neue Tickets erst nach der Verbindung.",
     siehe: ["Kerberos"],
   },
   {
