@@ -3,6 +3,7 @@ import {
   ASSISTANT_TREE, ASSISTANT_GUIDES, ASSISTANT_SYNONYMS, ASSISTANT_STOPWORDS,
 } from "./assistant-data.js";
 import { GLOSSARY, GLOSSARY_CATEGORIES } from "./glossary-data.js";
+import { createTraining } from "./training.js";
 
 const state = {
   user: null,
@@ -52,6 +53,25 @@ const TYPING_PROMPTS = [
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const notificationCenter = createNotifications({ api, formatDateTime, onError: (error) => showToast(error.message) });
+
+/*
+ * Schulung: eigene Datei, die Anwendung reicht nur die Bausteine durch, die sie
+ * braucht. Die verwendeten Funktionen sind Deklarationen weiter unten und
+ * deshalb schon hier verfuegbar.
+ */
+const training = createTraining({
+  api,
+  escapeHtml,
+  showToast,
+  getCommands: () => state.commands,
+  copyCommand: (command) => copyCommand(command),
+  openGlossary: async (begriff) => {
+    await switchView("glossary");
+    jumpToGlossaryEntry(begriff);
+  },
+  openView: (view) => switchView(view),
+});
+training.init();
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -2169,6 +2189,8 @@ function applyRoleVisibility() {
 
 async function loadBootstrap() {
   const data = await api("/api/bootstrap");
+  // Nach einem Benutzerwechsel ohne Neuladen darf kein fremder Lernstand stehen bleiben.
+  if (state.user?.id !== data.user.id) training.reset();
   state.user = data.user;
   notificationCenter.start();
   state.categories = data.categories;
@@ -3427,6 +3449,7 @@ const VIEW_ROUTES = {
   commands: "befehle",
   solutions: "loesungen",
   glossary: "glossar",
+  training: "schulung",
   assistant: "assistent",
   cases: "faelle",
   escalation: "eskalation",
@@ -3446,7 +3469,8 @@ const VIEW_ROUTES = {
 
 /** Liest den Bereich aus der Adresse; unbekannte oder gesperrte -> Start. */
 function viewFromLocation() {
-  const slug = location.hash.replace(/^#\/?/, "");
+  // Nur das erste Stueck zaehlt: #/schulung/netzwerk gehoert zum Bereich "schulung".
+  const slug = location.hash.replace(/^#\/?/, "").split("/")[0];
   const view = Object.keys(VIEW_ROUTES).find((key) => VIEW_ROUTES[key] === slug);
   if (!view) return "start";
   if (view === "admin" && !isAdmin()) return "start";
@@ -3509,6 +3533,11 @@ async function switchView(view, { updateUrl = true } = {}) {
       "Wissen",
       "Lösungen",
       "Hier stehen bekannte Probleme mit Symptom, Ursache und erprobtem Lösungsweg.",
+    ],
+    training: [
+      "Wissen",
+      "Schulung",
+      "IT-Grundlagen und Helpdesk-Alltag in kurzen Modulen – mit Grafiken, Quiz und Praxisfällen.",
     ],
     glossary: [
       "Wissen",
@@ -3594,6 +3623,7 @@ async function switchView(view, { updateUrl = true } = {}) {
   if (view === "start") await renderStart();
   if (view === "solutions") renderSolutions();
   if (view === "glossary") renderGlossary();
+  if (view === "training") await training.render();
   if (view === "assistant") renderAssistant();
   if (view === "cases") await loadCases();
   if (view === "escalation") await loadEscalation();
@@ -5230,7 +5260,9 @@ async function initialize() {
 /** Oeffnet den Bereich aus der Adresse und schreibt sie in Normalform zurueck. */
 async function enterView() {
   const view = viewFromLocation();
-  history.replaceState(null, "", `#/${VIEW_ROUTES[view]}`);
+  // Die Adresse eines einzelnen Schulungsmoduls bleibt beim Neuladen erhalten.
+  const keep = view === "training" && /^#\/schulung(\/|$)/.test(location.hash);
+  if (!keep) history.replaceState(null, "", `#/${VIEW_ROUTES[view]}`);
   await switchView(view, { updateUrl: false });
 }
 
@@ -6426,6 +6458,7 @@ async function renderStart() {
     }),
     startCard("quick", "Favoriten &amp; zuletzt benutzt", { action: goLink("templates", "Alle Vorlagen") }),
     startCard("waiting", canReview() ? "Wartet auf dich" : "Meine Vorschläge"),
+    startCard("training", "Schulung", { wide: true, action: goLink("training", "Zur Schulung") }),
     startCard("news", "Neue IT-Meldungen", { wide: true, action: goLink("news", "Alle Meldungen") }),
   ].join("");
 
@@ -6445,6 +6478,10 @@ async function renderStart() {
 
   loadStartWaiting().then((html) => stillCurrent() && fillStartCard("waiting", html))
     .catch(() => fillStartCard("waiting", '<p class="muted">Konnte nicht geladen werden.</p>'));
+
+  training.load()
+    .then(() => stillCurrent() && fillStartCard("training", training.startCardHtml()))
+    .catch(() => fillStartCard("training", '<p class="muted">Fortschritt konnte nicht geladen werden.</p>'));
 
   api("/api/news").then((data) => stillCurrent() && renderStartNews(data.items || [], data.feeds || []))
     .catch(() => fillStartCard("news", '<p class="muted">Meldungen konnten nicht geladen werden.</p>'));
@@ -6610,6 +6647,13 @@ $("#view-start").addEventListener("click", async (event) => {
   if (go) {
     await switchView(go.dataset.startGo);
     if (go.dataset.startGo === "cases") $("#case-ticket")?.focus();
+    return;
+  }
+
+  const module = event.target.closest("[data-start-module]");
+  if (module) {
+    await switchView("training");
+    await training.openModule(module.dataset.startModule);
     return;
   }
 
@@ -6902,7 +6946,7 @@ $("#shortcut-button").addEventListener("click", () => $("#shortcut-dialog").show
    Dialog offen ist.
 */
 const GOTO_KEYS = {
-  s: "start", v: "templates", b: "commands", l: "solutions", w: "glossary", a: "assistant",
+  s: "start", v: "templates", b: "commands", l: "solutions", w: "glossary", k: "training", a: "assistant",
   f: "cases", t: "generator", d: "diagnose", e: "escalation", u: "handover", m: "news",
 };
 

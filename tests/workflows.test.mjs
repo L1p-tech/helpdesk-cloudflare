@@ -150,3 +150,77 @@ test('failed reminder notification does not mark it delivered', async () => {
   assert.equal((await f.request(employee,'/api/notifications')).status,200);
   assert.ok((await f.db.prepare('SELECT notified_at FROM reminders WHERE id=?1').bind(r.body.id).first()).notified_at);
 });
+
+test('training progress keeps the best result, stays passed and is private per user', async () => {
+  const other = await f.user('employee');
+  const quiz = (score, total = 4, itemId = 'netz-grundlagen') =>
+    f.request(employee, '/api/training', 'POST', { kind: 'quiz', itemId, score, total });
+
+  // Durchgefallen: gespeichert, aber nicht abgeschlossen.
+  let result = await quiz(2);
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.progress.percent, 50);
+  assert.equal(result.body.progress.completed_at, null);
+
+  // Bestanden: ab 70 Prozent.
+  result = await quiz(3);
+  assert.equal(result.body.progress.percent, 75);
+  assert.ok(result.body.progress.completed_at);
+  assert.equal(result.body.progress.attempts, 2);
+
+  // Schlechterer Versuch ueberschreibt weder Bestwert noch "bestanden".
+  result = await quiz(1);
+  assert.equal(result.body.progress.percent, 75);
+  assert.ok(result.body.progress.completed_at);
+  assert.equal(result.body.progress.attempts, 3);
+
+  // Andere Benutzer sehen nichts davon.
+  assert.deepEqual((await f.request(other, '/api/training')).body.progress, []);
+  assert.equal((await f.request(employee, '/api/training')).body.progress.length, 1);
+  assert.equal((await f.request(null, '/api/training')).status, 401);
+});
+
+test('training checklist items toggle and kinds cannot be mixed up', async () => {
+  const check = (itemId, done) => f.request(employee, '/api/training', 'POST', { kind: 'check', itemId, done });
+  assert.equal((await check('check:woche1:2', true)).status, 200);
+  let progress = (await f.request(employee, '/api/training')).body.progress;
+  assert.ok(progress.some(row => row.item_id === 'check:woche1:2' && row.completed_at));
+  assert.equal((await check('check:woche1:2', false)).status, 200);
+  progress = (await f.request(employee, '/api/training')).body.progress;
+  assert.ok(!progress.some(row => row.item_id === 'check:woche1:2'));
+
+  // Ein Quiz darf keinen Checklistenpunkt anlegen und umgekehrt.
+  assert.equal((await f.request(employee, '/api/training', 'POST', { kind: 'quiz', itemId: 'check:woche1:2', score: 1, total: 1 })).status, 400);
+  assert.equal((await check('netz-grundlagen', true)).status, 400);
+  assert.equal((await f.request(employee, '/api/training', 'POST', { kind: 'check', itemId: 'check:woche1:2' })).status, 400);
+});
+
+test('training rejects invalid quiz input and can reset only the own progress', async () => {
+  const other = await f.user('employee');
+  const post = body => f.request(employee, '/api/training', 'POST', { kind: 'quiz', itemId: 'ungueltig-test', ...body });
+  for (const bad of [{ score: 5, total: 4 }, { score: -1, total: 4 }, { score: 1, total: 0 }, { score: 1, total: 51 }, { score: 1.5, total: 4 }, { score: 'x', total: 4 }]) {
+    assert.equal((await post(bad)).status, 400, JSON.stringify(bad));
+  }
+  for (const itemId of ['', 'GROSS', '../x', 'a b', 'x'.repeat(81), "x'; DROP TABLE users;--"]) {
+    assert.equal((await f.request(employee, '/api/training', 'POST', { kind: 'quiz', itemId, score: 1, total: 1 })).status, 400, itemId);
+  }
+  assert.equal((await f.request(employee, '/api/training', 'POST', { kind: 'unbekannt', itemId: 'x', score: 1, total: 1 })).status, 400);
+
+  await f.request(other, '/api/training', 'POST', { kind: 'quiz', itemId: 'netz-grundlagen', score: 4, total: 4 });
+  assert.equal((await f.request(employee, '/api/training', 'DELETE')).status, 200);
+  assert.deepEqual((await f.request(employee, '/api/training')).body.progress, []);
+  assert.equal((await f.request(other, '/api/training')).body.progress.length, 1);
+  assert.deepEqual((await f.db.prepare('PRAGMA foreign_key_check').all()).results, []);
+});
+
+test('every command named in the training exists in the command list', async () => {
+  const { TRAINING_MODULES } = await import('../public/training-data.js');
+  const { body } = await f.request(employee, '/api/bootstrap');
+  const names = body.commands.map(command => command.name.toLowerCase());
+  assert.ok(names.length > 20, 'Befehlsliste unerwartet leer');
+  const missing = [];
+  for (const module of TRAINING_MODULES) {
+    for (const name of module.befehle) if (!names.some(candidate => candidate.includes(name.toLowerCase()))) missing.push(`${module.id}: ${name}`);
+  }
+  assert.deepEqual(missing, []);
+});

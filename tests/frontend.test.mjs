@@ -287,3 +287,73 @@ test('glossary terms are unique, categories valid and every cross reference exis
     for (const target of entry.siehe || []) assert.ok(names.includes(target), `${entry.begriff} -> ${target}`);
   }
 });
+
+test('training content is consistent: ids, quiz answers, diagrams, icons, glossary links, checklist', async () => {
+  const { TRAINING_MODULES, TRAINING_GROUPS, FIRST_WEEK, PASS_PERCENT } = await import('../public/training-data.js');
+  const { DIAGRAMS } = await import('../public/training-diagrams.js');
+  const { GLOSSARY } = await import('../public/glossary-data.js');
+  const terms = new Set(GLOSSARY.map(entry => entry.begriff));
+  const groups = new Set(TRAINING_GROUPS.map(group => group.id));
+  const sprite = html;
+  assert.equal(PASS_PERCENT, 70, 'muss zum Worker (TRAINING_PASS_PERCENT) passen');
+  const worker = await readFile('src/index.ts', 'utf8');
+  assert.match(worker, /TRAINING_PASS_PERCENT = 70/);
+
+  const ids = TRAINING_MODULES.map(module => module.id);
+  assert.equal(new Set(ids).size, ids.length, 'doppelte Modul-ID');
+  assert.deepEqual(TRAINING_MODULES.map(module => module.nr), ids.map((_, index) => index + 1), 'Nummern lückenlos in Reihenfolge');
+  for (const module of TRAINING_MODULES) {
+    // Muss zur serverseitigen Pruefung passen, sonst liesse sich der Fortschritt nie speichern.
+    assert.match(module.id, /^[a-z0-9][a-z0-9-]{0,79}$/, module.id);
+    assert.ok(!module.id.startsWith('check:'), module.id);
+    assert.ok(groups.has(module.gruppe), `${module.id}: Gruppe`);
+    assert.match(module.farbe, /^#[0-9a-f]{6}$/i, `${module.id}: Farbe`);
+    assert.ok(sprite.includes(`id="${module.icon}"`), `${module.id}: Symbol ${module.icon} fehlt im Sprite`);
+    assert.ok(module.abschnitte.length >= 3, `${module.id}: zu wenige Abschnitte`);
+    assert.ok(module.quiz.length >= 3 && module.quiz.length <= 50, `${module.id}: Quizlänge`);
+    for (const question of module.quiz) {
+      assert.ok(question.antworten.length >= 3 && question.antworten.length <= 6, `${module.id}: Antwortanzahl`);
+      assert.ok(Number.isInteger(question.richtig) && question.richtig >= 0 && question.richtig < question.antworten.length, `${module.id}: richtig`);
+      assert.equal(new Set(question.antworten).size, question.antworten.length, `${module.id}: doppelte Antwort`);
+      assert.ok(question.erklaerung.length > 20, `${module.id}: Erklärung`);
+    }
+    const fall = module.fall;
+    assert.ok(fall.optionen.length >= 3 && fall.beste >= 0 && fall.beste < fall.optionen.length, `${module.id}: Praxisfall`);
+    assert.ok(fall.optionen.every(option => option.text && option.feedback), `${module.id}: Feedback fehlt`);
+    for (const section of module.abschnitte) {
+      if (section.diagramm) assert.ok(DIAGRAMS[section.diagramm], `${module.id}: Grafik ${section.diagramm}`);
+      assert.ok(section.titel && section.text, `${module.id}: Abschnitt`);
+    }
+    // Jeder [[Begriff]] im Text und jeder Eintrag in `glossar` muss im Glossar stehen.
+    const text = [module.kurz, ...module.abschnitte.flatMap(section =>
+      [section.titel, section.text, section.merke, section.vergleich?.schlecht, section.vergleich?.gut])].filter(Boolean).join('\n');
+    for (const match of text.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)) assert.ok(terms.has(match[1]), `${module.id}: [[${match[1]}]] fehlt im Glossar`);
+    for (const term of module.glossar || []) assert.ok(terms.has(term), `${module.id}: ${term} fehlt im Glossar`);
+  }
+
+  const checkIds = FIRST_WEEK.map(item => item.id);
+  assert.equal(new Set(checkIds).size, checkIds.length, 'doppelte Checklisten-ID');
+  for (const item of FIRST_WEEK) {
+    assert.match(item.id, /^check:[a-z0-9:-]{1,70}$/, item.id);
+    if (item.modul) assert.ok(ids.includes(item.modul), `${item.id}: Modul ${item.modul}`);
+  }
+});
+
+test('every training diagram renders valid SVG without leftover template text', async () => {
+  const { DIAGRAMS } = await import('../public/training-diagrams.js');
+  const { JSDOM: Dom } = await import('jsdom');
+  for (const [name, draw] of Object.entries(DIAGRAMS)) {
+    const markup = draw();
+    assert.ok(!/undefined|NaN|\[object/.test(markup), `${name}: enthält undefined/NaN`);
+    const dom = new Dom(`<body>${markup}</body>`, { contentType: 'text/html' });
+    const svg = dom.window.document.querySelector('svg');
+    assert.ok(svg && svg.getAttribute('aria-label'), `${name}: SVG oder Beschriftung fehlt`);
+    // Alle Koordinaten muessen innerhalb der Zeichenflaeche liegen.
+    const [,, width, height] = svg.getAttribute('viewBox').split(' ').map(Number);
+    for (const rect of svg.querySelectorAll('rect')) {
+      const x = Number(rect.getAttribute('x')), y = Number(rect.getAttribute('y'));
+      assert.ok(x >= 0 && y >= 0 && x + Number(rect.getAttribute('width')) <= width && y + Number(rect.getAttribute('height')) <= height, `${name}: Kasten außerhalb`);
+    }
+    dom.window.close();
+  }
+});

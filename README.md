@@ -23,6 +23,12 @@
 - Glossar mit rund 100 Fachwörtern aus Vorlagen, Befehlen und Lösungen,
   jeweils mit Beispiel und Querverweisen; auch über die Schnellsuche
   erreichbar. Begriffe ergänzen in `public/glossary-data.js`
+- Schulung mit 10 Lernmodulen (Fehlersuche, Netzwerk, Anmeldung, Microsoft 365,
+  Sicherheit am Telefon, Tickets und Eskalation, Priorisieren, Datenschutz,
+  Gespräche, der Helper selbst): einfache Erklärungen mit Grafiken, Quiz,
+  Praxisfall und Checkliste für die erste Woche. Der Fortschritt wird pro
+  Benutzer gespeichert und ist nur für den Benutzer selbst sichtbar. Inhalte
+  ergänzen in `public/training-data.js`, Grafiken in `public/training-diagrams.js`
 - Startseite „Mein Tag“: letzte Übergabe, offene Fälle, Erinnerungen,
   Favoriten, wartende Freigaben und neue IT-Meldungen
 - Seitenleiste mit Zählern, eigene Adresse je Bereich (`#/befehle`),
