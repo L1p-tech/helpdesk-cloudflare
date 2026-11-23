@@ -48,6 +48,7 @@
       <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/></symbol>
       <symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></symbol>
       <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+      <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h6M9 11h4"/></symbol>
       <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></symbol>
     </defs>
   </svg>
@@ -102,6 +103,9 @@
           </button>
           <button class="main-tab" data-view="solutions" type="button" title="Lösungen (g l)">
             <svg class="ico"><use href="#i-bulb"/></svg><span class="nav-label">Lösungen</span>
+          </button>
+          <button class="main-tab" data-view="glossary" type="button" title="Glossar (g w)">
+            <svg class="ico"><use href="#i-book"/></svg><span class="nav-label">Glossar</span>
           </button>
 
           <p class="nav-section">Arbeiten</p>
@@ -331,6 +335,23 @@
             neue Lösungen vorschlagen, Redakteure und Admins legen sie direkt an.
           </p>
           <div id="solutions-list" class="templates-list"></div>
+        </section>
+
+        <!-- Glossar: Fachwoerter aus Vorlagen, Befehlen und Loesungen erklaert. -->
+        <section class="view hidden" id="view-glossary">
+          <div class="controls">
+            <div class="search-box">
+              <span class="search-icon">⌕</span>
+              <input id="glossary-search" type="search" autocomplete="off"
+                     placeholder="Begriff suchen… z. B. DNS, Kerberos, Spooler">
+            </div>
+            <select id="glossary-category" class="filter-select" aria-label="Nach Bereich filtern">
+              <option value="">Alle Bereiche</option>
+            </select>
+          </div>
+          <nav class="glossary-letters" id="glossary-letters" aria-label="Nach Anfangsbuchstabe springen"></nav>
+          <p class="panel-hint" id="glossary-count"></p>
+          <div id="glossary-list" class="glossary-list"></div>
         </section>
 
         <section class="view hidden" id="view-assistant">
@@ -938,6 +959,7 @@
           <dt><kbd>g</kbd> <kbd>v</kbd></dt><dd>Ticket-Vorlagen</dd>
           <dt><kbd>g</kbd> <kbd>b</kbd></dt><dd>Befehle</dd>
           <dt><kbd>g</kbd> <kbd>l</kbd></dt><dd>Lösungen</dd>
+          <dt><kbd>g</kbd> <kbd>w</kbd></dt><dd>Glossar (Wörterbuch)</dd>
           <dt><kbd>g</kbd> <kbd>a</kbd></dt><dd>Symptom-Assistent</dd>
           <dt><kbd>g</kbd> <kbd>f</kbd></dt><dd>Meine Fälle</dd>
           <dt><kbd>g</kbd> <kbd>t</kbd></dt><dd>Ticket-Generator</dd>
@@ -954,7 +976,7 @@
 
   <dialog id="palette-dialog" class="palette">
     <input id="palette-input" type="text" autocomplete="off"
-           placeholder="Vorlagen, Befehle und Lösungen durchsuchen…"
+           placeholder="Vorlagen, Befehle, Lösungen und Begriffe durchsuchen…"
            aria-label="Schnellsuche">
     <div id="palette-results" class="palette-results"></div>
     <p class="palette-hint">

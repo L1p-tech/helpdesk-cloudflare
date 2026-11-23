@@ -271,3 +271,19 @@ test('assistant tree only links existing nodes and guides, and every guide is re
     assert.ok(guide.titel && guide.schritte.length && guide.stichworte.length, id);
   }
 });
+
+test('glossary terms are unique, categories valid and every cross reference exists', async () => {
+  const { GLOSSARY, GLOSSARY_CATEGORIES } = await import('../public/glossary-data.js');
+  const names = GLOSSARY.map(entry => entry.begriff);
+  assert.equal(new Set(names).size, names.length, 'doppelter Begriff');
+  // Gleiche Bildung wie glossarySlug() in app.js: Sprungziele muessen eindeutig sein.
+  const slug = text => text.toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  const slugs = names.map(slug);
+  assert.equal(new Set(slugs).size, slugs.length, 'zwei Begriffe ergeben dieselbe Sprungadresse');
+  for (const entry of GLOSSARY) {
+    assert.ok(GLOSSARY_CATEGORIES.includes(entry.kategorie), `${entry.begriff}: Kategorie ${entry.kategorie}`);
+    assert.ok(entry.text && entry.text.length > 20, `${entry.begriff}: Erklärung fehlt`);
+    for (const target of entry.siehe || []) assert.ok(names.includes(target), `${entry.begriff} -> ${target}`);
+  }
+});

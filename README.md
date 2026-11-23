@@ -20,6 +20,9 @@
   Bereiche zu 94 Leitfäden mit Rückfragen, abhakbaren Schritten, passenden
   Befehlen und Lösungen; Ergebnis geht in Ticket-Generator oder Fall.
   Wissen ergänzen in `public/assistant-data.js`
+- Glossar mit rund 100 Fachwörtern aus Vorlagen, Befehlen und Lösungen,
+  jeweils mit Beispiel und Querverweisen; auch über die Schnellsuche
+  erreichbar. Begriffe ergänzen in `public/glossary-data.js`
 - Startseite „Mein Tag“: letzte Übergabe, offene Fälle, Erinnerungen,
   Favoriten, wartende Freigaben und neue IT-Meldungen
 - Seitenleiste mit Zählern, eigene Adresse je Bereich (`#/befehle`),

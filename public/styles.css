@@ -2071,6 +2071,10 @@ input[type="color"] { height: 40px; }
   color: #ffc98a;
   background: rgba(216, 155, 54, 0.18);
 }
+.palette-kind-glossary {
+  color: #d8b4fe;
+  background: rgba(192, 132, 252, 0.18);
+}
 .palette-title {
   flex: 1;
   min-width: 0;
@@ -3119,3 +3123,119 @@ details.card:hover .row-copy,
 
 /* Scrollleisten im Theme statt hellgrau -- die Eigenschaft wird vererbt. */
 :root { scrollbar-color: color-mix(in srgb, var(--primary) 30%, transparent) transparent; }
+
+/* ============================================================
+   Glossar
+   ============================================================ */
+.glossary-letters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 0 0 10px;
+  position: sticky;
+  top: calc(var(--topbar-h) + 6px);
+  z-index: 5;
+  padding: 6px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-strong) 92%, transparent);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+.glossary-letters button,
+.glossary-letters span {
+  min-width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.glossary-letters button {
+  border: 1px solid transparent;
+  background: var(--surface-soft);
+  color: var(--text-strong);
+  padding: 0;
+}
+.glossary-letters button:hover { border-color: var(--primary); color: var(--primary); }
+.glossary-letters span { color: var(--muted-dark); opacity: .45; }
+
+.glossary-list { display: flex; flex-direction: column; gap: 18px; }
+.glossary-group { scroll-margin-top: calc(var(--topbar-h) + 64px); }
+.glossary-letter {
+  margin: 0 0 8px;
+  font-size: 22px;
+  color: var(--primary);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--primary) 50%, transparent);
+}
+.glossary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+.glossary-entry {
+  padding: 13px 15px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--category-color);
+  background: var(--surface);
+  scroll-margin-top: calc(var(--topbar-h) + 64px);
+}
+.glossary-entry.flash { animation: glossary-flash 1.6s ease; }
+@keyframes glossary-flash {
+  0%, 30% { box-shadow: 0 0 0 2px var(--primary), 0 0 24px -4px var(--primary); }
+  100% { box-shadow: none; }
+}
+.glossary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.glossary-head h4 { margin: 0; font-size: 15px; color: var(--text-strong); }
+.glossary-head .badge { flex-shrink: 0; font-size: 9.5px; }
+.glossary-aka { margin: 0 0 6px; color: var(--muted-dark); font-size: 11.5px; }
+.glossary-text { margin: 0; font-size: 13.5px; line-height: 1.55; }
+.glossary-example {
+  margin: 8px 0 0;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.glossary-example strong { color: var(--text); }
+.glossary-see {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 9px;
+  color: var(--muted-dark);
+  font-size: 11.5px;
+}
+.glossary-chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--primary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.glossary-chip:hover { border-color: var(--primary); background: var(--surface-soft-hover); }
+.glossary-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.glossary-empty p { margin: 0; }
+@media (max-width: 700px) {
+  .glossary-grid { grid-template-columns: 1fr; }
+}
+
+/* Ohne Buchstaben (waehrend einer Suche) kein leerer Kasten. */
+.glossary-letters:empty { display: none; }
+/* Auf dem Handy eine scrollbare Zeile statt drei Zeilen Buchstaben. */
+@media (max-width: 700px) {
+  .glossary-letters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .glossary-letters button, .glossary-letters span { flex-shrink: 0; }
+}
