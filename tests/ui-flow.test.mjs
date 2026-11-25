@@ -89,7 +89,9 @@ test('login form: wrong password shows the error, correct login opens the app wi
     assert.ok(!ui.doc.querySelector('#app-view').classList.contains('hidden'));
     assert.equal(ui.doc.querySelector('#login-message').textContent, '');
     assert.equal(ui.app.state.user.role, 'employee');
-    assert.ok(ui.doc.querySelector('#approval-count').classList.contains('hidden'));
+    const restricted = [...ui.doc.querySelectorAll("[data-role='admin'], [data-role='reviewer']")];
+    assert.ok(restricted.length > 0);
+    assert.ok(restricted.every(element => element.classList.contains('hidden')));
   } finally { if (ui) await closeApp(ui); await f.close(); }
 });
 
