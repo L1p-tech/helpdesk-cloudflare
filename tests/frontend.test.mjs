@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 import { createNotifications } from '../public/notifications.js';
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -52,7 +52,7 @@ test('HTML IDs are unique and every direct app selector has a target', async () 
   try {
     const ids=[...document.querySelectorAll('[id]')].map(el=>el.id);
     assert.equal(new Set(ids).size,ids.length);
-    const source=await readFile('public/app.js','utf8');
+    const source=(await Promise.all((await readdir('public')).filter(f=>f.endsWith('.js')).map(f=>readFile('public/'+f,'utf8')))).join('\n');
     for(const match of source.matchAll(/\$\("#([\w-]+)"\)/g)) assert.ok(document.getElementById(match[1]),match[1]);
   } finally {dom.window.close();delete globalThis.document;}
 });
@@ -60,7 +60,7 @@ test('HTML IDs are unique and every direct app selector has a target', async () 
 test('edit forms send the opened version and retain drafts after conflicts; reminder form sends UTC', async () => {
   const { build } = await import('esbuild');
   const source = await readFile('public/app.js','utf8');
-  const compiled = await build({stdin:{contents:source+'\nglobalThis.__app={state,openProposal,submitProposal,openSolutionDialog,submitSolution,notificationCenter};',resolveDir:process.cwd()+'/public'},bundle:true,format:'iife',write:false});
+  const compiled = await build({stdin:{contents:'import "./app.js";\nimport {state} from "./base.js";import {notificationCenter} from "./core.js";\nimport {openProposal,submitProposal} from "./proposals.js";\nimport {openSolutionDialog,submitSolution} from "./solutions.js";\nglobalThis.__app={state,openProposal,submitProposal,openSolutionDialog,submitSolution,notificationCenter};',resolveDir:process.cwd()+'/public'},bundle:true,format:'iife',write:false});
   const dom=new JSDOM(html,{url:'https://test.invalid',runScripts:'outside-only',pretendToBeVisual:true});
   const {window}=dom;const calls=[],alerts=[];
   window.HTMLCanvasElement.prototype.getContext=()=>new Proxy({}, {get:(_,key)=>key==='measureText'?()=>({width:0}):()=>({addColorStop(){}})});
@@ -110,10 +110,9 @@ test('edit forms send the opened version and retain drafts after conflicts; remi
   }
 });
 
-async function loadApp(exports) {
+async function loadApp(imports, exports) {
   const { build } = await import('esbuild');
-  const source = await readFile('public/app.js','utf8');
-  const compiled = await build({stdin:{contents:source+`\nglobalThis.__app={${exports}};`,resolveDir:process.cwd()+'/public'},bundle:true,format:'iife',write:false});
+  const compiled = await build({stdin:{contents:`import "./app.js";\n${imports}\nglobalThis.__app={${exports}};`,resolveDir:process.cwd()+'/public'},bundle:true,format:'iife',write:false});
   const dom=new JSDOM(html,{url:'https://test.invalid/',runScripts:'outside-only',pretendToBeVisual:true});
   const {window}=dom;
   window.HTMLCanvasElement.prototype.getContext=()=>new Proxy({}, {get:(_,key)=>key==='measureText'?()=>({width:0}):()=>({addColorStop(){}})});
@@ -125,7 +124,7 @@ async function loadApp(exports) {
 }
 
 test('placeholders skip PowerShell syntax; filling copies values, remembers them per case, cancel copies nothing', async () => {
-  const {window,app}=await loadApp('state,copyText,findPlaceholders,notificationCenter');
+  const {window,app}=await loadApp('import {state} from "./base.js"; import {notificationCenter} from "./core.js"; import {copyText,findPlaceholders} from "./templates.js";','state,copyText,findPlaceholders,notificationCenter');
   const written=[];
   Object.defineProperty(window.navigator,'clipboard',{value:{writeText:async text=>{written.push(text);}}});
   try {
@@ -155,7 +154,7 @@ test('placeholders skip PowerShell syntax; filling copies values, remembers them
 });
 
 test('routes map to views and respect roles', async () => {
-  const {window,app}=await loadApp('state,viewFromLocation,notificationCenter');
+  const {window,app}=await loadApp('import {state} from "./base.js";import {notificationCenter} from "./core.js"; import {viewFromLocation} from "./router.js";','state,viewFromLocation,notificationCenter');
   try {
     app.state.user={id:1,role:'employee',displayName:'Test'};
     window.location.hash='#/befehle';
@@ -173,7 +172,7 @@ test('routes map to views and respect roles', async () => {
 });
 
 test('assistant free text recognises typical user descriptions', async () => {
-  const {window,app}=await loadApp('state,matchAssistant,notificationCenter');
+  const {window,app}=await loadApp('import {state} from "./base.js";import {notificationCenter} from "./core.js"; import {matchAssistant} from "./assistant.js";','state,matchAssistant,notificationCenter');
   const cases = {
     'Outlook fragt ständig nach dem Passwort': 'outlook-kennwort',
     'Konto gesperrt': 'konto-gesperrt',
