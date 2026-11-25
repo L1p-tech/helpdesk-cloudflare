@@ -5,6 +5,7 @@ import { copyCommand } from "./templates.js";
 import { VIEW_ROUTES, loadBootstrap, switchView, viewFromLocation } from "./router.js";
 import { jumpToGlossaryEntry } from "./glossary.js";
 import { initializeChat } from "./chat.js";
+import "./generator.js";
 
 /*
  * Schulung: eigene Datei, die Anwendung reicht nur die Bausteine durch, die sie

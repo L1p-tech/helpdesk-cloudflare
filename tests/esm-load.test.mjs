@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { JSDOM } from 'jsdom';
 
@@ -27,7 +27,22 @@ test('public/app.js loads as native ES modules: no module evaluates before what 
     await new Promise(resolve => setTimeout(resolve, 100));
     assert.ok(requests.includes('/api/auth/me'));
     assert.ok(!document.querySelector('#login-view').classList.contains('hidden'));
+    assert.ok(document.querySelector('#diag-type').options.length > 0);
+    assert.ok(document.querySelector('#diag-checklist').children.length > 0);
   } finally {
     window.close();
   }
+});
+
+test('every module in public/ is reachable from app.js, so none silently never runs', async () => {
+  const seen = new Set();
+  const visit = async file => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    const source = await readFile('public/' + file, 'utf8');
+    for (const match of source.matchAll(/(?:import|export)[^;]*?from\s+"\.\/([^"]+)"|import\s+"\.\/([^"]+)"/g)) await visit(match[1] || match[2]);
+  };
+  await visit('app.js');
+  const all = (await readdir('public')).filter(file => file.endsWith('.js'));
+  assert.deepEqual(all.filter(file => !seen.has(file)), []);
 });
