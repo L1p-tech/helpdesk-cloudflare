@@ -94,3 +94,20 @@ test('login is blocked per IP after 20 failures, also for unknown usernames', as
     assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM login_attempts').first()).n,20);
   } finally { await f.close(); }
 });
+
+test('concurrent logins cannot exceed the per-IP limit and a success frees its slot', async () => {
+  const f=await fixture();
+  try {
+    const burst=await Promise.all(Array.from({length:40},(_,i)=>
+      f.request(null,'/api/auth/login','POST',{username:'gibt-es-nicht-'+i,password:'wrong test password'})));
+    assert.equal(burst.filter(r=>r.status===401).length,20);
+    assert.equal(burst.filter(r=>r.status===429).length,20);
+    await f.db.prepare('DELETE FROM login_attempts').run();
+    const admin=await f.user(); const user=await f.user('employee');
+    const name=(await f.db.prepare('SELECT username FROM users WHERE id=?1').bind(user.id).first()).username;
+    await f.request(admin,`/api/users/${user.id}`,'PATCH',{password:'new secure test password'});
+    const ok=await f.request(null,'/api/auth/login','POST',{username:name,password:'new secure test password'});
+    assert.equal(ok.status,200);
+    assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM login_attempts').first()).n,0);
+  } finally { await f.close(); }
+});

@@ -3,7 +3,9 @@
 -- Die Kontosperre (failed_login_count) schuetzt nur ein einzelnes Konto. Wer
 -- viele Benutzernamen mit einem Passwort durchprobiert oder nicht vorhandene
 -- Namen verwendet, wurde bisher nicht gebremst. Diese Tabelle zaehlt
--- Fehlversuche je IP; Eintraege werden beim Schreiben nach einem Tag geloescht.
+-- Anmeldeversuche je IP: Jeder Versuch reserviert vor der Pruefung einen
+-- Platz (atomar, damit parallele Anfragen das Limit nicht umgehen) und gibt ihn
+-- bei Erfolg wieder frei. Eintraege werden beim Schreiben nach einem Tag geloescht.
 CREATE TABLE login_attempts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ip TEXT NOT NULL,
