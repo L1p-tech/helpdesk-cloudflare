@@ -296,7 +296,7 @@ test('training content is consistent: ids, quiz answers, diagrams, icons, glossa
   const groups = new Set(TRAINING_GROUPS.map(group => group.id));
   const sprite = html;
   assert.equal(PASS_PERCENT, 70, 'muss zum Worker (TRAINING_PASS_PERCENT) passen');
-  const worker = await readFile('src/index.ts', 'utf8');
+  const worker = await readFile('src/handlers/training.ts', 'utf8');
   assert.match(worker, /TRAINING_PASS_PERCENT = 70/);
 
   const ids = TRAINING_MODULES.map(module => module.id);
