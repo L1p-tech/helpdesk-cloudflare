@@ -238,6 +238,15 @@ test('assistant free text recognises typical user descriptions', async () => {
     'externe Festplatte erscheint nicht': 'usb-geraet',
     'Mail mit Anhang kommt zurück, zu groß': 'anhang-gross',
     'Kalender Stellvertretung einrichten': 'kalender-freigabe',
+    'Beamer im Besprechungsraum zeigt kein Bild': 'beamer-besprechungsraum',
+    'Monitor flackert und hat Streifen': 'bildschirm-flackert',
+    'Bluetooth Kopfhörer verbindet nicht': 'bluetooth-verbindet-nicht',
+    'Laptop wird sehr heiß und der Lüfter ist laut': 'laptop-ueberhitzt',
+    'Teams Nachricht wird nicht gesendet': 'teams-nachrichten',
+    'externe Teams Besprechung beitreten geht nicht': 'teams-gast-extern',
+    'Mails werden automatisch an eine fremde Adresse weitergeleitet': 'mail-regeln-weiterleitung',
+    'Senden als für Funktionspostfach geht nicht': 'mail-senden-als',
+    'Mitarbeiter hat einen USB Stick gefunden und angesteckt': 'fremder-usb-stick',
   };
   try {
     app.state.solutions=[];
