@@ -1824,7 +1824,7 @@ export const ASSISTANT_GUIDES = {
     schritte: [
       "Kabel und Anschlüsse prüfen, den Monitor einmal an einem anderen Anschluss testen",
       "Bildwiederholrate in den erweiterten Anzeige-Einstellungen prüfen (meist 60 Hz)",
-      "Task-Manager öffnen: flackert er mit, liegt es am Grafiktreiber, sonst an Kabel oder Monitor",
+      "Task-Manager öffnen: flackert er mit, den Grafiktreiber prüfen; bleibt er ruhig, eine inkompatible Anwendung als Ursache prüfen (Programm schließen, aktualisieren oder ohne Hardwarebeschleunigung starten)",
       "Grafiktreiber auf Version prüfen und über Geräte-Manager oder Herstellerpaket aktualisieren",
       "Mit anderem Monitor / Kabel gegenprüfen, um Gerät und Zubehör zu trennen",
     ],
@@ -1835,7 +1835,7 @@ export const ASSISTANT_GUIDES = {
       "Geräte-Manager öffnen",
       "Grafik-Diagnose öffnen",
     ],
-    eskalation: "Bleibt das Flackern mit anderem Kabel und Monitor bestehen: Hardware-Defekt am Gerät, Austausch über den Hardware-Prozess.",
+    eskalation: "Bleibt das Flackern mit anderem Kabel und Monitor bestehen und liegt es weder am Treiber noch an einer Anwendung: Defekt am Gerät (Grafikausgabe oder Display) prüfen, Austausch über den Hardware-Prozess.",
   },
 
   "bluetooth-verbindet-nicht": {
