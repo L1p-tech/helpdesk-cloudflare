@@ -78,6 +78,8 @@ export const ASSISTANT_TREE = {
       { text: "Signatur fehlt oder falsch", leitfaden: "signatur" },
       { text: "Anhang zu groß", leitfaden: "anhang-gross" },
       { text: "Kalender freigeben / Stellvertretung", leitfaden: "kalender-freigabe" },
+      { text: "Unerwartete Weiterleitung / Regel im Postfach", leitfaden: "mail-regeln-weiterleitung" },
+      { text: "Senden als / im Auftrag klappt nicht", leitfaden: "mail-senden-als" },
       { text: "Etwas anderes", leitfaden: "mail-sonstiges" },
     ],
   },
@@ -89,6 +91,8 @@ export const ASSISTANT_TREE = {
       { text: "Bildschirm teilen geht nicht", leitfaden: "teams-teilen" },
       { text: "Telefonie: keine Anrufe / Rufnummer fehlt", leitfaden: "teams-telefonie" },
       { text: "Status falsch / keine Benachrichtigungen", leitfaden: "teams-status" },
+      { text: "Nachrichten kommen nicht an / verzögert", leitfaden: "teams-nachrichten" },
+      { text: "Externe Besprechung / Gastzugriff", leitfaden: "teams-gast-extern" },
       { text: "Etwas anderes", leitfaden: "teams-sonstiges" },
     ],
   },
@@ -168,6 +172,7 @@ export const ASSISTANT_TREE = {
       { text: "Kein Speicherplatz", leitfaden: "speicherplatz" },
       { text: "Startmenü, Taskleiste oder Suche reagiert nicht", leitfaden: "startmenue" },
       { text: "Uhrzeit oder Datum falsch", leitfaden: "uhrzeit" },
+      { text: "Laptop heiß, Lüfter dauerlaut", leitfaden: "laptop-ueberhitzt" },
       { text: "Etwas anderes", leitfaden: "rechner-sonstiges" },
     ],
   },
@@ -194,6 +199,9 @@ export const ASSISTANT_TREE = {
       { text: "Webcam", leitfaden: "webcam" },
       { text: "Laptop-Akku / lädt nicht", leitfaden: "akku" },
       { text: "USB-Stick / externe Festplatte", leitfaden: "usb-geraet" },
+      { text: "Beamer / Besprechungsraum: kein Bild", leitfaden: "beamer-besprechungsraum" },
+      { text: "Bildschirm flackert / Streifen", leitfaden: "bildschirm-flackert" },
+      { text: "Bluetooth-Gerät verbindet nicht", leitfaden: "bluetooth-verbindet-nicht" },
       { text: "Gerät defekt / Austausch", leitfaden: "hardware-defekt" },
     ],
   },
@@ -233,6 +241,7 @@ export const ASSISTANT_TREE = {
       { text: "Virenwarnung / Rechner verhält sich seltsam", leitfaden: "virus" },
       { text: "Laptop oder Handy verloren / gestohlen", leitfaden: "geraet-verloren" },
       { text: "Fremde Anmeldung / Konto missbraucht", leitfaden: "konto-kompromittiert" },
+      { text: "Fremder oder gefundener USB-Stick", leitfaden: "fremder-usb-stick" },
     ],
   },
 };
@@ -1777,6 +1786,230 @@ export const ASSISTANT_GUIDES = {
     eskalation: "Sicherheitsvorfall: sofort an das Sicherheitsteam.",
     dringend: true,
   },
+
+  "beamer-besprechungsraum": {
+    titel: "Kein Bild im Besprechungsraum / am Beamer",
+    stichworte: ["beamer", "projektor", "besprechungsraum", "konferenzraum", "praesentation", "kein bild", "hdmi", "grosser bildschirm"],
+    fragen: [
+      "Ist es der eigene Laptop oder der fest installierte Raum-PC?",
+      "Geht es mit einem anderen Laptop oder Kabel?",
+      "Zeigt der Beamer / das Display eine Meldung wie „Kein Signal“?",
+    ],
+    schritte: [
+      "Am Beamer / Display die richtige Eingangsquelle wählen (HDMI 1, HDMI 2, DisplayPort)",
+      "Kabel und Adapter an beiden Enden prüfen, einmal ab- und wieder anstecken",
+      "Am Laptop Windows-Taste + P drücken und „Duplizieren“ oder „Erweitern“ wählen",
+      "In den Anzeige-Einstellungen prüfen, ob das zweite Display erkannt wird („Erkennen“)",
+      "Bei unscharfem Bild oder Rand die Auflösung auf die Empfehlung des Beamers stellen",
+      "Mit Dockingstation: Dock vom Strom trennen, 30 Sekunden warten, neu verbinden",
+      "Hilft nichts: anderes Kabel / anderen Laptop testen, um Raumtechnik und Gerät zu trennen",
+    ],
+    befehle: [
+      "Anzeige-Einstellungen öffnen",
+      "Monitore anzeigen",
+      "Grafikkarte und Auflösung anzeigen",
+      "Hardware neu einlesen",
+    ],
+    eskalation: "Funktioniert ein zweiter Laptop ebenfalls nicht: Raumtechnik / Facility-Team mit Raumnummer und Fehlerbild informieren.",
+  },
+
+  "bildschirm-flackert": {
+    titel: "Bildschirm flackert oder zeigt Streifen",
+    stichworte: ["flackert", "flimmern", "streifen", "bildfehler", "artefakte", "bild springt", "monitor flackert"],
+    fragen: [
+      "Flackert nur ein Bildschirm oder alle, auch das Laptop-Display?",
+      "Tritt es dauernd auf oder nur bei bestimmten Programmen?",
+      "Hat sich zuletzt etwas geändert (Treiber-Update, neues Kabel, Dockingstation)?",
+    ],
+    schritte: [
+      "Kabel und Anschlüsse prüfen, den Monitor einmal an einem anderen Anschluss testen",
+      "Bildwiederholrate in den erweiterten Anzeige-Einstellungen prüfen (meist 60 Hz)",
+      "Task-Manager öffnen: flackert er mit, den Grafiktreiber prüfen; bleibt er ruhig, eine inkompatible Anwendung als Ursache prüfen (Programm schließen, aktualisieren oder ohne Hardwarebeschleunigung starten)",
+      "Grafiktreiber auf Version prüfen und über Geräte-Manager oder Herstellerpaket aktualisieren",
+      "Mit anderem Monitor / Kabel gegenprüfen, um Gerät und Zubehör zu trennen",
+    ],
+    befehle: [
+      "Anzeige-Einstellungen öffnen",
+      "Grafikkarte und Auflösung anzeigen",
+      "Treiberversion eines Geräts anzeigen",
+      "Geräte-Manager öffnen",
+      "Grafik-Diagnose öffnen",
+    ],
+    eskalation: "Bleibt das Flackern mit anderem Kabel und Monitor bestehen und liegt es weder am Treiber noch an einer Anwendung: Defekt am Gerät (Grafikausgabe oder Display) prüfen, Austausch über den Hardware-Prozess.",
+  },
+
+  "bluetooth-verbindet-nicht": {
+    titel: "Bluetooth-Gerät verbindet nicht",
+    stichworte: ["bluetooth", "koppeln", "pairing", "kopfhoerer", "maus verbindet nicht", "tastatur verbindet nicht", "verbunden aber kein ton"],
+    fragen: [
+      "Um welches Gerät geht es (Headset, Maus, Tastatur) und funktioniert es an einem anderen Gerät?",
+      "Ist das Gerät geladen und im Kopplungsmodus?",
+      "War es schon einmal gekoppelt?",
+    ],
+    schritte: [
+      "Bluetooth in den Einstellungen aus- und wieder einschalten, Flugmodus prüfen",
+      "Gerät laden und neu in den Kopplungsmodus versetzen",
+      "Gerät in Windows entfernen und neu koppeln",
+      "Wird es verbunden, aber es kommt kein Ton: Ausgabegerät in den Sound-Einstellungen wählen",
+      "Treiber des Bluetooth-Adapters im Geräte-Manager prüfen, Gerät ggf. deaktivieren und aktivieren",
+      "Bei Funkstörungen näher heran gehen und andere Geräte (Hotspot, USB-3-Hub) testweise entfernen",
+    ],
+    befehle: [
+      "Bluetooth-Einstellungen öffnen",
+      "Bluetooth-Geräte anzeigen",
+      "Audiogeräte anzeigen",
+      "Sound-Einstellungen öffnen",
+      "Geräte-Manager öffnen",
+    ],
+    eskalation: "Adapter fehlt im Geräte-Manager oder meldet einen Fehler: Treiber-/BIOS-Update prüfen, sonst Hardware-Tausch.",
+  },
+
+  "laptop-ueberhitzt": {
+    titel: "Laptop wird heiß, Lüfter dauerhaft laut",
+    stichworte: ["ueberhitzt", "heiss", "luefter laut", "luefter", "warm", "ventilator", "laptop heiss", "drosselt"],
+    fragen: [
+      "Seit wann tritt es auf und bei welcher Tätigkeit (Videokonferenz, Leerlauf, Dockingstation)?",
+      "Steht das Gerät auf einer weichen Unterlage oder sind die Lüftungsschlitze verdeckt?",
+    ],
+    schritte: [
+      "Auf harte, freie Unterlage stellen, Lüftungsschlitze prüfen und vorsichtig vom Staub befreien",
+      "Im Task-Manager prüfen, welcher Prozess dauerhaft viel Prozessorleistung verbraucht",
+      "Defender-Scan oder Windows-Update als Ursache ausschließen, kurz abwarten, ob die Last sinkt",
+      "Energiemodus auf „Ausgewogen“ stellen, Autostart-Programme ausdünnen",
+      "BIOS und Treiber auf aktuellen Stand bringen",
+      "Bleibt die Temperatur hoch: Gerät zur Reinigung / Lüftertausch einplanen",
+    ],
+    befehle: [
+      "Prozessor und Auslastung anzeigen",
+      "CPU-Fresser finden",
+      "Autostart-Programme anzeigen",
+      "Energieeinstellungen-Bericht erstellen",
+      "BIOS-Version anzeigen",
+    ],
+    eskalation: "Gerät schaltet sich ab, riecht verbrannt oder der Akku ist aufgebläht: sofort vom Strom trennen und nicht weiter benutzen, Hardware-Prozess starten.",
+  },
+
+  "teams-nachrichten": {
+    titel: "Teams: Nachrichten kommen nicht an oder verzögert",
+    stichworte: ["teams nachricht", "teams chat", "nachricht nicht gesendet", "nachricht verzoegert", "chat laedt nicht", "benachrichtigung teams", "teams benachrichtigungen"],
+    fragen: [
+      "Betrifft es einen Chat, einen Kanal oder alle Unterhaltungen?",
+      "Geht es in der Browser-Version unter teams.microsoft.com?",
+      "Zeigt Teams oben ein Warnsymbol oder „Verbindung wird hergestellt“?",
+    ],
+    schritte: [
+      "Internetverbindung prüfen, VPN kurz trennen und testen",
+      "In der Browser-Version gegenprüfen: dort ok bedeutet Fehler in der App",
+      "Status bei Microsoft prüfen (Admin-Center: Dienstintegrität), ob eine Störung vorliegt",
+      "Teams komplett beenden (auch im Infobereich) und neu starten",
+      "Cache von Teams leeren, danach neu anmelden",
+      "Benachrichtigungen: in Teams und in Windows (Fokus-Assistent / Nicht stören) prüfen",
+    ],
+    befehle: [
+      "Teams beenden",
+      "Teams-Cache leeren (neues Teams)",
+      "Teams-Cache leeren (klassisch)",
+      "Proxy-Einstellungen des Systems anzeigen",
+    ],
+    eskalation: "Betrifft es mehrere Benutzer gleichzeitig: Störung bei Microsoft oder im Netz, an das Netzwerk- / M365-Team melden.",
+  },
+
+  "teams-gast-extern": {
+    titel: "Teams: Externe Besprechung oder Gastzugriff funktioniert nicht",
+    stichworte: ["teams extern", "gast", "externe besprechung", "einladung teams", "teams link", "als gast", "fremder tenant", "besprechung beitreten"],
+    fragen: [
+      "Soll der Benutzer einer externen Besprechung beitreten oder soll ein Externer zu uns eingeladen werden?",
+      "Welche Fehlermeldung erscheint (Zugriff verweigert, Warteraum, Anmeldung nicht möglich)?",
+      "Geht der Beitritt über den Link im Browser?",
+    ],
+    schritte: [
+      "Einladungslink im Browser öffnen und „Im Web fortfahren“ wählen",
+      "Wird die Firma als Fremd-Tenant blockiert: Meldung festhalten und an Teams-Administration weitergeben",
+      "Bei Anmeldung mit falschem Konto: Konto in Teams oben rechts prüfen oder privates Browserfenster nutzen",
+      "Externe, die zu uns wollen: Besprechungsoptionen prüfen (Lobby, „Wer kann umgehen?“)",
+      "Gastkonten werden über die Teams-/Entra-Administration eingeladen, nicht durch den Helpdesk angelegt",
+    ],
+    befehle: [
+      "Teams beenden",
+      "Teams-Cache leeren (neues Teams)",
+    ],
+    eskalation: "Gast- oder Fremd-Tenant-Freigaben sind Sache der M365-Administration: mit Namen der Organisation, Fehlertext und Besprechungszeit weitergeben.",
+  },
+
+  "mail-regeln-weiterleitung": {
+    titel: "Unerwartete Weiterleitung oder Regel im Postfach",
+    stichworte: ["weiterleitung", "weiterleitungsregel", "posteingangsregel", "mails verschwinden", "mails landen im ordner", "regel", "automatisch weitergeleitet", "mail umleitung"],
+    fragen: [
+      "Hat der Benutzer die Regel selbst angelegt oder ist sie unbekannt?",
+      "Gehen Mails an eine externe Adresse, die der Benutzer nicht kennt?",
+      "Gab es zuletzt eine Phishing-Mail, auf die der Benutzer reagiert hat?",
+    ],
+    schritte: [
+      "Regeln in Outlook prüfen (Datei > Regeln und Benachrichtigungen) und mit dem Benutzer durchgehen",
+      "Weiterleitung im Postfach prüfen (Outlook-Einstellungen oder Exchange-Abfrage)",
+      "Unbekannte Weiterleitung an externe Adresse: nicht stillschweigend löschen, zuerst als möglichen Missbrauch behandeln",
+      "Bei Verdacht Sicherheitsvorfall eröffnen und mit dem Security-Team das Konto prüfen",
+      "Nach Klärung die Regel entfernen und Benutzer zu sicherem Verhalten beraten",
+    ],
+    befehle: [
+      "Weiterleitungsregeln eines Postfachs prüfen",
+      "Postfach-Weiterleitung prüfen",
+      "Mit Exchange Online verbinden",
+      "Nachrichtenverfolgung",
+    ],
+    eskalation: "Eine unbekannte Weiterleitung nach außen gilt als Hinweis auf ein übernommenes Konto: sofort an Security eskalieren (siehe „Konto kompromittiert“).",
+  },
+
+  "mail-senden-als": {
+    titel: "Senden als / im Auftrag von klappt nicht",
+    stichworte: ["senden als", "im auftrag", "freigegebenes postfach senden", "absender aendern", "von adresse", "shared mailbox senden", "funktionspostfach"],
+    fragen: [
+      "Von welchem Postfach soll gesendet werden, und hat der Benutzer dafür die Berechtigung „Senden als“ oder „Im Auftrag“?",
+      "Wurde das Postfach erst kürzlich eingerichtet oder die Berechtigung gerade erst vergeben?",
+      "Welche Meldung erscheint (Zustellung nicht möglich, Absender nicht erlaubt)?",
+    ],
+    schritte: [
+      "Postfachberechtigungen des Zielpostfachs prüfen: „Senden als“ und „Im Auftrag“ sind getrennte Rechte",
+      "Nach neu vergebener Berechtigung bis zu 60 Minuten warten, Outlook neu starten",
+      "In Outlook das Feld „Von“ einblenden (Optionen > Von) und die Adresse dort wählen",
+      "Bei neuer Outlook-Version das Postfach direkt über „Von“ hinzufügen",
+      "Unbekannten Absender oder Zustellfehler mit der Nachrichtenverfolgung nachvollziehen",
+    ],
+    befehle: [
+      "Postfachberechtigungen anzeigen",
+      "Mit Exchange Online verbinden",
+      "Nachrichtenverfolgung",
+      "Postfachtyp anzeigen",
+      "Outlook im abgesicherten Modus starten",
+    ],
+    eskalation: "Berechtigungen vergibt die Postfachverwaltung auf Antrag des Postfachverantwortlichen, nicht der Helpdesk.",
+  },
+
+  "fremder-usb-stick": {
+    titel: "Fremder oder gefundener USB-Stick",
+    stichworte: ["usb stick gefunden", "fremder stick", "unbekannter usb", "stick gefunden", "wechseldatentraeger unbekannt", "usb unbekannt", "speicherstick gefunden"],
+    dringend: true,
+    fragen: [
+      "Wurde der Stick bereits an einen Rechner angesteckt?",
+      "An welchem Rechner und wann?",
+      "Wurde eine Datei auf dem Stick geöffnet?",
+    ],
+    schritte: [
+      "Der Benutzer soll den Stick nicht anstecken und nicht weitergeben, sondern aufbewahren",
+      "Wurde er bereits angesteckt: Rechner nicht ausschalten, vom Netzwerk trennen lassen und Security informieren",
+      "Defender-Schnellscan und Funde auf dem betroffenen Rechner prüfen",
+      "Den Stick nicht selbst untersuchen, sondern an Security übergeben (Fundort, Zeit, Person notieren)",
+      "Ticket mit Zeitablauf dokumentieren",
+    ],
+    befehle: [
+      "USB-Geräte anzeigen",
+      "Defender-Status anzeigen",
+      "Defender-Schnellscan starten",
+      "Defender-Funde anzeigen",
+      "Datei-Hash berechnen",
+    ],
+    eskalation: "Immer an Security melden. Wurde der Stick angesteckt: wie ein Virusverdacht behandeln, Rechner isolieren lassen.",
+  },
 };
 
 /*
@@ -1785,6 +2018,11 @@ export const ASSISTANT_GUIDES = {
  * Buchstaben treffen auch als Wortanfang: "druck" findet "druckt", "drucken".
  */
 export const ASSISTANT_SYNONYMS = [
+  ["beamer", "projektor", "besprechungsraum", "konferenzraum", "praesentation"],
+  ["flackert", "flimmern", "streifen", "bildfehler"],
+  ["ueberhitzt", "heiss", "luefter", "ventilator"],
+  ["weiterleitung", "umleitung", "weitergeleitet", "posteingangsregel"],
+  ["bluetooth", "koppeln", "pairing", "kopfhoerer"],
   ["passwort", "kennwort", "pw", "passwd", "password"],
   ["hello", "pin", "fingerabdruck", "gesichtserkennung"],
   ["bitlocker", "wiederherstellungsschluessel", "recovery", "schluessel"],

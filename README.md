@@ -17,7 +17,7 @@
   wird vorbelegt (nur im Browser-Tab, nicht in der Datenbank)
 - Symptom-Assistent: erkennt Probleme aus einer Beschreibung in eigenen
   Worten (Synonyme, Wortformen) oder führt Schritt für Schritt durch 16
-  Bereiche zu 94 Leitfäden mit Rückfragen, abhakbaren Schritten, passenden
+  Bereiche zu 103 Leitfäden mit Rückfragen, abhakbaren Schritten, passenden
   Befehlen und Lösungen; Ergebnis geht in Ticket-Generator oder Fall.
   Wissen ergänzen in `public/assistant-data.js`
 - Befehlsbibliothek mit rund 225 Befehlen in 19 Bereichen (u. a. Active
@@ -28,7 +28,7 @@
   Rechner vom Netz nehmen bzw. neu starten (ein Test sichert das ab).
   Neue Standardbefehle in `src/seed-data.ts`; sie werden beim nächsten
   Seitenaufruf automatisch ergänzt, ohne Migration
-- Glossar mit rund 120 Fachwörtern aus Vorlagen, Befehlen und Lösungen,
+- Glossar mit rund 130 Fachwörtern aus Vorlagen, Befehlen und Lösungen,
   jeweils mit Beispiel und Querverweisen; auch über die Schnellsuche
   erreichbar. Begriffe ergänzen in `public/glossary-data.js`
 - Schulung mit 16 Lernmodulen in vier Gruppen (Einarbeitung, Technik, Microsoft-Welt,

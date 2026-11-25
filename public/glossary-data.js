@@ -422,6 +422,39 @@ export const GLOSSARY = [
     siehe: ["Abgesicherter Modus"],
   },
 
+  {
+    begriff: "Weiterleitungsregel",
+    kategorie: "E-Mail & Microsoft 365",
+    auch: ["Posteingangsregel", "Regel", "Weiterleitung", "Inbox Rule"],
+    text: "Eine Einstellung im Postfach, die eingehende Mails automatisch verschiebt, löscht oder an eine andere Adresse sendet. Angreifer legen nach einem Kontoübergriff gern unbemerkt Weiterleitungen nach außen an.",
+    beispiel: "Benutzer vermisst Mails: Regeln prüfen. Eine unbekannte Weiterleitung nach außen sofort an Security melden.",
+    siehe: ["Postfach", "Phishing", "Nachrichtenablaufverfolgung"],
+  },
+  {
+    begriff: "Senden als / Im Auftrag",
+    kategorie: "E-Mail & Microsoft 365",
+    auch: ["Send As", "Send on Behalf", "Absender ändern"],
+    text: "Zwei getrennte Rechte für fremde Postfächer. Bei „Senden als“ erscheint nur das Postfach als Absender, bei „Im Auftrag“ steht zusätzlich, wer die Mail tatsächlich geschrieben hat.",
+    beispiel: "Funktionspostfach soll antworten: beide Rechte unterscheiden und das passende beantragen.",
+    siehe: ["Freigegebenes Postfach", "Stellvertretung"],
+  },
+  {
+    begriff: "Gastzugriff",
+    kategorie: "E-Mail & Microsoft 365",
+    auch: ["Gast", "Gastkonto", "Externe Zusammenarbeit", "B2B"],
+    text: "Externe Personen erhalten ein eingeschränktes Konto in unserem Microsoft-365-Mandanten, um etwa an Teams oder Dokumenten mitzuarbeiten. Gäste werden von der Administration eingeladen, nicht über den Helpdesk angelegt.",
+    beispiel: "Dienstleister kommt nicht in den Teams-Kanal: prüfen, ob er als Gast eingeladen und die Einladung angenommen wurde.",
+    siehe: ["Tenant", "Entra ID"],
+  },
+  {
+    begriff: "Warteraum (Lobby)",
+    kategorie: "E-Mail & Microsoft 365",
+    auch: ["Lobby", "Warteraum", "Besprechungsoptionen"],
+    text: "Bei Teams-Besprechungen halten Teilnehmende im Warteraum, bis jemand sie hineinlässt. Die Besprechungsoptionen legen fest, wer ihn umgehen darf, zum Beispiel nur Personen aus der eigenen Organisation.",
+    beispiel: "Externer wartet seit Minuten: Organisator muss ihn im Warteraum zulassen.",
+    siehe: ["Gastzugriff"],
+  },
+
   /* ---------- Windows & System ---------- */
   {
     begriff: "Abgesicherter Modus",
@@ -607,6 +640,55 @@ export const GLOSSARY = [
     auch: ["Seriennummer", "Hostname", "Computername", "PC-Name", "Inventarnummer"],
     text: "Seriennummer identifiziert das Gerät beim Hersteller (Garantie), der Hostname ist sein Name im Netzwerk (z. B. PC-0815).",
     beispiel: "Für Garantiefälle die Seriennummer, für Remotezugriff den Hostnamen notieren.",
+  },
+
+  {
+    begriff: "HDMI / DisplayPort",
+    kategorie: "Hardware",
+    auch: ["HDMI", "DisplayPort", "DP", "Bildkabel", "USB-C Video"],
+    text: "Kabelanschlüsse, über die ein Laptop Bild (und bei HDMI auch Ton) an Monitor oder Beamer sendet. Moderne Laptops liefern das Bild oft über USB-C mit Adapter.",
+    beispiel: "Im Besprechungsraum kommt kein Bild: erst die Eingangsquelle am Beamer und den Adapter prüfen.",
+    siehe: ["Dockingstation", "Bildwiederholrate"],
+  },
+  {
+    begriff: "Bildwiederholrate",
+    kategorie: "Hardware",
+    auch: ["Hertz", "Hz", "Refresh Rate"],
+    text: "Wie oft pro Sekunde das Bild neu aufgebaut wird, angegeben in Hertz. Eine falsch gestellte Rate kann Flackern oder ein schwarzes Bild verursachen.",
+    beispiel: "Monitor flackert nach Treiber-Update: Rate in den erweiterten Anzeige-Einstellungen auf 60 Hz prüfen.",
+    siehe: ["Treiber", "HDMI / DisplayPort"],
+  },
+  {
+    begriff: "Bluetooth-Kopplung",
+    kategorie: "Hardware",
+    auch: ["Pairing", "Koppeln", "Bluetooth"],
+    text: "Das einmalige Verbinden zweier Bluetooth-Geräte, zum Beispiel Laptop und Headset. Das Gerät muss dafür im Kopplungsmodus sein. Danach merken sich beide Seiten die Verbindung.",
+    beispiel: "Headset ist verbunden, aber es kommt kein Ton: oft ist in Windows ein anderes Ausgabegerät gewählt.",
+    siehe: ["Treiber", "Geräte-Manager"],
+  },
+  {
+    begriff: "Thermisches Drosseln",
+    kategorie: "Hardware",
+    auch: ["Throttling", "Überhitzung", "Temperaturdrosselung"],
+    text: "Wird ein Prozessor zu heiß, senkt er automatisch seine Leistung, um sich zu schützen. Der Rechner wird dann spürbar langsam, obwohl er nicht defekt ist.",
+    beispiel: "Laptop ist in Videokonferenzen träge und der Lüfter läuft laut: Lüftungsschlitze und Prozesslast prüfen.",
+    siehe: ["Task-Manager", "BIOS / Firmware"],
+  },
+  {
+    begriff: "Akku-Zyklen",
+    kategorie: "Hardware",
+    auch: ["Ladezyklen", "Akkuverschleiß", "Akkugesundheit"],
+    text: "Ein Zyklus ist einmal vollständiges Laden und Entladen. Mit jedem Zyklus verliert ein Akku etwas Kapazität. Nach einigen hundert Zyklen hält er sichtbar kürzer.",
+    beispiel: "Laptop hält nur noch eine Stunde: Akkubericht erstellen und Kapazität mit dem Ursprungswert vergleichen.",
+    siehe: ["Seriennummer / Hostname"],
+  },
+  {
+    begriff: "SSD / Festplatte",
+    kategorie: "Hardware",
+    auch: ["SSD", "HDD", "Datenträger", "NVMe"],
+    text: "Der Speicher, auf dem Windows und alle Dateien liegen. Eine SSD ist deutlich schneller als eine klassische Festplatte (HDD). Ist der Datenträger fast voll oder defekt, wird der Rechner langsam oder startet nicht.",
+    beispiel: "Rechner friert beim Start ein: Gesundheitsstatus des Datenträgers prüfen, bevor man Software neu installiert.",
+    siehe: ["Datenträgerbereinigung", "Backup / Restore"],
   },
 
   /* ---------- Befehle ---------- */
