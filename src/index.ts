@@ -340,6 +340,9 @@ async function createInitialAdmin(request: Request, env: Env): Promise<Response>
   return json({ ok: true }, { status: 201 });
 }
 
+const LOGIN_IP_MAX_FAILURES = 20;
+const LOGIN_IP_WINDOW_MINUTES = 15;
+
 async function handleAuth(
   request: Request,
   env: Env,
@@ -352,12 +355,37 @@ async function handleAuth(
 
   if (path === "/api/auth/login" && request.method === "POST") {
     const body = await readJson<Record<string, unknown>>(request);
-    const result = await login(
-      request,
-      env,
-      requiredString(body.username, "Benutzername", 40),
-      requiredString(body.password, "Passwort", 200),
-    );
+    const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+    const results = await env.DB.batch([
+      env.DB.prepare("DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-1 day')"),
+      env.DB.prepare(
+        `INSERT INTO login_attempts (ip)
+         SELECT ?1 WHERE (
+           SELECT COUNT(*) FROM login_attempts
+           WHERE ip = ?1 AND attempted_at > datetime('now', '-' || ?2 || ' minutes')
+         ) < ?3`,
+      ).bind(ip, LOGIN_IP_WINDOW_MINUTES, LOGIN_IP_MAX_FAILURES),
+    ]);
+    const reservation = results[1]!;
+    if (reservation.meta.changes === 0) {
+      throw new HttpError(429, "Zu viele Fehlversuche von dieser Adresse. Bitte später erneut versuchen.");
+    }
+    const attemptId = reservation.meta.last_row_id;
+
+    let result;
+    try {
+      result = await login(
+        request,
+        env,
+        requiredString(body.username, "Benutzername", 40),
+        requiredString(body.password, "Passwort", 200),
+      );
+    } catch (error) {
+      const failedCredentials = error instanceof HttpError && (error.status === 401 || error.status === 429);
+      if (!failedCredentials) await env.DB.prepare("DELETE FROM login_attempts WHERE id = ?1").bind(attemptId).run();
+      throw error;
+    }
+    await env.DB.prepare("DELETE FROM login_attempts WHERE id = ?1").bind(attemptId).run();
 
     await audit(env, result.user.id, "login", "session", null);
     return json(

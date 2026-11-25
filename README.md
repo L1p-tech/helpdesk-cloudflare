@@ -169,6 +169,25 @@ Danach im Cloudflare-Dashboard:
 3. **Settings → Domains & Routes**
 4. eigene Domain hinzufügen, zum Beispiel `helpdesk.deine-domain.de`
 
+## Datensicherung
+
+`npm run db:backup` exportiert die Produktionsdatenbank nach
+`backups/helpdesk-JJJJ-MM-TT.sql` (die letzten 30 Dateien bleiben erhalten;
+der Ordner ist nicht im Repository). Dafür muss `wrangler` angemeldet sein.
+Für eine tägliche Sicherung den Befehl per Cron oder Aufgabenplanung
+ausführen, zum Beispiel:
+
+```
+0 3 * * * cd /pfad/zum/projekt && npm run db:backup
+```
+
+Die Datei enthält Passwort-Hashes und alle Fallinhalte, deshalb gehört sie an
+einen geschützten Ort. Einspielen in eine leere Datenbank:
+`npx wrangler d1 execute helpdesk-db --remote --file backups/<datei>.sql`.
+Zusätzlich bietet Cloudflare D1 „Time Travel“: Wiederherstellung auf einen
+beliebigen Zeitpunkt der letzten 30 Tage
+(`npx wrangler d1 time-travel restore helpdesk-db --timestamp=<ISO-Zeit>`).
+
 ## Rollen
 
 - `employee`: Vorlagen nutzen und Vorschläge einreichen
@@ -182,6 +201,8 @@ Danach im Cloudflare-Dashboard:
 - Session-Tokens nur gehasht in D1
 - `HttpOnly`, `Secure`, `SameSite=Strict`
 - Kontosperre nach fünf Fehlversuchen
+- zusätzlich höchstens 20 Fehlversuche je IP-Adresse in 15 Minuten
+  (Tabelle `login_attempts`, Migration 0024)
 - Rechteprüfung ausschließlich im Worker
 - Mutationen werden auf gleiche Origin geprüft
 - hohe Spielscores werden plausibilisiert
@@ -191,8 +212,9 @@ Danach im Cloudflare-Dashboard:
 
 - starke individuelle Startpasswörter
 - erzwungener Passwortwechsel bei Erstanmeldung
-- Cloudflare WAF-/Rate-Limit-Regel für `/api/auth/login`
-- täglicher D1-Export oder regelmäßige Backups
+- optional zusätzlich eine Cloudflare WAF-/Rate-Limit-Regel für `/api/auth/login`
+  (die Begrenzung je IP im Worker ist bereits eingebaut)
+- Backups einrichten, siehe Abschnitt „Datensicherung“
 - interne Datenschutzprüfung
 - Test mit zwei parallel angemeldeten Benutzern
 
