@@ -14,9 +14,8 @@ async function until(condition) {
   assert.fail('condition not reached in time');
 }
 const html = await readFile('public/index.html', 'utf8');
-const source = await readFile('public/app.js', 'utf8');
 const compiled = await build({
-  stdin: { contents: source + '\nglobalThis.__app={state,openProposal};', resolveDir: process.cwd() + '/public' },
+  stdin: { contents: 'import "./app.js";\nimport { state } from "./base.js";\nimport { openProposal } from "./proposals.js";\nimport { switchView, VIEW_ROUTES } from "./router.js";\nglobalThis.__app={state,openProposal,switchView,VIEW_ROUTES};', resolveDir: process.cwd() + '/public' },
   bundle: true, format: 'iife', write: false,
 });
 
@@ -55,9 +54,9 @@ async function closeApp(ui) {
   ui.window.close();
 }
 
-async function employeeWithPassword(f, password) {
+async function employeeWithPassword(f, password, role = 'employee') {
   const admin = await f.user();
-  const employee = await f.user('employee');
+  const employee = await f.user(role);
   const reset = await f.request(admin, `/api/users/${employee.id}`, 'PATCH', { password });
   assert.equal(reset.status, 200);
   const row = await f.db.prepare('SELECT username FROM users WHERE id=?1').bind(employee.id).first();
@@ -118,4 +117,29 @@ test('employee submits a template proposal through the form and it lands as pend
     assert.equal(row.submitted_by, id);
     assert.ok(!ui.doc.querySelector('#proposal-dialog').hasAttribute('open'));
   } finally { if (ui) await closeApp(ui); await f.close(); }
+});
+
+test('every view opens for an admin without errors', async () => {
+  const f = await fixture();
+  const errors = [];
+  const onRejection = reason => errors.push(String(reason?.stack || reason));
+  process.on('unhandledRejection', onRejection);
+  let ui;
+  try {
+    const { username } = await employeeWithPassword(f, 'correct test password', 'admin');
+    ui = await openApp(f);
+    ui.window.addEventListener('error', event => errors.push(String(event.error?.stack || event.message)));
+    await submitLogin(ui, username, 'correct test password', () => ui.app.state.user && ui.doc.querySelector('#login-view').classList.contains('hidden'));
+    const views = Object.keys(ui.app.VIEW_ROUTES);
+    assert.ok(views.length >= 15, 'found ' + views.length + ' views');
+    for (const view of views) {
+      await ui.app.switchView(view);
+      await new Promise(resolve => setTimeout(resolve, 60));
+    }
+    assert.deepEqual(errors, []);
+  } finally {
+    process.off('unhandledRejection', onRejection);
+    if (ui) await closeApp(ui);
+    await f.close();
+  }
 });
