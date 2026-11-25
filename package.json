@@ -11,6 +11,7 @@
     "db:create": "wrangler d1 create helpdesk-db",
     "db:migrate:local": "wrangler d1 migrations apply helpdesk-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply helpdesk-db --remote",
+    "db:backup": "node scripts/backup.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "npm run typecheck && node --check public/app.js && node --check public/notifications.js && node --check public/assistant-data.js && node --check public/glossary-data.js && node --check public/training.js && node --check public/command-match.js && node --check public/training-data.js && node --check public/training-diagrams.js && npm test"
   },

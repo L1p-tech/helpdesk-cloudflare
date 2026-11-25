@@ -81,3 +81,16 @@ test('invalid password update cannot partially change profile fields', async () 
     assert.deepEqual(await f.db.prepare('SELECT display_name FROM users WHERE id=?1').bind(user.id).first(),before);
   } finally { await f.close(); }
 });
+
+test('login is blocked per IP after 20 failures, also for unknown usernames', async () => {
+  const f=await fixture();
+  try {
+    for (let i=0;i<20;i++) {
+      const r=await f.request(null,'/api/auth/login','POST',{username:'gibt-es-nicht-'+i,password:'wrong test password'});
+      assert.equal(r.status,401);
+    }
+    const blocked=await f.request(null,'/api/auth/login','POST',{username:'gibt-es-nicht',password:'wrong test password'});
+    assert.equal(blocked.status,429); assert.match(blocked.body.error,/Adresse/);
+    assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM login_attempts').first()).n,20);
+  } finally { await f.close(); }
+});

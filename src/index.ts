@@ -340,6 +340,9 @@ async function createInitialAdmin(request: Request, env: Env): Promise<Response>
   return json({ ok: true }, { status: 201 });
 }
 
+const LOGIN_IP_MAX_FAILURES = 20;
+const LOGIN_IP_WINDOW_MINUTES = 15;
+
 async function handleAuth(
   request: Request,
   env: Env,
@@ -352,12 +355,34 @@ async function handleAuth(
 
   if (path === "/api/auth/login" && request.method === "POST") {
     const body = await readJson<Record<string, unknown>>(request);
-    const result = await login(
-      request,
-      env,
-      requiredString(body.username, "Benutzername", 40),
-      requiredString(body.password, "Passwort", 200),
-    );
+    const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+    const recent = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM login_attempts
+       WHERE ip = ?1 AND attempted_at > datetime('now', '-' || ?2 || ' minutes')`,
+    )
+      .bind(ip, LOGIN_IP_WINDOW_MINUTES)
+      .first<{ n: number }>();
+    if ((recent?.n ?? 0) >= LOGIN_IP_MAX_FAILURES) {
+      throw new HttpError(429, "Zu viele Fehlversuche von dieser Adresse. Bitte später erneut versuchen.");
+    }
+
+    let result;
+    try {
+      result = await login(
+        request,
+        env,
+        requiredString(body.username, "Benutzername", 40),
+        requiredString(body.password, "Passwort", 200),
+      );
+    } catch (error) {
+      if (error instanceof HttpError && (error.status === 401 || error.status === 429)) {
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-1 day')"),
+          env.DB.prepare("INSERT INTO login_attempts (ip) VALUES (?1)").bind(ip),
+        ]);
+      }
+      throw error;
+    }
 
     await audit(env, result.user.id, "login", "session", null);
     return json(
